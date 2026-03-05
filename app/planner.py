@@ -10,7 +10,6 @@ def generate_weekly_grocery_list():
     grocery = {}
 
     with get_session() as session:
-        # Get all weekly plans
         weekly = session.exec(select(WeeklyPlan)).all()
 
         for plan in weekly:
@@ -18,7 +17,6 @@ def generate_weekly_grocery_list():
             if not meal_id:
                 continue
 
-            # Get all ingredients for this meal
             links = session.exec(
                 select(MealIngredient).where(MealIngredient.meal_id == meal_id)
             ).all()
@@ -26,8 +24,9 @@ def generate_weekly_grocery_list():
             for link in links:
                 ingredient = session.get(Ingredient, link.ingredient_id)
                 if ingredient.name not in grocery:
-                    grocery[ingredient.name] = link.qty
+                    grocery[ingredient.name] = f"{link.qty} {ingredient.unit}"
                 else:
-                    grocery[ingredient.name] += link.qty
+                    # merge quantities as string for now
+                    grocery[ingredient.name] = f"{int(grocery[ingredient.name].split()[0]) + link.qty} {ingredient.unit}"
 
     return grocery
