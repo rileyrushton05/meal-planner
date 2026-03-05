@@ -37,3 +37,8 @@ class GroceryItem(SQLModel, table=True):
     desired_qty: Optional[float] = None
     unit: Optional[str] = None
     bought: bool = False
+
+class WeeklyPlan(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    day_of_week: str = Field(index=True)
+    meal_id: Optional[int] = Field(default=None, foreign_key="meal.id")
