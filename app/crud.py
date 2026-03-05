@@ -37,17 +37,14 @@ def get_ingredients():
     
 def set_meal_for_day(day: str, meal_id: int):
     with get_session() as session:
-
-        existing = session.exec(
-            select(WeeklyPlan).where(WeeklyPlan.day_of_week == day)
+        plan = session.exec(
+            select(WeeklyPlan).where(WeeklyPlan.day_of_week == day)  
         ).first()
-
-        if existing:
-            existing.meal_id = meal_id
+        if plan:
+            plan.meal_id = meal_id
         else:
-            plan = WeeklyPlan(day_of_week=day, meal_id=meal_id)
+            plan = WeeklyPlan(day_of_week=day, meal_id=meal_id) 
             session.add(plan)
-
         session.commit()
 
 def get_weekly_plan():
