@@ -2,6 +2,7 @@ from sqlmodel import select
 from app.db import get_session
 from app.models import Meal, Ingredient
 from app.models import WeeklyPlan
+from app.models import MealIngredient
 
 
 def add_meal(name: str, servings: int = 1):
@@ -28,6 +29,17 @@ def add_ingredient(name: str):
         session.refresh(ingredient)
         return ingredient
 
+def add_ingredient_to_meal(meal_id: int, ingredient_name: str, qty: float, unit: str):
+    with get_session() as session:
+        # check if ingredient exists
+        ingredient = session.exec(select(Ingredient).where(Ingredient.name == ingredient_name)).first()
+        if not ingredient:
+            ingredient = add_ingredient(ingredient_name)
+        
+        # link to meal
+        link = MealIngredient(meal_id=meal_id, ingredient_id=ingredient.id, qty=qty, unit=unit)
+        session.add(link)
+        session.commit()
 
 def get_ingredients():
     with get_session() as session:
