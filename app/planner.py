@@ -22,11 +22,19 @@ def generate_weekly_grocery_list():
             ).all()
 
             for link in links:
-                ingredient = session.get(Ingredient, link.ingredient_id)
-                if ingredient.name not in grocery:
-                    grocery[ingredient.name] = f"{link.qty} {ingredient.unit}"
-                else:
-                    # merge quantities as string for now
-                    grocery[ingredient.name] = f"{int(grocery[ingredient.name].split()[0]) + link.qty} {ingredient.unit}"
+                name = session.get(Ingredient, link.ingredient_id).name
+                unit = link.unit if link.unit else ""
+                qty = link.qty if link.qty else 0
 
-    return grocery
+                if name not in grocery:
+                    grocery[name] = {"qty": qty, "unit": unit}
+                else:
+                    # merge quantities if unit matches
+                    if grocery[name]["unit"] == unit:
+                        grocery[name]["qty"] += qty
+                    else:
+                        # simple fallback: keep as separate entries (advanced: normalize units)
+                        grocery[f"{name} ({unit})"] = {"qty": qty, "unit": unit}
+
+    # convert to display format
+    return {k: f'{v["qty"]} {v["unit"]}'.strip() for k,v in grocery.items()}
