@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 import pandas as pd
-from app.crud import add_meal, get_meals, set_meal_for_day
+from app.crud import add_meal, get_meals, set_meal_for_day, add_ingredient_to_meal
 from app.db import create_db_and_tables
 from app.planner import generate_weekly_grocery_list
 
@@ -22,6 +22,28 @@ if st.button("Add Meal"):
     add_meal(meal_name)
     st.success("Meal added!")
 
+# Add Ingredient Section
+st.header("Add Ingredient to Meal")
+
+meals = get_meals()
+
+if meals:
+    meal_names = {meal.name: meal.id for meal in meals}
+
+    selected_meal = st.selectbox(
+        "Select Meal",
+        list(meal_names.keys()),
+        key="ingredient_meal"
+    )
+
+    ingredient_name = st.text_input("Ingredient name")
+    qty = st.number_input("Quantity", min_value=0.0, step=1.0)
+    unit = st.text_input("Unit (g, ml, tbsp, etc)")
+
+    if st.button("Add Ingredient"):
+        meal_id = meal_names[selected_meal]
+        add_ingredient_to_meal(meal_id, ingredient_name, qty, unit)
+        st.success(f"{ingredient_name} added to {selected_meal}")
 
 # Assign Meals to Days Section
 st.header("Assign Meals to Days")
@@ -41,7 +63,6 @@ with st.form("weekly_plan_form"):
         for day, meal_name in day_to_meal.items():
             set_meal_for_day(day, meal_names[meal_name])
         st.success("Weekly plan saved!")
-
 
 # Weekly Grocery List Section 
 st.header("Weekly Grocery List")
