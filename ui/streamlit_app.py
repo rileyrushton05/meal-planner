@@ -5,7 +5,16 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 import pandas as pd
-from app.crud import add_meal, get_meals, set_meal_for_day, add_ingredient_to_meal, get_weekly_plan
+from app.crud import (
+    add_meal,
+    get_meals,
+    set_meal_for_day,
+    add_ingredient_to_meal,
+    get_weekly_plan,
+    delete_meal,
+    get_meal_ingredients,
+    remove_ingredient_from_meal,
+)
 from app.db import create_db_and_tables
 from app.planner import generate_weekly_grocery_list
 
@@ -27,6 +36,20 @@ if st.button("Add Meal"):
             st.error(str(e))
     else:
         st.error("Please enter a meal name.")
+
+# Manage Meals Section
+st.header("Manage Meals")
+
+existing_meals = get_meals()
+if existing_meals:
+    for meal in existing_meals:
+        col1, col2 = st.columns([4, 1])
+        col1.write(f"**{meal.name}** (serves {meal.servings})")
+        if col2.button("Delete", key=f"delete_meal_{meal.id}"):
+            delete_meal(meal.id)
+            st.rerun()
+else:
+    st.caption("No meals yet.")
 
 # Add Ingredient Section
 st.header("Add Ingredient to Meal")
@@ -56,6 +79,18 @@ if meals:
                 st.success(f"{ingredient_name} added to {selected_meal}")
             except ValueError as e:
                 st.error(str(e))
+
+    st.subheader(f"Ingredients in {selected_meal}")
+    current_ingredients = get_meal_ingredients(meal_names[selected_meal])
+    if current_ingredients:
+        for link, ingredient in current_ingredients:
+            c1, c2 = st.columns([4, 1])
+            c1.write(f"{ingredient.name}: {link.qty or 0} {link.unit or ''}".strip())
+            if c2.button("Remove", key=f"remove_ing_{meal_names[selected_meal]}_{ingredient.id}"):
+                remove_ingredient_from_meal(meal_names[selected_meal], ingredient.id)
+                st.rerun()
+    else:
+        st.caption("No ingredients added yet.")
 
 # Assign Meals to Days Section
 st.header("Assign Meals to Days")

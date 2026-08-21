@@ -73,6 +73,48 @@ def add_ingredient_to_meal(meal_id: int, ingredient_name: str, qty: float, unit:
 
         session.commit()
 
+def delete_meal(meal_id: int):
+    with get_session() as session:
+        meal = session.get(Meal, meal_id)
+        if not meal:
+            return
+
+        links = session.exec(
+            select(MealIngredient).where(MealIngredient.meal_id == meal_id)
+        ).all()
+        for link in links:
+            session.delete(link)
+
+        plans = session.exec(
+            select(WeeklyPlan).where(WeeklyPlan.meal_id == meal_id)
+        ).all()
+        for plan in plans:
+            plan.meal_id = None
+
+        session.delete(meal)
+        session.commit()
+
+def get_meal_ingredients(meal_id: int):
+    with get_session() as session:
+        statement = (
+            select(MealIngredient, Ingredient)
+            .where(MealIngredient.meal_id == meal_id)
+            .where(MealIngredient.ingredient_id == Ingredient.id)
+        )
+        return session.exec(statement).all()
+
+def remove_ingredient_from_meal(meal_id: int, ingredient_id: int):
+    with get_session() as session:
+        link = session.exec(
+            select(MealIngredient).where(
+                MealIngredient.meal_id == meal_id,
+                MealIngredient.ingredient_id == ingredient_id
+            )
+        ).first()
+        if link:
+            session.delete(link)
+            session.commit()
+
 def set_meal_for_day(day: str, meal_id: int):
     with get_session() as session:
         plan = session.exec(
