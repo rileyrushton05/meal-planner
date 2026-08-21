@@ -13,6 +13,8 @@ from app.crud import (
     delete_meal,
     get_meal_ingredients,
     remove_ingredient_from_meal,
+    update_meal,
+    update_meal_ingredient,
 )
 from app.db import create_db_and_tables
 from app.planner import generate_weekly_grocery_list
@@ -289,6 +291,28 @@ with tab_meals:
                 if c2.button("Delete", key=f"delete_meal_{meal.id}", help=f"Delete {meal.name}"):
                     delete_meal(meal.id)
                     st.rerun()
+
+                with st.expander("Edit"):
+                    edit_col_name, edit_col_servings = st.columns([4, 1])
+                    with edit_col_name:
+                        edited_name = st.text_input(
+                            "Meal name", value=meal.name, key=f"edit_name_{meal.id}"
+                        )
+                    with edit_col_servings:
+                        edited_servings = st.number_input(
+                            "Servings", min_value=1, step=1, value=meal.servings,
+                            key=f"edit_servings_{meal.id}"
+                        )
+                    if st.button("Save", key=f"save_meal_{meal.id}"):
+                        if edited_name.strip():
+                            try:
+                                update_meal(meal.id, edited_name.strip(), int(edited_servings))
+                                st.success("Meal updated!")
+                                st.rerun()
+                            except ValueError as e:
+                                st.error(str(e))
+                        else:
+                            st.error("Please enter a meal name.")
     else:
         st.info("No meals yet — add your first one above!")
 
@@ -328,6 +352,24 @@ with tab_meals:
                     if c2.button("Remove", key=f"remove_ing_{meal_id}_{ingredient.id}"):
                         remove_ingredient_from_meal(meal_id, ingredient.id)
                         st.rerun()
+
+                    with st.expander("Edit"):
+                        edit_col_qty, edit_col_unit = st.columns(2)
+                        with edit_col_qty:
+                            edited_qty = st.number_input(
+                                "Quantity", min_value=0.0, step=1.0,
+                                value=float(link.qty or 0),
+                                key=f"edit_qty_{meal_id}_{ingredient.id}"
+                            )
+                        with edit_col_unit:
+                            edited_unit = st.text_input(
+                                "Unit", value=link.unit or "",
+                                key=f"edit_unit_{meal_id}_{ingredient.id}"
+                            )
+                        if st.button("Save", key=f"save_ing_{meal_id}_{ingredient.id}"):
+                            update_meal_ingredient(meal_id, ingredient.id, edited_qty, edited_unit.strip())
+                            st.success("Ingredient updated!")
+                            st.rerun()
         else:
             st.caption("No ingredients added yet.")
     else:

@@ -73,6 +73,36 @@ def add_ingredient_to_meal(meal_id: int, ingredient_name: str, qty: float, unit:
 
         session.commit()
 
+def update_meal(meal_id: int, name: str, servings: int):
+    with get_session() as session:
+        meal = session.get(Meal, meal_id)
+        if not meal:
+            return
+
+        if name != meal.name:
+            existing = session.exec(
+                select(Meal).where(Meal.name == name, Meal.id != meal_id)
+            ).first()
+            if existing:
+                raise ValueError(f"A meal named '{name}' already exists.")
+
+        meal.name = name
+        meal.servings = servings
+        session.commit()
+
+def update_meal_ingredient(meal_id: int, ingredient_id: int, qty: float, unit: str):
+    with get_session() as session:
+        link = session.exec(
+            select(MealIngredient).where(
+                MealIngredient.meal_id == meal_id,
+                MealIngredient.ingredient_id == ingredient_id
+            )
+        ).first()
+        if link:
+            link.qty = qty
+            link.unit = unit
+            session.commit()
+
 def delete_meal(meal_id: int):
     with get_session() as session:
         meal = session.get(Meal, meal_id)

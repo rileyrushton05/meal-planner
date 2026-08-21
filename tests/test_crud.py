@@ -8,6 +8,8 @@ from app.crud import (
     add_ingredient_to_meal,
     get_meal_ingredients,
     remove_ingredient_from_meal,
+    update_meal,
+    update_meal_ingredient,
     delete_meal,
     set_meal_for_day,
     get_weekly_plan,
@@ -109,3 +111,43 @@ def test_set_meal_for_day_updates_existing_day_instead_of_duplicating():
     plans = [p for p in get_weekly_plan() if p.day_of_week == "Monday"]
     assert len(plans) == 1
     assert plans[0].meal_id == meal_b.id
+
+
+def test_update_meal_changes_name_and_servings():
+    meal = add_meal("Spaghetti", servings=1)
+
+    update_meal(meal.id, "Spaghetti Bolognese", 4)
+
+    updated = get_meals()[0]
+    assert updated.name == "Spaghetti Bolognese"
+    assert updated.servings == 4
+
+
+def test_update_meal_rejects_renaming_to_an_existing_meal_name():
+    meal_a = add_meal("Spaghetti")
+    meal_b = add_meal("Chicken Stir Fry")
+
+    with pytest.raises(ValueError):
+        update_meal(meal_b.id, "Spaghetti", meal_b.servings)
+
+    assert get_meals()[1].name == "Chicken Stir Fry"
+
+
+def test_update_meal_allows_keeping_the_same_name():
+    meal = add_meal("Spaghetti", servings=1)
+
+    update_meal(meal.id, "Spaghetti", 2)
+
+    assert get_meals()[0].servings == 2
+
+
+def test_update_meal_ingredient_changes_quantity_and_unit():
+    meal = add_meal("Spaghetti")
+    add_ingredient_to_meal(meal.id, "Pasta", 200, "g")
+    ingredient_id = get_meal_ingredients(meal.id)[0][1].id
+
+    update_meal_ingredient(meal.id, ingredient_id, 500, "kg")
+
+    link, _ = get_meal_ingredients(meal.id)[0]
+    assert link.qty == 500
+    assert link.unit == "kg"
