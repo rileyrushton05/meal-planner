@@ -7,6 +7,7 @@ def generate_weekly_grocery_list():
     Reads all meals assigned to days, collects ingredients,
     merges duplicates, and returns a dictionary {ingredient_name: total_qty}
     """
+    # accumulate by (name, unit) so no combination is ever overwritten
     grocery = {}
 
     with get_session() as session:
@@ -26,15 +27,18 @@ def generate_weekly_grocery_list():
                 unit = link.unit if link.unit else ""
                 qty = link.qty if link.qty else 0
 
-                if name not in grocery:
-                    grocery[name] = {"qty": qty, "unit": unit}
-                else:
-                    # merge quantities if unit matches
-                    if grocery[name]["unit"] == unit:
-                        grocery[name]["qty"] += qty
-                    else:
-                        # simple fallback: keep as separate entries (advanced: normalize units)
-                        grocery[f"{name} ({unit})"] = {"qty": qty, "unit": unit}
+                key = (name, unit)
+                grocery[key] = grocery.get(key, 0) + qty
 
-    # convert to display format
-    return {k: f'{v["qty"]} {v["unit"]}'.strip() for k,v in grocery.items()}
+    # only disambiguate with the unit when an ingredient has more than
+    # one unit variant across the week's meals
+    name_counts = {}
+    for name, unit in grocery:
+        name_counts[name] = name_counts.get(name, 0) + 1
+
+    result = {}
+    for (name, unit), qty in grocery.items():
+        label = name if name_counts[name] == 1 else f"{name} ({unit})"
+        result[label] = f"{qty} {unit}".strip()
+
+    return result

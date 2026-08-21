@@ -107,12 +107,14 @@ else:
 st.header("Weekly Grocery List")
 
 if st.button("Generate Grocery List"):
-    grocery = generate_weekly_grocery_list()
-    if grocery:
-        df = pd.DataFrame([
-            {"Ingredient": k, "Quantity": v}
-            for k, v in grocery.items()
-        ])
-        st.table(df)
-    else:
-        st.info("No meals assigned this week yet!")
+    st.session_state["grocery_list"] = generate_weekly_grocery_list()
+
+grocery = st.session_state.get("grocery_list")
+if grocery:
+    df = pd.DataFrame([
+        {"Ingredient": k, "Quantity": v}
+        for k, v in grocery.items()
+    ])
+    st.table(df)
+elif grocery is not None:
+    st.info("No meals assigned this week yet!")
