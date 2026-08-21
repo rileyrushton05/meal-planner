@@ -13,13 +13,17 @@ def add_meal(name: str, servings: int = 1):
         session.refresh(meal)
         return meal
 
-
 def get_meals():
     with get_session() as session:
         statement = select(Meal)
         meals = session.exec(statement).all()
         return meals
 
+def get_ingredients():
+    with get_session() as session:
+        statement = select(Ingredient)
+        ingredients = session.exec(statement).all()
+        return ingredients
 
 def add_ingredient(name: str):
     with get_session() as session:
@@ -36,17 +40,27 @@ def add_ingredient_to_meal(meal_id: int, ingredient_name: str, qty: float, unit:
         if not ingredient:
             ingredient = add_ingredient(ingredient_name)
         
-        # link to meal
-        link = MealIngredient(meal_id=meal_id, ingredient_id=ingredient.id, qty=qty, unit=unit)
-        session.add(link)
+        # check if this meal already has the ingredient
+        existing_link = session.exec(
+            select(MealIngredient).where(
+                MealIngredient.meal_id == meal_id,
+                MealIngredient.ingredient_id == ingredient.id
+            )
+        ).first()
+
+        if existing_link:
+            existing_link.qty += qty
+        else:
+            link = MealIngredient(
+                meal_id=meal_id,
+                ingredient_id=ingredient.id,
+                qty=qty,
+                unit=unit
+            )
+            session.add(link)
+
         session.commit()
 
-def get_ingredients():
-    with get_session() as session:
-        statement = select(Ingredient)
-        ingredients = session.exec(statement).all()
-        return ingredients
-    
 def set_meal_for_day(day: str, meal_id: int):
     with get_session() as session:
         plan = session.exec(
