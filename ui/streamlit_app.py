@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
 import pandas as pd
-from app.crud import add_meal, get_meals, set_meal_for_day, add_ingredient_to_meal
+from app.crud import add_meal, get_meals, set_meal_for_day, add_ingredient_to_meal, get_weekly_plan
 from app.db import create_db_and_tables
 from app.planner import generate_weekly_grocery_list
 
@@ -63,6 +63,30 @@ with st.form("weekly_plan_form"):
         for day, meal_name in day_to_meal.items():
             set_meal_for_day(day, meal_names[meal_name])
         st.success("Weekly plan saved!")
+
+# Weekly Schedule
+st.header("Weekly Schedule")
+
+plans = get_weekly_plan()
+
+if plans:
+
+    schedule = []
+
+    meal_lookup = {meal.id: meal.name for meal in get_meals()}
+
+    for plan in plans:
+        schedule.append({
+            "Day": plan.day_of_week,
+            "Meal": meal_lookup.get(plan.meal_id, "None")
+        })
+
+    df = pd.DataFrame(schedule)
+
+    st.table(df)
+
+else:
+    st.info("No meals assigned yet.")
 
 # Weekly Grocery List Section 
 st.header("Weekly Grocery List")
