@@ -2,11 +2,15 @@
 
 A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**. Add meals, attach ingredients with quantities, assign meals to days of the week, and automatically generate a consolidated grocery list for the week.
 
+## Live demo
+
+[**meal-planner-riley.streamlit.app**](https://meal-planner-riley.streamlit.app/) — hosted free on Streamlit Community Cloud. Free-tier apps sleep after 12 hours with no traffic; if you land on a "wake up" screen, click through it and the app restarts within a few seconds. Data resets on each cold start, since the free tier's filesystem isn't persistent — this is a UI demo, not a place to keep a real meal plan long-term.
+
 ## Features
 
-- **Meal management** — create meals with a name and serving size.
-- **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.). Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it.
-- **Weekly scheduling** — assign one meal to each day of the week (Monday–Sunday) via a simple form.
+- **Meal management** — create meals with a name and serving size, delete them when no longer needed.
+- **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), and remove individual ingredients from a meal. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it.
+- **Weekly scheduling** — assign one meal to each day of the week (Monday–Sunday) via a simple form, shown as a color-coded day-by-day view.
 - **Grocery list generation** — walks the week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list.
 
 ## Tech stack
@@ -14,7 +18,6 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 - **[Streamlit](https://streamlit.io/)** — the web UI, run directly from a Python script.
 - **[SQLModel](https://sqlmodel.tiangolo.com/)** — ORM layer combining SQLAlchemy and Pydantic for the data models and queries.
 - **SQLite** — file-based database (via Python's built-in `sqlite3`), stored at `data/data.db`.
-- **[pandas](https://pandas.pydata.org/)** — used to shape query results into tables for display in the UI.
 
 ## Project structure
 
@@ -22,11 +25,13 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 meal-planner/
 ├── app/
 │   ├── db.py         # SQLite engine/session setup, table creation
-│   ├── models.py     # SQLModel table definitions (Meal, Ingredient, MealIngredient, WeeklyPlan, GroceryItem)
-│   ├── crud.py        # Create/read helpers for meals, ingredients, and the weekly plan
+│   ├── models.py     # SQLModel table definitions (Meal, Ingredient, MealIngredient, WeeklyPlan)
+│   ├── crud.py        # Create/read/delete helpers for meals, ingredients, and the weekly plan
 │   └── planner.py     # Aggregates the week's meals into a merged grocery list
 ├── ui/
 │   └── streamlit_app.py  # Streamlit front end — wires the UI to the CRUD/planner functions
+├── .streamlit/
+│   └── config.toml      # Dark color theme (background, accent, fonts)
 ├── data/
 │   └── data.db         # SQLite database file (created automatically on first run)
 ├── init_db.py          # Standalone script to create the database and tables
@@ -40,7 +45,6 @@ meal-planner/
 - **Ingredient** — `id`, `name`.
 - **MealIngredient** — join table linking a `Meal` to an `Ingredient`, with a `qty` and `unit` for that pairing (many-to-many with extra fields).
 - **WeeklyPlan** — maps a `day_of_week` to a `meal_id`, one row per day.
-- **GroceryItem** — standalone model for a shopping list entry (`name`, `desired_qty`, `unit`, `bought`), separate from the generated weekly grocery list.
 
 ## Setup
 
@@ -73,9 +77,9 @@ This opens the app in your browser (typically at `http://localhost:8501`). The S
 
 ## Usage
 
-1. **Add Meal** — enter a name and click "Add Meal".
-2. **Add Ingredient to Meal** — pick a meal, then enter an ingredient name, quantity, and unit.
-3. **Assign Meals to Days** — select a meal for each day of the week and submit the form.
-4. **Weekly Schedule** — view the current day-to-meal assignments in a table.
-5. **Generate Grocery List** — click the button to compute and display the combined ingredient list for everything scheduled that week.
+The app is organized into three tabs:
+
+1. **Meals** — add a meal by name, delete meals you no longer need, and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be removed from a meal without deleting the whole meal.
+2. **Weekly Plan** — assign one meal to each day of the week and save the plan; the current week is shown as a color-coded card per day.
+3. **Grocery List** — generate a combined shopping list from everything assigned that week, with quantities merged across meals that share the same ingredient and unit.
 
