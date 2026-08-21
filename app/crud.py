@@ -49,7 +49,13 @@ def add_ingredient_to_meal(meal_id: int, ingredient_name: str, qty: float, unit:
         ).first()
 
         if existing_link:
-            existing_link.qty += qty
+            if existing_link.unit != unit:
+                raise ValueError(
+                    f"{ingredient_name} is already on this meal measured in "
+                    f"'{existing_link.unit}'. Use the same unit to add more, "
+                    f"or remove the existing entry first."
+                )
+            existing_link.qty = (existing_link.qty or 0) + qty
         else:
             link = MealIngredient(
                 meal_id=meal_id,

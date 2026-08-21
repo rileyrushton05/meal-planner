@@ -42,8 +42,11 @@ if meals:
 
     if st.button("Add Ingredient"):
         meal_id = meal_names[selected_meal]
-        add_ingredient_to_meal(meal_id, ingredient_name, qty, unit)
-        st.success(f"{ingredient_name} added to {selected_meal}")
+        try:
+            add_ingredient_to_meal(meal_id, ingredient_name, qty, unit)
+            st.success(f"{ingredient_name} added to {selected_meal}")
+        except ValueError as e:
+            st.error(str(e))
 
 # Assign Meals to Days Section
 st.header("Assign Meals to Days")
