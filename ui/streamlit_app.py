@@ -19,8 +19,11 @@ st.header("Add Meal")
 meal_name = st.text_input("Meal name")
 
 if st.button("Add Meal"):
-    add_meal(meal_name)
-    st.success("Meal added!")
+    if meal_name.strip():
+        add_meal(meal_name.strip())
+        st.success("Meal added!")
+    else:
+        st.error("Please enter a meal name.")
 
 # Add Ingredient Section
 st.header("Add Ingredient to Meal")
@@ -41,12 +44,15 @@ if meals:
     unit = st.text_input("Unit (g, ml, tbsp, etc)")
 
     if st.button("Add Ingredient"):
-        meal_id = meal_names[selected_meal]
-        try:
-            add_ingredient_to_meal(meal_id, ingredient_name, qty, unit)
-            st.success(f"{ingredient_name} added to {selected_meal}")
-        except ValueError as e:
-            st.error(str(e))
+        if not ingredient_name.strip():
+            st.error("Please enter an ingredient name.")
+        else:
+            meal_id = meal_names[selected_meal]
+            try:
+                add_ingredient_to_meal(meal_id, ingredient_name.strip(), qty, unit)
+                st.success(f"{ingredient_name} added to {selected_meal}")
+            except ValueError as e:
+                st.error(str(e))
 
 # Assign Meals to Days Section
 st.header("Assign Meals to Days")
@@ -55,17 +61,20 @@ meals = get_meals()
 meal_names = {meal.name: meal.id for meal in meals}
 days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-with st.form("weekly_plan_form"):
-    day_to_meal = {}
-    for day in days:
-        selected = st.selectbox(day, list(meal_names.keys()), key=day)
-        day_to_meal[day] = selected
+if meal_names:
+    with st.form("weekly_plan_form"):
+        day_to_meal = {}
+        for day in days:
+            selected = st.selectbox(day, list(meal_names.keys()), key=day)
+            day_to_meal[day] = selected
 
-    submitted = st.form_submit_button("Set Weekly Plan")
-    if submitted:
-        for day, meal_name in day_to_meal.items():
-            set_meal_for_day(day, meal_names[meal_name])
-        st.success("Weekly plan saved!")
+        submitted = st.form_submit_button("Set Weekly Plan")
+        if submitted:
+            for day, meal_name in day_to_meal.items():
+                set_meal_for_day(day, meal_names[meal_name])
+            st.success("Weekly plan saved!")
+else:
+    st.info("Add a meal first before assigning it to days.")
 
 # Weekly Schedule
 st.header("Weekly Schedule")
