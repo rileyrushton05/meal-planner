@@ -263,12 +263,16 @@ tab_meals, tab_plan, tab_grocery = st.tabs(["Meals", "Weekly Plan", "Grocery Lis
 with tab_meals:
     st.subheader("Add a Meal")
     with st.form("add_meal_form", clear_on_submit=True):
-        meal_name = st.text_input("Meal name")
+        col_name, col_servings = st.columns([4, 1])
+        with col_name:
+            meal_name = st.text_input("Meal name")
+        with col_servings:
+            servings = st.number_input("Servings", min_value=1, step=1, value=1)
         submitted_meal = st.form_submit_button("Add Meal", type="primary")
         if submitted_meal:
             if meal_name.strip():
                 try:
-                    add_meal(meal_name.strip())
+                    add_meal(meal_name.strip(), servings=int(servings))
                     st.success(f"Added {meal_name.strip()}!")
                 except ValueError as e:
                     st.error(str(e))
