@@ -40,5 +40,5 @@ class GroceryItem(SQLModel, table=True):
 
 class WeeklyPlan(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    day_of_week: str = Field(index=True)
+    day_of_week: str = Field(index=True, unique=True)
     meal_id: Optional[int] = Field(default=None, foreign_key="meal.id")

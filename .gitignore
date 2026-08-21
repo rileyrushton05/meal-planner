@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.venv/
+
+# Database
+data/
+
+# Editor/OS
+.DS_Store
+.vscode/
