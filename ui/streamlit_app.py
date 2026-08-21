@@ -20,8 +20,11 @@ meal_name = st.text_input("Meal name")
 
 if st.button("Add Meal"):
     if meal_name.strip():
-        add_meal(meal_name.strip())
-        st.success("Meal added!")
+        try:
+            add_meal(meal_name.strip())
+            st.success("Meal added!")
+        except ValueError as e:
+            st.error(str(e))
     else:
         st.error("Please enter a meal name.")
 

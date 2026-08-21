@@ -7,6 +7,12 @@ from app.models import MealIngredient
 
 def add_meal(name: str, servings: int = 1):
     with get_session() as session:
+        existing = session.exec(
+            select(Meal).where(Meal.name == name)
+        ).first()
+        if existing:
+            raise ValueError(f"A meal named '{name}' already exists.")
+
         meal = Meal(name=name, servings=servings)
         session.add(meal)
         session.commit()
