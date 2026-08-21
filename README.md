@@ -1,5 +1,7 @@
 # Meal Planner
 
+[![Tests](https://github.com/rileyrushton05/meal-planner/actions/workflows/tests.yml/badge.svg)](https://github.com/rileyrushton05/meal-planner/actions/workflows/tests.yml)
+
 A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**. Add meals, attach ingredients with quantities, assign meals to days of the week, and automatically generate a consolidated grocery list for the week.
 
 ## Live demo
