@@ -34,8 +34,10 @@ meal-planner/
 │   └── config.toml      # Dark color theme (background, accent, fonts)
 ├── data/
 │   └── data.db         # SQLite database file (created automatically on first run)
+├── tests/               # pytest suite for crud.py and planner.py, isolated from data/data.db
 ├── init_db.py          # Standalone script to create the database and tables
 ├── requirements.txt
+├── requirements-dev.txt # Adds pytest for running the test suite
 └── README.md
 ```
 
@@ -74,6 +76,15 @@ streamlit run ui/streamlit_app.py
 ```
 
 This opens the app in your browser (typically at `http://localhost:8501`). The SQLite database and tables are created automatically on first run at `data/data.db`.
+
+## Running tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The suite runs against a temporary SQLite database created per test, never `data/data.db`.
 
 ## Usage
 

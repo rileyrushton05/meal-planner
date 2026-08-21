@@ -1,0 +1,63 @@
+from app.crud import add_meal, add_ingredient_to_meal, set_meal_for_day
+from app.planner import generate_weekly_grocery_list
+
+
+def test_empty_plan_produces_empty_list():
+    assert generate_weekly_grocery_list() == {}
+
+
+def test_single_day_single_ingredient():
+    meal = add_meal("Spaghetti")
+    add_ingredient_to_meal(meal.id, "Pasta", 200, "g")
+    set_meal_for_day("Monday", meal.id)
+
+    assert generate_weekly_grocery_list() == {"Pasta": "200.0 g"}
+
+
+def test_same_meal_on_multiple_days_sums_quantities():
+    meal = add_meal("Spaghetti")
+    add_ingredient_to_meal(meal.id, "Pasta", 200, "g")
+    set_meal_for_day("Monday", meal.id)
+    set_meal_for_day("Thursday", meal.id)
+
+    assert generate_weekly_grocery_list() == {"Pasta": "400.0 g"}
+
+
+def test_matching_unit_across_meals_merges_into_one_entry():
+    meal_a = add_meal("Spaghetti")
+    meal_b = add_meal("Garlic Bread")
+    add_ingredient_to_meal(meal_a.id, "Butter", 20, "g")
+    add_ingredient_to_meal(meal_b.id, "Butter", 30, "g")
+    set_meal_for_day("Monday", meal_a.id)
+    set_meal_for_day("Tuesday", meal_b.id)
+
+    assert generate_weekly_grocery_list() == {"Butter": "50.0 g"}
+
+
+def test_three_different_units_are_all_kept_not_overwritten():
+    meal_a = add_meal("Meal A")
+    meal_b = add_meal("Meal B")
+    meal_c = add_meal("Meal C")
+    add_ingredient_to_meal(meal_a.id, "Milk", 200, "ml")
+    add_ingredient_to_meal(meal_b.id, "Milk", 1, "cup")
+    add_ingredient_to_meal(meal_c.id, "Milk", 2, "L")
+    set_meal_for_day("Monday", meal_a.id)
+    set_meal_for_day("Tuesday", meal_b.id)
+    set_meal_for_day("Wednesday", meal_c.id)
+
+    result = generate_weekly_grocery_list()
+
+    assert result == {
+        "Milk (ml)": "200.0 ml",
+        "Milk (cup)": "1.0 cup",
+        "Milk (L)": "2.0 L",
+    }
+
+
+def test_unassigned_day_is_ignored():
+    meal = add_meal("Spaghetti")
+    add_ingredient_to_meal(meal.id, "Pasta", 200, "g")
+    set_meal_for_day("Monday", meal.id)
+    set_meal_for_day("Tuesday", None)
+
+    assert generate_weekly_grocery_list() == {"Pasta": "200.0 g"}
