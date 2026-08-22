@@ -20,6 +20,12 @@ def add_meal(name: str, servings: int = 1):
         session.refresh(meal)
         return meal
 
+def add_meal_from_template(template: dict):
+    meal = add_meal(template["name"], servings=template["servings"])
+    for ingredient_name, qty, unit in template["ingredients"]:
+        add_ingredient_to_meal(meal.id, ingredient_name, qty, unit)
+    return meal
+
 def get_meals():
     with get_session() as session:
         statement = select(Meal)

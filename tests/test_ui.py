@@ -3,6 +3,7 @@ from datetime import timedelta
 from streamlit.testing.v1 import AppTest
 
 from app.crud import get_meals, get_meal_ingredients
+from app.templates import MEAL_TEMPLATES
 
 
 def _submit_key(at, tab_index, form_name):
@@ -21,12 +22,34 @@ def _add_meal(at, name, servings=None):
     at.tabs[0].button(key=_submit_key(at, 0, "add_meal_form")).click().run()
 
 
+def _seed_ingredient_searchbox(at, value):
+    """AppTest has no way to drive the st_searchbox custom component's
+    actual typing/selection interaction (it isn't part of AppTest's
+    supported widget set). Instead this pre-seeds the component's own
+    session_state entry with the value it would return after a
+    selection - a white-box technique based on reading the library's
+    source, verified to work, but it only covers the Python-side
+    handling of the returned value, not the real search/render/select
+    behavior in a browser."""
+    generation = (
+        at.session_state["ingredient_searchbox_generation"]
+        if "ingredient_searchbox_generation" in at.session_state else 0
+    )
+    key = f"ingredient_searchbox_{generation}"
+    at.session_state[key] = {
+        "result": value,
+        "search": value,
+        "options_js": [],
+        "options_py": [],
+        "key_react": f"{key}_react_0",
+    }
+
+
 def _add_ingredient(at, meal_name, ingredient_name, qty, unit):
     at.tabs[0].selectbox(key="ingredient_meal").select(meal_name).run()
-    name_w = [w for w in at.tabs[0].text_input if w.label == "Ingredient name"][0]
+    _seed_ingredient_searchbox(at, ingredient_name)
     qty_w = [w for w in at.tabs[0].number_input if w.label == "Quantity"][0]
     unit_w = [w for w in at.tabs[0].text_input if w.label == "Unit (g, ml, tbsp...)"][0]
-    name_w.input(ingredient_name)
     qty_w.set_value(qty)
     unit_w.input(unit)
     at.run()
@@ -210,3 +233,32 @@ def test_grocery_list_export_text_and_download_are_available():
     text_areas = list(at.tabs[2].text_area)
     assert len(text_areas) == 1
     assert "- Pasta: 200.0 g" in text_areas[0].value
+
+
+def test_add_meal_from_template_creates_meal_and_ingredients():
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+
+    template = MEAL_TEMPLATES[0]
+    at.tabs[0].button(key=f"template_{template['name']}").click().run()
+
+    assert len(at.exception) == 0
+    assert any(f"Added {template['name']}" in s.value for s in at.success)
+
+    meals = get_meals()
+    assert [m.name for m in meals] == [template["name"]]
+    saved_ingredients = {i.name for _, i in get_meal_ingredients(meals[0].id)}
+    assert saved_ingredients == {name for name, _, _ in template["ingredients"]}
+
+
+def test_add_meal_from_template_twice_warns_instead_of_duplicating():
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+
+    template = MEAL_TEMPLATES[0]
+    at.tabs[0].button(key=f"template_{template['name']}").click().run()
+    at.tabs[0].button(key=f"template_{template['name']}").click().run()
+
+    assert len(at.exception) == 0
+    assert any("already exists" in w.value for w in at.warning)
+    assert len(get_meals()) == 1

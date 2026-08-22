@@ -11,7 +11,8 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 ## Features
 
 - **Meal management** — create meals with a name and serving size, edit or delete them at any time. Deleting a meal asks for confirmation first, since it also removes its ingredient links and unassigns it from any planned day.
-- **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), edit or remove them individually. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it. Meal and ingredient names match case-insensitively, so "Eggs" and "eggs" are treated as the same thing rather than silently fragmenting into duplicates.
+- **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), edit or remove them individually. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it. Meal and ingredient names match case-insensitively, so "Eggs" and "eggs" are treated as the same thing rather than silently fragmenting into duplicates. The ingredient name field is a live-search autocomplete over ingredients you've already used, so re-entering a staple doesn't mean retyping it.
+- **Quick-add meal templates** — a gallery of ~18 common meals (Spaghetti Bolognese, Tacos, Fried Rice, etc.) with typical ingredients already filled in, so staples don't have to be built from scratch every time.
 - **Weekly scheduling** — assign a meal (and, optionally, how many servings you're actually cooking) to each day of the week via a simple form, shown as a color-coded day-by-day view. Pick any week with the week selector — each week's plan is independent, so past and future weeks are never overwritten.
 - **Grocery list generation** — walks the selected week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list. Metric mass and volume units (mg/g/kg, ml/L) are converted to a common base unit before merging, so "200 g" and "0.5 kg" of the same ingredient combine into one line instead of two. Ingredient quantities scale automatically if a day's planned servings differ from the meal's base recipe size. The list can be copied from a text box or downloaded as a `.txt` file.
 
@@ -20,6 +21,7 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 - **[Streamlit](https://streamlit.io/)** — the web UI, run directly from a Python script.
 - **[SQLModel](https://sqlmodel.tiangolo.com/)** — ORM layer combining SQLAlchemy and Pydantic for the data models and queries.
 - **SQLite** — file-based database (via Python's built-in `sqlite3`), stored at `data/data.db`.
+- **[streamlit-searchbox](https://github.com/m-wrzr/streamlit-searchbox)** — a custom Streamlit component providing the live-search autocomplete on the ingredient name field.
 
 ## Project structure
 
@@ -29,7 +31,8 @@ meal-planner/
 │   ├── db.py         # SQLite engine/session setup, table creation
 │   ├── models.py     # SQLModel table definitions (Meal, Ingredient, MealIngredient, WeeklyPlan)
 │   ├── crud.py        # Create/read/delete helpers for meals, ingredients, and the weekly plan
-│   └── planner.py     # Aggregates the week's meals into a merged grocery list
+│   ├── planner.py     # Aggregates the week's meals into a merged grocery list
+│   └── templates.py   # Starter meal data for the Quick Add gallery
 ├── ui/
 │   └── streamlit_app.py  # Streamlit front end — wires the UI to the CRUD/planner functions
 ├── .streamlit/
@@ -92,7 +95,7 @@ The suite runs against a temporary SQLite database created per test, never `data
 
 A week selector at the top applies to the Weekly Plan and Grocery List tabs — pick any date and it navigates to that date's Monday–Sunday week. The app is organized into three tabs:
 
-1. **Meals** — add a meal by name, edit or delete meals (delete asks for confirmation), and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be edited or removed without deleting the whole meal.
+1. **Meals** — add a meal by name, or one-click a starter from "Quick Add from Templates." Edit or delete meals (delete asks for confirmation), and attach ingredients (with quantity and unit) to a selected meal — the ingredient name field autocompletes from ingredients you've used before. Individual ingredients can be edited or removed without deleting the whole meal.
 2. **Weekly Plan** — assign a meal and its planned servings to each day of the selected week (or leave a day unset) and save the plan; the week is shown as a color-coded card per day. Switching weeks doesn't lose any other week's plan. "Copy previous week's plan" carries the prior week's assignments forward instead of re-picking all 7 days from scratch.
 3. **Grocery List** — generate a combined shopping list from everything assigned that week, with quantities merged across meals that share the same ingredient/unit and scaled for each day's planned servings. Copy it from the text box or download it as a `.txt` file.
 
