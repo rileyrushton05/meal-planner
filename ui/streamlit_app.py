@@ -389,14 +389,18 @@ with tab_meals:
 
         col_a, col_b, col_c = st.columns([2, 1, 1])
         with col_a:
-            ingredient_name = st_searchbox(
+            generation = st.session_state["ingredient_searchbox_generation"]
+            picked_ingredient = st_searchbox(
                 _search_ingredients,
-                placeholder="Search or type a new ingredient...",
-                label="Ingredient name",
+                placeholder="Pick an existing ingredient...",
+                label="Existing ingredient",
                 default="",
-                default_use_searchterm=True,
-                key=f"ingredient_searchbox_{st.session_state['ingredient_searchbox_generation']}",
+                key=f"ingredient_searchbox_{generation}",
             )
+            new_ingredient_name = st.text_input(
+                "...or type a new one", key=f"new_ingredient_name_{generation}"
+            )
+            ingredient_name = new_ingredient_name.strip() or (picked_ingredient or "").strip()
         with col_b:
             qty = st.number_input("Quantity", min_value=0.0, step=1.0)
         with col_c:

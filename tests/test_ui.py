@@ -46,10 +46,13 @@ def _seed_ingredient_searchbox(at, value):
 
 
 def _add_ingredient(at, meal_name, ingredient_name, qty, unit):
+    """Adds an ingredient via the plain 'type a new one' text field -
+    the guaranteed-reliable path, and the one most tests should use."""
     at.tabs[0].selectbox(key="ingredient_meal").select(meal_name).run()
-    _seed_ingredient_searchbox(at, ingredient_name)
+    name_w = [w for w in at.tabs[0].text_input if w.label == "...or type a new one"][0]
     qty_w = [w for w in at.tabs[0].number_input if w.label == "Quantity"][0]
     unit_w = [w for w in at.tabs[0].text_input if w.label == "Unit (g, ml, tbsp...)"][0]
+    name_w.input(ingredient_name)
     qty_w.set_value(qty)
     unit_w.input(unit)
     at.run()
@@ -85,6 +88,55 @@ def test_add_ingredient_shows_success_and_appears_in_list():
     assert len(at.exception) == 0
     assert any("Pasta added" in s.value for s in at.success)
     assert any("Pasta — 200.0 g" in m.value for m in at.tabs[0].markdown)
+
+
+def test_add_ingredient_not_in_autocomplete_still_works():
+    """Regression test: the ingredient name field used to be a single
+    searchbox relying on typed-but-not-selected text being captured
+    via default_use_searchterm. That could only be verified by faking
+    the component's return value in a test, and turned out not to
+    hold up in real use - typing something with no existing match
+    (e.g. "Bread" on a fresh app) couldn't actually be added. Fixed
+    by splitting into a searchbox for picking an existing ingredient
+    and a separate plain text field for typing a new one; this test
+    exercises the new-ingredient field specifically."""
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+    _add_meal(at, "Sandwich")
+
+    _add_ingredient(at, "Sandwich", "Bread", 4, "slices")
+
+    assert len(at.exception) == 0
+    assert any("Bread added" in s.value for s in at.success)
+    assert any("Bread — 4.0 slices" in m.value for m in at.tabs[0].markdown)
+
+
+def test_add_ingredient_via_searchbox_reuses_existing_ingredient():
+    """Covers the other half of the ingredient field: picking an
+    existing ingredient through the searchbox. Since AppTest can't
+    drive the component's real search/select interaction, this seeds
+    its session_state with the value a selection would produce (see
+    _seed_ingredient_searchbox) - verifies the Python-side handling,
+    not the actual browser interaction."""
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+    _add_meal(at, "Spaghetti")
+    _add_meal(at, "Garlic Bread")
+    _add_ingredient(at, "Spaghetti", "Garlic", 2, "cloves")
+
+    at.tabs[0].selectbox(key="ingredient_meal").select("Garlic Bread").run()
+    _seed_ingredient_searchbox(at, "Garlic")
+    qty_w = [w for w in at.tabs[0].number_input if w.label == "Quantity"][0]
+    unit_w = [w for w in at.tabs[0].text_input if w.label == "Unit (g, ml, tbsp...)"][0]
+    qty_w.set_value(1)
+    unit_w.input("clove")
+    at.run()
+    at.tabs[0].button(key="add_ingredient_btn").click().run()
+
+    assert len(at.exception) == 0
+    assert any("Garlic added" in s.value for s in at.success)
+    from app.crud import get_ingredients
+    assert [i.name for i in get_ingredients()] == ["Garlic"]
 
 
 def test_edit_meal_shows_success_message():
