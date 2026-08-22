@@ -317,12 +317,15 @@ with tab_meals:
                         if edited_name.strip():
                             try:
                                 update_meal(meal.id, edited_name.strip(), int(edited_servings))
-                                st.success("Meal updated!")
+                                st.session_state[f"meal_updated_{meal.id}"] = True
                                 st.rerun()
                             except ValueError as e:
                                 st.error(str(e))
                         else:
                             st.error("Please enter a meal name.")
+
+                    if st.session_state.pop(f"meal_updated_{meal.id}", False):
+                        st.success("Meal updated!")
     else:
         st.info("No meals yet — add your first one above!")
 
@@ -378,8 +381,11 @@ with tab_meals:
                             )
                         if st.button("Save", key=f"save_ing_{meal_id}_{ingredient.id}"):
                             update_meal_ingredient(meal_id, ingredient.id, edited_qty, edited_unit.strip())
-                            st.success("Ingredient updated!")
+                            st.session_state[f"ing_updated_{meal_id}_{ingredient.id}"] = True
                             st.rerun()
+
+                        if st.session_state.pop(f"ing_updated_{meal_id}_{ingredient.id}", False):
+                            st.success("Ingredient updated!")
         else:
             st.caption("No ingredients added yet.")
     else:
@@ -392,14 +398,30 @@ with tab_plan:
     meals = get_meals()
     meal_names = {meal.name: meal.id for meal in meals}
 
-    existing_plans = get_weekly_plan(selected_monday)
-    existing_by_day = {p.day_of_week: p.meal_id for p in existing_plans}
-    meal_id_to_name = {meal.id: meal.name for meal in meals}
-
     if meal_names:
+        previous_monday = selected_monday - timedelta(days=7)
+        if st.button("Copy previous week's plan"):
+            previous_plans = get_weekly_plan(previous_monday)
+            if previous_plans:
+                for p in previous_plans:
+                    if p.meal_id:
+                        set_meal_for_day(selected_monday, p.day_of_week, p.meal_id)
+                st.session_state["copy_plan_success"] = True
+                st.rerun()
+            else:
+                st.info(f"No plan found for the week of {previous_monday.strftime('%b %d, %Y')}.")
+
+        if st.session_state.pop("copy_plan_success", False):
+            st.success("Copied last week's plan!")
+
+        UNSET = "— Unset —"
+        existing_plans = get_weekly_plan(selected_monday)
+        existing_by_day = {p.day_of_week: p.meal_id for p in existing_plans}
+        meal_id_to_name = {meal.id: meal.name for meal in meals}
+
         with st.form("weekly_plan_form"):
             day_to_meal = {}
-            meal_option_list = list(meal_names.keys())
+            meal_option_list = [UNSET] + list(meal_names.keys())
             for day in DAYS:
                 current_name = meal_id_to_name.get(existing_by_day.get(day))
                 default_index = (
@@ -415,7 +437,8 @@ with tab_plan:
             submitted = st.form_submit_button("Set Weekly Plan", type="primary")
             if submitted:
                 for day, meal_name in day_to_meal.items():
-                    set_meal_for_day(selected_monday, day, meal_names[meal_name])
+                    meal_id = meal_names.get(meal_name)
+                    set_meal_for_day(selected_monday, day, meal_id)
                 st.success("Weekly plan saved!")
     else:
         st.info("Add a meal first before assigning it to days.")
