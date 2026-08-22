@@ -105,13 +105,20 @@ def test_edit_ingredient_shows_success_message():
     assert any("Pasta — 500.0" in m.value for m in at.tabs[0].markdown)
 
 
-def test_delete_meal_removes_it_from_list():
+def test_delete_meal_requires_confirmation():
     at = AppTest.from_file("ui/streamlit_app.py")
     at.run()
     _add_meal(at, "Spaghetti")
     meal_id = get_meals()[0].id
 
     at.tabs[0].button(key=f"delete_meal_{meal_id}").click().run()
+    assert get_meals() != []  # clicking Delete only asks for confirmation
+
+    at.tabs[0].button(key=f"cancel_delete_{meal_id}").click().run()
+    assert get_meals() != []  # Cancel must not delete
+
+    at.tabs[0].button(key=f"delete_meal_{meal_id}").click().run()
+    at.tabs[0].button(key=f"confirm_delete_{meal_id}").click().run()
 
     assert len(at.exception) == 0
     assert get_meals() == []
@@ -158,3 +165,48 @@ def test_copy_previous_week_plan_shows_success_and_copies_assignments():
     day_cards = [m.value for m in at.tabs[1].markdown if "day-card" in m.value]
     monday_card = [c for c in day_cards if "Mon" in c][0]
     assert "Spaghetti" in monday_card
+
+
+def test_planned_servings_scale_the_grocery_list():
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+    _add_meal(at, "Spaghetti", servings=4)
+    _add_ingredient(at, "Spaghetti", "Pasta", 400, "g")
+
+    monday_key = [w.key for w in at.tabs[1].selectbox if w.key and w.key.endswith("_Monday")][0]
+    servings_key = [
+        w.key for w in at.tabs[1].number_input
+        if w.key and w.key.endswith("_Monday") and "servings" in w.key
+    ][0]
+    at.tabs[1].selectbox(key=monday_key).select("Spaghetti")
+    at.tabs[1].number_input(key=servings_key).set_value(2)
+    at.run()
+    at.tabs[1].button(key=_submit_key(at, 1, "weekly_plan_form")).click().run()
+
+    day_cards = [m.value for m in at.tabs[1].markdown if "day-card" in m.value]
+    monday_card = [c for c in day_cards if "Mon" in c][0]
+    assert "2 servings" in monday_card
+
+    at.tabs[2].button(key=[w.key for w in at.tabs[2].button][0]).click().run()
+
+    assert len(at.exception) == 0
+    assert any("200.0 g" in m.value for m in at.tabs[2].markdown if "grocery-row" in m.value)
+
+
+def test_grocery_list_export_text_and_download_are_available():
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+    _add_meal(at, "Spaghetti")
+    _add_ingredient(at, "Spaghetti", "Pasta", 200, "g")
+
+    monday_key = [w.key for w in at.tabs[1].selectbox if w.key and w.key.endswith("_Monday")][0]
+    at.tabs[1].selectbox(key=monday_key).select("Spaghetti")
+    at.run()
+    at.tabs[1].button(key=_submit_key(at, 1, "weekly_plan_form")).click().run()
+
+    at.tabs[2].button(key=[w.key for w in at.tabs[2].button][0]).click().run()
+
+    assert len(at.exception) == 0
+    text_areas = list(at.tabs[2].text_area)
+    assert len(text_areas) == 1
+    assert "- Pasta: 200.0 g" in text_areas[0].value

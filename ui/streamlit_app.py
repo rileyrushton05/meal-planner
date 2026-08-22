@@ -298,9 +298,25 @@ with tab_meals:
             with st.container(border=True):
                 c1, c2 = st.columns([5, 1])
                 c1.markdown(f"**{meal.name}**  \n:gray[serves {meal.servings}]")
-                if c2.button("Delete", key=f"delete_meal_{meal.id}", help=f"Delete {meal.name}"):
-                    delete_meal(meal.id)
-                    st.rerun()
+
+                pending_delete_key = f"pending_delete_{meal.id}"
+                if not st.session_state.get(pending_delete_key):
+                    if c2.button("Delete", key=f"delete_meal_{meal.id}", help=f"Delete {meal.name}"):
+                        st.session_state[pending_delete_key] = True
+                        st.rerun()
+                else:
+                    st.warning(
+                        f"Delete **{meal.name}**? This also removes its ingredients "
+                        f"and unassigns it from any day it's currently planned on."
+                    )
+                    col_cancel, col_confirm = st.columns(2)
+                    if col_cancel.button("Cancel", key=f"cancel_delete_{meal.id}"):
+                        st.session_state[pending_delete_key] = False
+                        st.rerun()
+                    if col_confirm.button("Yes, delete", key=f"confirm_delete_{meal.id}", type="primary"):
+                        delete_meal(meal.id)
+                        st.session_state.pop(pending_delete_key, None)
+                        st.rerun()
 
                 with st.expander("Edit"):
                     edit_col_name, edit_col_servings = st.columns([4, 1])
@@ -417,28 +433,46 @@ with tab_plan:
         UNSET = "— Unset —"
         existing_plans = get_weekly_plan(selected_monday)
         existing_by_day = {p.day_of_week: p.meal_id for p in existing_plans}
+        existing_servings_by_day = {p.day_of_week: p.servings for p in existing_plans}
         meal_id_to_name = {meal.id: meal.name for meal in meals}
+        meal_id_to_servings = {meal.id: meal.servings for meal in meals}
 
         with st.form("weekly_plan_form"):
             day_to_meal = {}
+            day_to_servings = {}
             meal_option_list = [UNSET] + list(meal_names.keys())
             for day in DAYS:
-                current_name = meal_id_to_name.get(existing_by_day.get(day))
+                current_meal_id = existing_by_day.get(day)
+                current_name = meal_id_to_name.get(current_meal_id)
                 default_index = (
                     meal_option_list.index(current_name)
                     if current_name in meal_option_list else 0
                 )
-                selected = st.selectbox(
-                    day, meal_option_list, index=default_index,
-                    key=f"plan_{selected_monday}_{day}"
+                default_servings = (
+                    existing_servings_by_day.get(day)
+                    or meal_id_to_servings.get(current_meal_id)
+                    or 1
                 )
+                col_day, col_servings = st.columns([3, 1])
+                with col_day:
+                    selected = st.selectbox(
+                        day, meal_option_list, index=default_index,
+                        key=f"plan_{selected_monday}_{day}"
+                    )
+                with col_servings:
+                    day_servings = st.number_input(
+                        "Servings", min_value=1, step=1, value=int(default_servings),
+                        key=f"plan_servings_{selected_monday}_{day}"
+                    )
                 day_to_meal[day] = selected
+                day_to_servings[day] = day_servings
 
             submitted = st.form_submit_button("Set Weekly Plan", type="primary")
             if submitted:
                 for day, meal_name in day_to_meal.items():
                     meal_id = meal_names.get(meal_name)
-                    set_meal_for_day(selected_monday, day, meal_id)
+                    servings = day_to_servings[day] if meal_id else None
+                    set_meal_for_day(selected_monday, day, meal_id, servings)
                 st.success("Weekly plan saved!")
     else:
         st.info("Add a meal first before assigning it to days.")
@@ -450,16 +484,21 @@ with tab_plan:
     if plans:
         meal_lookup = {meal.id: meal.name for meal in get_meals()}
         plan_lookup = {p.day_of_week: p.meal_id for p in plans}
+        servings_lookup = {p.day_of_week: p.servings for p in plans}
 
         cols = st.columns(7)
         for col, day in zip(cols, DAYS):
-            meal_for_day = meal_lookup.get(plan_lookup.get(day), "—")
+            meal_id_for_day = plan_lookup.get(day)
+            meal_for_day = meal_lookup.get(meal_id_for_day, "—")
+            servings_for_day = servings_lookup.get(day)
+            detail = f"{servings_for_day} serving{'s' if servings_for_day != 1 else ''}" if meal_id_for_day and servings_for_day else ""
             color = DAY_COLORS[day]
             col.markdown(
                 f"""
                 <div class="day-card" style="background-color:{color};">
                     <div class="day-name">{day[:3]}</div>
                     <div class="meal-name">{meal_for_day}</div>
+                    <div class="day-name">{detail}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -487,5 +526,14 @@ with tab_grocery:
                 """,
                 unsafe_allow_html=True,
             )
+
+        grocery_text = "\n".join(f"- {ingredient}: {amount}" for ingredient, amount in grocery.items())
+        st.text_area("Copy your list", value=grocery_text, height=150)
+        st.download_button(
+            "Download as .txt",
+            data=grocery_text,
+            file_name=f"grocery-list-{selected_monday}.txt",
+            mime="text/plain",
+        )
     elif grocery is not None:
         st.info("No meals assigned this week yet!")

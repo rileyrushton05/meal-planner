@@ -41,3 +41,7 @@ class WeeklyPlan(SQLModel, table=True):
     week_start_date: date = Field(index=True)
     day_of_week: str = Field(index=True)
     meal_id: Optional[int] = Field(default=None, foreign_key="meal.id")
+    # Servings actually planned for this day, which may differ from the
+    # meal's own base servings (e.g. cooking a serves-4 recipe for 2
+    # people). None means "use the meal's base servings unscaled".
+    servings: Optional[int] = None

@@ -1,6 +1,6 @@
 from sqlmodel import select
 from app.db import get_session
-from app.models import WeeklyPlan, MealIngredient, Ingredient
+from app.models import WeeklyPlan, MealIngredient, Ingredient, Meal
 
 # Unambiguous unit conversions, normalized to a base unit per family, so
 # e.g. "200 g" and "0.5 kg" of the same ingredient merge into one grocery
@@ -43,13 +43,18 @@ def generate_weekly_grocery_list(week_start_date):
             if not meal_id:
                 continue
 
+            meal = session.get(Meal, meal_id)
+            scale = 1
+            if plan.servings and meal.servings:
+                scale = plan.servings / meal.servings
+
             links = session.exec(
                 select(MealIngredient).where(MealIngredient.meal_id == meal_id)
             ).all()
 
             for link in links:
                 name = session.get(Ingredient, link.ingredient_id).name
-                qty, unit = _normalize_unit(link.qty if link.qty else 0, link.unit)
+                qty, unit = _normalize_unit((link.qty if link.qty else 0) * scale, link.unit)
 
                 key = (name, unit)
                 grocery[key] = grocery.get(key, 0) + qty

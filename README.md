@@ -10,10 +10,10 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 
 ## Features
 
-- **Meal management** — create meals with a name and serving size, edit or delete them at any time.
+- **Meal management** — create meals with a name and serving size, edit or delete them at any time. Deleting a meal asks for confirmation first, since it also removes its ingredient links and unassigns it from any planned day.
 - **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), edit or remove them individually. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it. Meal and ingredient names match case-insensitively, so "Eggs" and "eggs" are treated as the same thing rather than silently fragmenting into duplicates.
-- **Weekly scheduling** — assign one meal to each day of the week (Monday–Sunday) via a simple form, shown as a color-coded day-by-day view. Pick any week with the week selector — each week's plan is independent, so past and future weeks are never overwritten.
-- **Grocery list generation** — walks the selected week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list. Metric mass and volume units (mg/g/kg, ml/L) are converted to a common base unit before merging, so "200 g" and "0.5 kg" of the same ingredient combine into one line instead of two.
+- **Weekly scheduling** — assign a meal (and, optionally, how many servings you're actually cooking) to each day of the week via a simple form, shown as a color-coded day-by-day view. Pick any week with the week selector — each week's plan is independent, so past and future weeks are never overwritten.
+- **Grocery list generation** — walks the selected week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list. Metric mass and volume units (mg/g/kg, ml/L) are converted to a common base unit before merging, so "200 g" and "0.5 kg" of the same ingredient combine into one line instead of two. Ingredient quantities scale automatically if a day's planned servings differ from the meal's base recipe size. The list can be copied from a text box or downloaded as a `.txt` file.
 
 ## Tech stack
 
@@ -48,7 +48,7 @@ meal-planner/
 - **Meal** — `id`, `name`, `servings`, `created_at`.
 - **Ingredient** — `id`, `name`.
 - **MealIngredient** — join table linking a `Meal` to an `Ingredient`, with a `qty` and `unit` for that pairing (many-to-many with extra fields).
-- **WeeklyPlan** — maps a `(week_start_date, day_of_week)` pair to a `meal_id`, one row per day per week, so different weeks never overwrite each other.
+- **WeeklyPlan** — maps a `(week_start_date, day_of_week)` pair to a `meal_id` and an optional planned `servings` count, one row per day per week, so different weeks never overwrite each other.
 
 ## Setup
 
@@ -92,7 +92,7 @@ The suite runs against a temporary SQLite database created per test, never `data
 
 A week selector at the top applies to the Weekly Plan and Grocery List tabs — pick any date and it navigates to that date's Monday–Sunday week. The app is organized into three tabs:
 
-1. **Meals** — add a meal by name, edit or delete meals, and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be edited or removed without deleting the whole meal.
-2. **Weekly Plan** — assign a meal to each day of the selected week (or leave a day unset) and save the plan; the week is shown as a color-coded card per day. Switching weeks doesn't lose any other week's plan. "Copy previous week's plan" carries the prior week's assignments forward instead of re-picking all 7 days from scratch.
-3. **Grocery List** — generate a combined shopping list from everything assigned that week, with quantities merged across meals that share the same ingredient and unit.
+1. **Meals** — add a meal by name, edit or delete meals (delete asks for confirmation), and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be edited or removed without deleting the whole meal.
+2. **Weekly Plan** — assign a meal and its planned servings to each day of the selected week (or leave a day unset) and save the plan; the week is shown as a color-coded card per day. Switching weeks doesn't lose any other week's plan. "Copy previous week's plan" carries the prior week's assignments forward instead of re-picking all 7 days from scratch.
+3. **Grocery List** — generate a combined shopping list from everything assigned that week, with quantities merged across meals that share the same ingredient/unit and scaled for each day's planned servings. Copy it from the text box or download it as a `.txt` file.
 

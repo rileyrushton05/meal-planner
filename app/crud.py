@@ -150,7 +150,7 @@ def remove_ingredient_from_meal(meal_id: int, ingredient_id: int):
             session.delete(link)
             session.commit()
 
-def set_meal_for_day(week_start_date, day: str, meal_id: int):
+def set_meal_for_day(week_start_date, day: str, meal_id: int, servings: int = None):
     with get_session() as session:
         plan = session.exec(
             select(WeeklyPlan).where(
@@ -160,8 +160,12 @@ def set_meal_for_day(week_start_date, day: str, meal_id: int):
         ).first()
         if plan:
             plan.meal_id = meal_id
+            plan.servings = servings
         else:
-            plan = WeeklyPlan(week_start_date=week_start_date, day_of_week=day, meal_id=meal_id)
+            plan = WeeklyPlan(
+                week_start_date=week_start_date, day_of_week=day,
+                meal_id=meal_id, servings=servings
+            )
             session.add(plan)
         session.commit()
 

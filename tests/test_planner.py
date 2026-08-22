@@ -86,6 +86,22 @@ def test_unit_case_is_normalized_even_when_not_convertible():
     assert generate_weekly_grocery_list(WEEK_1) == {"Sugar": "3.0 tbsp"}
 
 
+def test_planned_servings_scales_ingredient_quantities():
+    meal = add_meal("Spaghetti", servings=4)
+    add_ingredient_to_meal(meal.id, "Pasta", 400, "g")
+    set_meal_for_day(WEEK_1, "Monday", meal.id, servings=2)
+
+    assert generate_weekly_grocery_list(WEEK_1) == {"Pasta": "200.0 g"}
+
+
+def test_no_planned_servings_uses_recipe_quantity_unscaled():
+    meal = add_meal("Spaghetti", servings=4)
+    add_ingredient_to_meal(meal.id, "Pasta", 400, "g")
+    set_meal_for_day(WEEK_1, "Monday", meal.id)
+
+    assert generate_weekly_grocery_list(WEEK_1) == {"Pasta": "400.0 g"}
+
+
 def test_unassigned_day_is_ignored():
     meal = add_meal("Spaghetti")
     add_ingredient_to_meal(meal.id, "Pasta", 200, "g")
