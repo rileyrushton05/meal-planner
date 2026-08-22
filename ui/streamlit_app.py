@@ -409,6 +409,8 @@ with tab_meals:
         if st.button("Add Ingredient", key="add_ingredient_btn", type="primary"):
             if not (ingredient_name or "").strip():
                 st.error("Please enter an ingredient name.")
+            elif qty <= 0:
+                st.error("Please enter a quantity greater than 0.")
             else:
                 try:
                     add_ingredient_to_meal(meal_id, ingredient_name.strip(), qty, unit)
@@ -446,9 +448,12 @@ with tab_meals:
                                 key=f"edit_unit_{meal_id}_{ingredient.id}"
                             )
                         if st.button("Save", key=f"save_ing_{meal_id}_{ingredient.id}"):
-                            update_meal_ingredient(meal_id, ingredient.id, edited_qty, edited_unit.strip())
-                            st.session_state[f"ing_updated_{meal_id}_{ingredient.id}"] = True
-                            st.rerun()
+                            if edited_qty <= 0:
+                                st.error("Please enter a quantity greater than 0.")
+                            else:
+                                update_meal_ingredient(meal_id, ingredient.id, edited_qty, edited_unit.strip())
+                                st.session_state[f"ing_updated_{meal_id}_{ingredient.id}"] = True
+                                st.rerun()
 
                         if st.session_state.pop(f"ing_updated_{meal_id}_{ingredient.id}", False):
                             st.success("Ingredient updated!")

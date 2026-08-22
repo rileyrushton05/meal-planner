@@ -111,6 +111,21 @@ def test_add_ingredient_not_in_autocomplete_still_works():
     assert any("Bread — 4.0 slices" in m.value for m in at.tabs[0].markdown)
 
 
+def test_add_ingredient_rejects_zero_quantity():
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+    _add_meal(at, "Spaghetti")
+
+    name_w = [w for w in at.tabs[0].text_input if w.label == "...or type a new one"][0]
+    name_w.input("Pasta")
+    at.run()
+    at.tabs[0].button(key="add_ingredient_btn").click().run()
+
+    assert len(at.exception) == 0
+    assert any("quantity greater than 0" in e.value for e in at.tabs[0].error)
+    assert get_meal_ingredients(get_meals()[0].id) == []
+
+
 def test_add_ingredient_via_searchbox_reuses_existing_ingredient():
     """Covers the other half of the ingredient field: picking an
     existing ingredient through the searchbox. Since AppTest can't
@@ -178,6 +193,24 @@ def test_edit_ingredient_shows_success_message():
     assert len(at.exception) == 0
     assert any("Ingredient updated" in s.value for s in at.success)
     assert any("Pasta — 500.0" in m.value for m in at.tabs[0].markdown)
+
+
+def test_edit_ingredient_rejects_zero_quantity():
+    at = AppTest.from_file("ui/streamlit_app.py")
+    at.run()
+    _add_meal(at, "Spaghetti")
+    _add_ingredient(at, "Spaghetti", "Pasta", 200, "g")
+    meal_id = get_meals()[0].id
+    ingredient_id = get_meal_ingredients(meal_id)[0][1].id
+
+    at.tabs[0].number_input(key=f"edit_qty_{meal_id}_{ingredient_id}").set_value(0)
+    at.run()
+    at.tabs[0].button(key=f"save_ing_{meal_id}_{ingredient_id}").click().run()
+
+    assert len(at.exception) == 0
+    assert any("quantity greater than 0" in e.value for e in at.tabs[0].error)
+    link, _ = get_meal_ingredients(meal_id)[0]
+    assert link.qty == 200
 
 
 def test_delete_meal_requires_confirmation():
