@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlmodel import select
 from app.db import get_session
 from app.models import Meal, Ingredient
@@ -8,10 +9,10 @@ from app.models import MealIngredient
 def add_meal(name: str, servings: int = 1):
     with get_session() as session:
         existing = session.exec(
-            select(Meal).where(Meal.name == name)
+            select(Meal).where(func.lower(Meal.name) == name.lower())
         ).first()
         if existing:
-            raise ValueError(f"A meal named '{name}' already exists.")
+            raise ValueError(f"A meal named '{existing.name}' already exists.")
 
         meal = Meal(name=name, servings=servings)
         session.add(meal)
@@ -41,8 +42,12 @@ def add_ingredient(name: str):
 
 def add_ingredient_to_meal(meal_id: int, ingredient_name: str, qty: float, unit: str):
     with get_session() as session:
-        # check if ingredient exists
-        ingredient = session.exec(select(Ingredient).where(Ingredient.name == ingredient_name)).first()
+        # check if ingredient exists (case-insensitively, so "Eggs" and
+        # "eggs" reuse the same ingredient instead of fragmenting the
+        # grocery list into duplicate line items)
+        ingredient = session.exec(
+            select(Ingredient).where(func.lower(Ingredient.name) == ingredient_name.lower())
+        ).first()
         if not ingredient:
             ingredient = add_ingredient(ingredient_name)
         
@@ -79,12 +84,12 @@ def update_meal(meal_id: int, name: str, servings: int):
         if not meal:
             return
 
-        if name != meal.name:
+        if name.lower() != meal.name.lower():
             existing = session.exec(
-                select(Meal).where(Meal.name == name, Meal.id != meal_id)
+                select(Meal).where(func.lower(Meal.name) == name.lower(), Meal.id != meal_id)
             ).first()
             if existing:
-                raise ValueError(f"A meal named '{name}' already exists.")
+                raise ValueError(f"A meal named '{existing.name}' already exists.")
 
         meal.name = name
         meal.servings = servings
