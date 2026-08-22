@@ -2,6 +2,29 @@ from sqlmodel import select
 from app.db import get_session
 from app.models import WeeklyPlan, MealIngredient, Ingredient
 
+# Unambiguous unit conversions, normalized to a base unit per family, so
+# e.g. "200 g" and "0.5 kg" of the same ingredient merge into one grocery
+# line instead of two. Deliberately excludes tsp/tbsp/cup - their actual
+# size varies by region (an Australian metric cup is 250 ml, a US cup is
+# ~237 ml), so auto-converting them risks silently producing a wrong
+# quantity rather than just failing to merge.
+UNIT_CONVERSIONS = {
+    "mg": ("g", 0.001),
+    "g": ("g", 1),
+    "kg": ("g", 1000),
+    "ml": ("ml", 1),
+    "l": ("ml", 1000),
+}
+
+
+def _normalize_unit(qty, unit):
+    unit_key = (unit or "").strip().lower()
+    if unit_key in UNIT_CONVERSIONS:
+        base_unit, factor = UNIT_CONVERSIONS[unit_key]
+        return qty * factor, base_unit
+    return qty, unit_key
+
+
 def generate_weekly_grocery_list(week_start_date):
     """
     Reads all meals assigned to days in the given week, collects ingredients,
@@ -26,8 +49,7 @@ def generate_weekly_grocery_list(week_start_date):
 
             for link in links:
                 name = session.get(Ingredient, link.ingredient_id).name
-                unit = link.unit if link.unit else ""
-                qty = link.qty if link.qty else 0
+                qty, unit = _normalize_unit(link.qty if link.qty else 0, link.unit)
 
                 key = (name, unit)
                 grocery[key] = grocery.get(key, 0) + qty
