@@ -5,9 +5,12 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 import streamlit as st
+from streamlit_searchbox import st_searchbox
 from app.crud import (
     add_meal,
+    add_meal_from_template,
     get_meals,
+    get_ingredients,
     set_meal_for_day,
     add_ingredient_to_meal,
     get_weekly_plan,
@@ -19,6 +22,15 @@ from app.crud import (
 )
 from app.db import create_db_and_tables
 from app.planner import generate_weekly_grocery_list
+from app.templates import MEAL_TEMPLATES
+
+
+def _search_ingredients(searchterm: str):
+    names = [i.name for i in get_ingredients()]
+    if not searchterm:
+        return names
+    term = searchterm.lower()
+    return [n for n in names if term in n.lower()]
 
 create_db_and_tables()
 
@@ -291,6 +303,26 @@ with tab_meals:
             else:
                 st.error("Please enter a meal name.")
 
+    with st.expander("Quick Add from Templates"):
+        st.caption("One-click starter meals with typical ingredients already filled in.")
+        template_cols = st.columns(3)
+        for i, template in enumerate(MEAL_TEMPLATES):
+            with template_cols[i % 3]:
+                with st.container(border=True):
+                    st.markdown(f"**{template['name']}**  \n:gray[serves {template['servings']}]")
+                    ingredient_summary = ", ".join(name for name, _, _ in template["ingredients"])
+                    st.caption(ingredient_summary)
+                    if st.button("Add", key=f"template_{template['name']}"):
+                        try:
+                            add_meal_from_template(template)
+                            st.session_state["template_added_message"] = f"Added {template['name']}!"
+                            st.rerun()
+                        except ValueError as e:
+                            st.warning(str(e))
+
+        if "template_added_message" in st.session_state:
+            st.success(st.session_state.pop("template_added_message"))
+
     st.subheader("Your Meals")
     existing_meals = get_meals()
     if existing_meals:
@@ -353,23 +385,37 @@ with tab_meals:
         selected_meal = st.selectbox("Select Meal", list(meal_names.keys()), key="ingredient_meal")
         meal_id = meal_names[selected_meal]
 
+        st.session_state.setdefault("ingredient_searchbox_generation", 0)
+
         col_a, col_b, col_c = st.columns([2, 1, 1])
         with col_a:
-            ingredient_name = st.text_input("Ingredient name")
+            ingredient_name = st_searchbox(
+                _search_ingredients,
+                placeholder="Search or type a new ingredient...",
+                label="Ingredient name",
+                default="",
+                default_use_searchterm=True,
+                key=f"ingredient_searchbox_{st.session_state['ingredient_searchbox_generation']}",
+            )
         with col_b:
             qty = st.number_input("Quantity", min_value=0.0, step=1.0)
         with col_c:
             unit = st.text_input("Unit (g, ml, tbsp...)")
 
         if st.button("Add Ingredient", key="add_ingredient_btn", type="primary"):
-            if not ingredient_name.strip():
+            if not (ingredient_name or "").strip():
                 st.error("Please enter an ingredient name.")
             else:
                 try:
                     add_ingredient_to_meal(meal_id, ingredient_name.strip(), qty, unit)
-                    st.success(f"{ingredient_name} added to {selected_meal}")
+                    st.session_state["ingredient_added_message"] = f"{ingredient_name} added to {selected_meal}"
+                    st.session_state["ingredient_searchbox_generation"] += 1
+                    st.rerun()
                 except ValueError as e:
                     st.error(str(e))
+
+        if "ingredient_added_message" in st.session_state:
+            st.success(st.session_state.pop("ingredient_added_message"))
 
         current_ingredients = get_meal_ingredients(meal_id)
         if current_ingredients:
