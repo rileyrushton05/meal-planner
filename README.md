@@ -93,6 +93,6 @@ The suite runs against a temporary SQLite database created per test, never `data
 A week selector at the top applies to the Weekly Plan and Grocery List tabs — pick any date and it navigates to that date's Monday–Sunday week. The app is organized into three tabs:
 
 1. **Meals** — add a meal by name, edit or delete meals, and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be edited or removed without deleting the whole meal.
-2. **Weekly Plan** — assign one meal to each day of the selected week and save the plan; the week is shown as a color-coded card per day. Switching weeks doesn't lose any other week's plan.
+2. **Weekly Plan** — assign a meal to each day of the selected week (or leave a day unset) and save the plan; the week is shown as a color-coded card per day. Switching weeks doesn't lose any other week's plan. "Copy previous week's plan" carries the prior week's assignments forward instead of re-picking all 7 days from scratch.
 3. **Grocery List** — generate a combined shopping list from everything assigned that week, with quantities merged across meals that share the same ingredient and unit.
 
