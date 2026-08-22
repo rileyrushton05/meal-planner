@@ -1,6 +1,7 @@
+from sqlalchemy import UniqueConstraint
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, date, UTC
 
 
 class MealIngredient(SQLModel, table=True):
@@ -32,6 +33,11 @@ class Ingredient(SQLModel, table=True):
 
 
 class WeeklyPlan(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("week_start_date", "day_of_week", name="uq_weeklyplan_week_day"),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
-    day_of_week: str = Field(index=True, unique=True)
+    week_start_date: date = Field(index=True)
+    day_of_week: str = Field(index=True)
     meal_id: Optional[int] = Field(default=None, foreign_key="meal.id")
