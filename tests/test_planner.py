@@ -39,13 +39,13 @@ def test_matching_unit_across_meals_merges_into_one_entry():
     assert generate_weekly_grocery_list(WEEK_1) == {"Butter": "50.0 g"}
 
 
-def test_three_different_units_are_all_kept_not_overwritten():
+def test_units_outside_the_convertible_families_are_all_kept_not_overwritten():
     meal_a = add_meal("Meal A")
     meal_b = add_meal("Meal B")
     meal_c = add_meal("Meal C")
     add_ingredient_to_meal(meal_a.id, "Milk", 200, "ml")
     add_ingredient_to_meal(meal_b.id, "Milk", 1, "cup")
-    add_ingredient_to_meal(meal_c.id, "Milk", 2, "L")
+    add_ingredient_to_meal(meal_c.id, "Milk", 2, "tbsp")
     set_meal_for_day(WEEK_1, "Monday", meal_a.id)
     set_meal_for_day(WEEK_1, "Tuesday", meal_b.id)
     set_meal_for_day(WEEK_1, "Wednesday", meal_c.id)
@@ -55,8 +55,35 @@ def test_three_different_units_are_all_kept_not_overwritten():
     assert result == {
         "Milk (ml)": "200.0 ml",
         "Milk (cup)": "1.0 cup",
-        "Milk (L)": "2.0 L",
+        "Milk (tbsp)": "2.0 tbsp",
     }
+
+
+def test_convertible_units_merge_via_their_base_unit():
+    meal_a = add_meal("Meal A")
+    meal_b = add_meal("Meal B")
+    meal_c = add_meal("Meal C")
+    add_ingredient_to_meal(meal_a.id, "Milk", 200, "ml")
+    add_ingredient_to_meal(meal_b.id, "Milk", 2, "L")
+    add_ingredient_to_meal(meal_c.id, "Flour", 300, "g")
+    set_meal_for_day(WEEK_1, "Monday", meal_a.id)
+    set_meal_for_day(WEEK_1, "Tuesday", meal_b.id)
+    set_meal_for_day(WEEK_1, "Wednesday", meal_c.id)
+
+    result = generate_weekly_grocery_list(WEEK_1)
+
+    assert result == {"Milk": "2200.0 ml", "Flour": "300.0 g"}
+
+
+def test_unit_case_is_normalized_even_when_not_convertible():
+    meal_a = add_meal("Meal A")
+    meal_b = add_meal("Meal B")
+    add_ingredient_to_meal(meal_a.id, "Sugar", 1, "Tbsp")
+    add_ingredient_to_meal(meal_b.id, "Sugar", 2, "tbsp")
+    set_meal_for_day(WEEK_1, "Monday", meal_a.id)
+    set_meal_for_day(WEEK_1, "Tuesday", meal_b.id)
+
+    assert generate_weekly_grocery_list(WEEK_1) == {"Sugar": "3.0 tbsp"}
 
 
 def test_unassigned_day_is_ignored():

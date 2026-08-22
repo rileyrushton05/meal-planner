@@ -35,6 +35,25 @@ def test_add_meal_rejects_duplicate_name():
     assert len(get_meals()) == 1
 
 
+def test_add_meal_rejects_duplicate_name_case_insensitively():
+    add_meal("Spaghetti")
+
+    with pytest.raises(ValueError):
+        add_meal("spaghetti")
+
+    assert len(get_meals()) == 1
+
+
+def test_add_ingredient_to_meal_reuses_ingredient_regardless_of_case():
+    meal_a = add_meal("Spaghetti")
+    meal_b = add_meal("Garlic Bread")
+
+    add_ingredient_to_meal(meal_a.id, "Eggs", 2, "")
+    add_ingredient_to_meal(meal_b.id, "eggs", 3, "")
+
+    assert [i.name for i in get_ingredients()] == ["Eggs"]
+
+
 def test_add_ingredient_to_meal_creates_ingredient_and_link():
     meal = add_meal("Spaghetti")
 
@@ -158,6 +177,24 @@ def test_update_meal_allows_keeping_the_same_name():
     update_meal(meal.id, "Spaghetti", 2)
 
     assert get_meals()[0].servings == 2
+
+
+def test_update_meal_rejects_renaming_to_an_existing_name_case_insensitively():
+    meal_a = add_meal("Spaghetti")
+    meal_b = add_meal("Chicken Stir Fry")
+
+    with pytest.raises(ValueError):
+        update_meal(meal_b.id, "SPAGHETTI", meal_b.servings)
+
+    assert get_meals()[1].name == "Chicken Stir Fry"
+
+
+def test_update_meal_allows_changing_only_the_casing_of_its_own_name():
+    meal = add_meal("spaghetti", servings=1)
+
+    update_meal(meal.id, "Spaghetti", 1)
+
+    assert get_meals()[0].name == "Spaghetti"
 
 
 def test_update_meal_ingredient_changes_quantity_and_unit():
