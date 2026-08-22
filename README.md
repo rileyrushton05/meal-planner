@@ -11,9 +11,9 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 ## Features
 
 - **Meal management** — create meals with a name and serving size, edit or delete them at any time.
-- **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), edit or remove them individually. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it.
+- **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), edit or remove them individually. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it. Meal and ingredient names match case-insensitively, so "Eggs" and "eggs" are treated as the same thing rather than silently fragmenting into duplicates.
 - **Weekly scheduling** — assign one meal to each day of the week (Monday–Sunday) via a simple form, shown as a color-coded day-by-day view. Pick any week with the week selector — each week's plan is independent, so past and future weeks are never overwritten.
-- **Grocery list generation** — walks the selected week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list.
+- **Grocery list generation** — walks the selected week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list. Metric mass and volume units (mg/g/kg, ml/L) are converted to a common base unit before merging, so "200 g" and "0.5 kg" of the same ingredient combine into one line instead of two.
 
 ## Tech stack
 
