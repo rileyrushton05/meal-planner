@@ -145,20 +145,23 @@ def remove_ingredient_from_meal(meal_id: int, ingredient_id: int):
             session.delete(link)
             session.commit()
 
-def set_meal_for_day(day: str, meal_id: int):
+def set_meal_for_day(week_start_date, day: str, meal_id: int):
     with get_session() as session:
         plan = session.exec(
-            select(WeeklyPlan).where(WeeklyPlan.day_of_week == day)  
+            select(WeeklyPlan).where(
+                WeeklyPlan.week_start_date == week_start_date,
+                WeeklyPlan.day_of_week == day,
+            )
         ).first()
         if plan:
             plan.meal_id = meal_id
         else:
-            plan = WeeklyPlan(day_of_week=day, meal_id=meal_id) 
+            plan = WeeklyPlan(week_start_date=week_start_date, day_of_week=day, meal_id=meal_id)
             session.add(plan)
         session.commit()
 
-def get_weekly_plan():
+def get_weekly_plan(week_start_date):
     with get_session() as session:
-        statement = select(WeeklyPlan)
+        statement = select(WeeklyPlan).where(WeeklyPlan.week_start_date == week_start_date)
         plans = session.exec(statement).all()
         return plans

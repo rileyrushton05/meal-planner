@@ -1,4 +1,5 @@
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -259,6 +260,15 @@ st.markdown(
 st.title("Weekly Meal Planner")
 st.caption("Plan your meals, build your week, and generate your grocery list — all in one place.")
 
+today = date.today()
+default_monday = today - timedelta(days=today.weekday())
+picked_date = st.date_input("Week", value=default_monday, key="week_picker")
+selected_monday = picked_date - timedelta(days=picked_date.weekday())
+selected_sunday = selected_monday + timedelta(days=6)
+st.caption(
+    f"Viewing week of {selected_monday.strftime('%b %d')} – {selected_sunday.strftime('%b %d, %Y')}"
+)
+
 tab_meals, tab_plan, tab_grocery = st.tabs(["Meals", "Weekly Plan", "Grocery List"])
 
 # ---------------------------------------------------------------- Meals tab
@@ -382,25 +392,38 @@ with tab_plan:
     meals = get_meals()
     meal_names = {meal.name: meal.id for meal in meals}
 
+    existing_plans = get_weekly_plan(selected_monday)
+    existing_by_day = {p.day_of_week: p.meal_id for p in existing_plans}
+    meal_id_to_name = {meal.id: meal.name for meal in meals}
+
     if meal_names:
         with st.form("weekly_plan_form"):
             day_to_meal = {}
+            meal_option_list = list(meal_names.keys())
             for day in DAYS:
-                selected = st.selectbox(day, list(meal_names.keys()), key=day)
+                current_name = meal_id_to_name.get(existing_by_day.get(day))
+                default_index = (
+                    meal_option_list.index(current_name)
+                    if current_name in meal_option_list else 0
+                )
+                selected = st.selectbox(
+                    day, meal_option_list, index=default_index,
+                    key=f"plan_{selected_monday}_{day}"
+                )
                 day_to_meal[day] = selected
 
             submitted = st.form_submit_button("Set Weekly Plan", type="primary")
             if submitted:
                 for day, meal_name in day_to_meal.items():
-                    set_meal_for_day(day, meal_names[meal_name])
+                    set_meal_for_day(selected_monday, day, meal_names[meal_name])
                 st.success("Weekly plan saved!")
     else:
         st.info("Add a meal first before assigning it to days.")
 
     st.divider()
-    st.subheader("This Week")
+    st.subheader(f"Week of {selected_monday.strftime('%b %d, %Y')}")
 
-    plans = get_weekly_plan()
+    plans = get_weekly_plan(selected_monday)
     if plans:
         meal_lookup = {meal.id: meal.name for meal in get_meals()}
         plan_lookup = {p.day_of_week: p.meal_id for p in plans}
@@ -423,12 +446,13 @@ with tab_plan:
 
 # ------------------------------------------------------------- Grocery tab
 with tab_grocery:
-    st.subheader("Weekly Grocery List")
+    st.subheader(f"Grocery List — Week of {selected_monday.strftime('%b %d, %Y')}")
 
+    grocery_key = f"grocery_list_{selected_monday}"
     if st.button("Generate Grocery List", type="primary"):
-        st.session_state["grocery_list"] = generate_weekly_grocery_list()
+        st.session_state[grocery_key] = generate_weekly_grocery_list(selected_monday)
 
-    grocery = st.session_state.get("grocery_list")
+    grocery = st.session_state.get(grocery_key)
     if grocery:
         for ingredient, amount in grocery.items():
             st.markdown(

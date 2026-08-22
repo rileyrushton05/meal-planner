@@ -12,8 +12,8 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 
 - **Meal management** — create meals with a name and serving size, edit or delete them at any time.
 - **Ingredient tracking** — attach ingredients to a meal with a quantity and unit (g, ml, tbsp, etc.), edit or remove them individually. Adding the same ingredient to a meal again accumulates the quantity rather than duplicating it.
-- **Weekly scheduling** — assign one meal to each day of the week (Monday–Sunday) via a simple form, shown as a color-coded day-by-day view.
-- **Grocery list generation** — walks the week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list.
+- **Weekly scheduling** — assign one meal to each day of the week (Monday–Sunday) via a simple form, shown as a color-coded day-by-day view. Pick any week with the week selector — each week's plan is independent, so past and future weeks are never overwritten.
+- **Grocery list generation** — walks the selected week's assigned meals, pulls every linked ingredient, and merges quantities across meals that share the same ingredient and unit into a single shopping list.
 
 ## Tech stack
 
@@ -48,7 +48,7 @@ meal-planner/
 - **Meal** — `id`, `name`, `servings`, `created_at`.
 - **Ingredient** — `id`, `name`.
 - **MealIngredient** — join table linking a `Meal` to an `Ingredient`, with a `qty` and `unit` for that pairing (many-to-many with extra fields).
-- **WeeklyPlan** — maps a `day_of_week` to a `meal_id`, one row per day.
+- **WeeklyPlan** — maps a `(week_start_date, day_of_week)` pair to a `meal_id`, one row per day per week, so different weeks never overwrite each other.
 
 ## Setup
 
@@ -90,9 +90,9 @@ The suite runs against a temporary SQLite database created per test, never `data
 
 ## Usage
 
-The app is organized into three tabs:
+A week selector at the top applies to the Weekly Plan and Grocery List tabs — pick any date and it navigates to that date's Monday–Sunday week. The app is organized into three tabs:
 
-1. **Meals** — add a meal by name, delete meals you no longer need, and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be removed from a meal without deleting the whole meal.
-2. **Weekly Plan** — assign one meal to each day of the week and save the plan; the current week is shown as a color-coded card per day.
+1. **Meals** — add a meal by name, edit or delete meals, and attach ingredients (with quantity and unit) to a selected meal. Individual ingredients can be edited or removed without deleting the whole meal.
+2. **Weekly Plan** — assign one meal to each day of the selected week and save the plan; the week is shown as a color-coded card per day. Switching weeks doesn't lose any other week's plan.
 3. **Grocery List** — generate a combined shopping list from everything assigned that week, with quantities merged across meals that share the same ingredient and unit.
 

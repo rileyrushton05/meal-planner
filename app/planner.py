@@ -2,16 +2,18 @@ from sqlmodel import select
 from app.db import get_session
 from app.models import WeeklyPlan, MealIngredient, Ingredient
 
-def generate_weekly_grocery_list():
+def generate_weekly_grocery_list(week_start_date):
     """
-    Reads all meals assigned to days, collects ingredients,
+    Reads all meals assigned to days in the given week, collects ingredients,
     merges duplicates, and returns a dictionary {ingredient_name: total_qty}
     """
     # accumulate by (name, unit) so no combination is ever overwritten
     grocery = {}
 
     with get_session() as session:
-        weekly = session.exec(select(WeeklyPlan)).all()
+        weekly = session.exec(
+            select(WeeklyPlan).where(WeeklyPlan.week_start_date == week_start_date)
+        ).all()
 
         for plan in weekly:
             meal_id = plan.meal_id

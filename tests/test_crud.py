@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import pytest
 
 from app.crud import (
@@ -89,15 +91,19 @@ def test_remove_ingredient_from_meal():
     assert get_meal_ingredients(meal.id) == []
 
 
+WEEK_1 = date(2026, 8, 3)
+WEEK_2 = date(2026, 8, 10)
+
+
 def test_delete_meal_removes_ingredient_links_and_unassigns_plan():
     meal = add_meal("Spaghetti")
     add_ingredient_to_meal(meal.id, "Pasta", 200, "g")
-    set_meal_for_day("Monday", meal.id)
+    set_meal_for_day(WEEK_1, "Monday", meal.id)
 
     delete_meal(meal.id)
 
     assert get_meals() == []
-    plan = {p.day_of_week: p.meal_id for p in get_weekly_plan()}
+    plan = {p.day_of_week: p.meal_id for p in get_weekly_plan(WEEK_1)}
     assert plan["Monday"] is None
 
 
@@ -105,12 +111,25 @@ def test_set_meal_for_day_updates_existing_day_instead_of_duplicating():
     meal_a = add_meal("Spaghetti")
     meal_b = add_meal("Chicken Stir Fry")
 
-    set_meal_for_day("Monday", meal_a.id)
-    set_meal_for_day("Monday", meal_b.id)
+    set_meal_for_day(WEEK_1, "Monday", meal_a.id)
+    set_meal_for_day(WEEK_1, "Monday", meal_b.id)
 
-    plans = [p for p in get_weekly_plan() if p.day_of_week == "Monday"]
+    plans = [p for p in get_weekly_plan(WEEK_1) if p.day_of_week == "Monday"]
     assert len(plans) == 1
     assert plans[0].meal_id == meal_b.id
+
+
+def test_set_meal_for_day_is_scoped_to_its_week():
+    meal_a = add_meal("Spaghetti")
+    meal_b = add_meal("Chicken Stir Fry")
+
+    set_meal_for_day(WEEK_1, "Monday", meal_a.id)
+    set_meal_for_day(WEEK_2, "Monday", meal_b.id)
+
+    week_1_plan = {p.day_of_week: p.meal_id for p in get_weekly_plan(WEEK_1)}
+    week_2_plan = {p.day_of_week: p.meal_id for p in get_weekly_plan(WEEK_2)}
+    assert week_1_plan["Monday"] == meal_a.id
+    assert week_2_plan["Monday"] == meal_b.id
 
 
 def test_update_meal_changes_name_and_servings():
