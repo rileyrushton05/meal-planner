@@ -1,3 +1,7 @@
-streamlit==1.55.0
-sqlmodel==0.0.37
-streamlit-searchbox==0.1.24
+# Streamlit Community Cloud installs from this file. Dependency versions
+# live in pyproject.toml; installing the project itself pulls them in.
+#
+# Editable (-e) on purpose: app/db.py locates data/ relative to the package
+# on disk, so the package must stay in the repo checkout rather than being
+# copied into site-packages.
+-e .

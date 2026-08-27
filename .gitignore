@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# Packaging artifacts from `pip install -e .`
+*.egg-info/
+build/
+dist/
+
 # Virtual environments
 venv/
 .venv/
