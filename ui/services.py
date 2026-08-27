@@ -7,6 +7,7 @@ repository wrappers are simply rebuilt.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 import streamlit as st
@@ -27,12 +28,18 @@ class Services:
 
 
 def _configured_url() -> str | None:
-    """The database URL from Streamlit secrets, if one is set there.
+    """The database URL to use, or None to let Database decide.
 
-    Streamlit Community Cloud injects secrets rather than environment
-    variables, so it is checked first. Returning None lets Database fall
-    back to MEAL_PLANNER_DB_URL and then to local SQLite.
+    An explicit environment variable wins over Streamlit secrets. That
+    ordering matters more than it looks: reading ``st.secrets`` has the side
+    effect of writing every top-level secret into ``os.environ``, so
+    consulting it first would let a local secrets.toml silently override the
+    database a caller had deliberately pinned - which pointed the test suite
+    at production the moment a secrets file existed.
     """
+    if os.getenv(DATABASE_URL_ENV_VAR):
+        return None
+
     try:
         return st.secrets[DATABASE_URL_ENV_VAR]
     except Exception:
