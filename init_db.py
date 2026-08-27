@@ -1,5 +1,16 @@
-from app.db import create_db_and_tables
+"""Create the database and tables without launching the UI.
 
-create_db_and_tables()
+Useful after deleting data/data.db, or to check the schema applies cleanly.
+"""
 
-print("Database and tables created successfully!")
+from app.db import Database
+
+
+def main() -> None:
+    database = Database()
+    database.create_tables()
+    print("Database and tables created successfully!")
+
+
+if __name__ == "__main__":
+    main()

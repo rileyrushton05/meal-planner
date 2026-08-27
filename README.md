@@ -23,35 +23,55 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 - **SQLite** — file-based database (via Python's built-in `sqlite3`), stored at `data/data.db`.
 - **[streamlit-searchbox](https://github.com/m-wrzr/streamlit-searchbox)** — a custom Streamlit component providing the live-search picker for reusing an existing ingredient.
 
-## Project structure
+## Architecture
+
+The app is split into a data layer that knows nothing about Streamlit, and a
+presentation layer that knows nothing about SQL.
+
+```
+ui/  →  Services (repositories)  →  Database  →  SQLite
+```
+
+- **`app/`** owns the domain. `Database` holds the engine and hands out
+  transactional sessions; the repositories in `repositories.py` run each
+  operation inside one, so multi-step writes (a meal *and* all its
+  ingredients) either land completely or roll back.
+- **`ui/`** renders and nothing else. It receives repositories through
+  `Services` rather than importing a global connection, which is what lets
+  the tests point the whole app at a temporary database without patching
+  any module internals.
 
 ```
 meal-planner/
 ├── app/
-│   ├── db.py         # SQLite engine/session setup, table creation
-│   ├── models.py     # SQLModel table definitions (Meal, Ingredient, MealIngredient, WeeklyPlan)
-│   ├── crud.py        # Create/read/delete helpers for meals, ingredients, and the weekly plan
-│   ├── planner.py     # Aggregates the week's meals into a merged grocery list
-│   └── templates.py   # Starter meal data for the Quick Add gallery
+│   ├── db.py            # Database: owns the engine, yields transactional sessions
+│   ├── models.py        # SQLModel tables + the DayOfWeek enum
+│   ├── repositories.py  # MealRepository / IngredientRepository / WeeklyPlanRepository
+│   ├── planner.py       # GroceryItem + weekly grocery aggregation
+│   ├── units.py         # Unit conversion and quantity formatting
+│   ├── templates.py     # Starter meals for the Quick Add gallery
+│   └── exceptions.py    # Domain errors carrying user-facing messages
 ├── ui/
-│   └── streamlit_app.py  # Streamlit front end — wires the UI to the CRUD/planner functions
-├── .streamlit/
-│   └── config.toml      # Dark color theme (background, accent, fonts)
-├── data/
-│   └── data.db         # SQLite database file (created automatically on first run)
-├── tests/               # pytest suite for crud.py and planner.py, isolated from data/data.db
-├── init_db.py          # Standalone script to create the database and tables
-├── requirements.txt
-├── requirements-dev.txt # Adds pytest for running the test suite
-└── README.md
+│   ├── streamlit_app.py # Entry point: page setup, week selector, tab routing
+│   ├── services.py      # Builds the Database and repositories for a script run
+│   ├── styles.py        # Theme tokens and the CSS applying them
+│   └── tabs/            # One module per tab: meals, weekly_plan, grocery
+├── tests/               # pytest suite, each test on its own temporary database
+├── data/data.db         # SQLite file, created automatically on first run
+├── init_db.py           # Create the schema without launching the UI
+├── pyproject.toml       # Packaging, dependencies and pytest configuration
+└── requirements.txt     # Installs the project (Streamlit Cloud reads this)
 ```
 
 ## Data model
 
 - **Meal** — `id`, `name`, `servings`, `created_at`.
-- **Ingredient** — `id`, `name`.
-- **MealIngredient** — join table linking a `Meal` to an `Ingredient`, with a `qty` and `unit` for that pairing (many-to-many with extra fields).
+- **Ingredient** — `id`, `name`. Shared across every meal that uses it.
+- **MealIngredient** — join table pairing a `Meal` with an `Ingredient`, plus the `qty` and `unit` for that pairing (many-to-many with extra fields).
 - **WeeklyPlan** — maps a `(week_start_date, day_of_week)` pair to a `meal_id` and an optional planned `servings` count, one row per day per week, so different weeks never overwrite each other.
+
+`MEAL_PLANNER_DB_URL` overrides the database location if set — used by the
+tests, and the hook for pointing at a managed database later.
 
 ## Setup
 
@@ -67,10 +87,16 @@ meal-planner/
    source venv/bin/activate  # on Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies:**
+3. **Install the project and its test tooling:**
    ```bash
-   pip install -r requirements.txt
+   pip install -e ".[dev]"
    ```
+   Or, without a build step: `pip install -r requirements-dev.txt`.
+
+   Streamlit Community Cloud installs from `requirements.txt` and runs the
+   entry script directly rather than installing the project, so
+   `ui/streamlit_app.py` puts the project root on `sys.path` itself. That
+   makes the app work either way — installed or not.
 
 ## Running the app
 
@@ -85,7 +111,6 @@ This opens the app in your browser (typically at `http://localhost:8501`). The S
 ## Running tests
 
 ```bash
-pip install -r requirements-dev.txt
 pytest
 ```
 

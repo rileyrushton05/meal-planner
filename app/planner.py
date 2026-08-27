@@ -1,73 +1,98 @@
+"""Turning a week's planned meals into a consolidated grocery list."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+
 from sqlmodel import select
-from app.db import get_session
-from app.models import WeeklyPlan, MealIngredient, Ingredient, Meal
 
-# Unambiguous unit conversions, normalized to a base unit per family, so
-# e.g. "200 g" and "0.5 kg" of the same ingredient merge into one grocery
-# line instead of two. Deliberately excludes tsp/tbsp/cup - their actual
-# size varies by region (an Australian metric cup is 250 ml, a US cup is
-# ~237 ml), so auto-converting them risks silently producing a wrong
-# quantity rather than just failing to merge.
-UNIT_CONVERSIONS = {
-    "mg": ("g", 0.001),
-    "g": ("g", 1),
-    "kg": ("g", 1000),
-    "ml": ("ml", 1),
-    "l": ("ml", 1000),
-}
+from app import units
+from app.db import Database
+from app.models import Ingredient, Meal, MealIngredient, WeeklyPlan
 
 
-def _normalize_unit(qty, unit):
-    unit_key = (unit or "").strip().lower()
-    if unit_key in UNIT_CONVERSIONS:
-        base_unit, factor = UNIT_CONVERSIONS[unit_key]
-        return qty * factor, base_unit
-    return qty, unit_key
+@dataclass(frozen=True, slots=True)
+class GroceryItem:
+    """One line of a grocery list: how much of one ingredient to buy.
 
-
-def generate_weekly_grocery_list(week_start_date):
+    Quantity stays numeric rather than pre-formatted, so callers can sort,
+    total or price it. Use :meth:`display_qty` for presentation.
     """
-    Reads all meals assigned to days in the given week, collects ingredients,
-    merges duplicates, and returns a dictionary {ingredient_name: total_qty}
-    """
-    # accumulate by (name, unit) so no combination is ever overwritten
-    grocery = {}
 
-    with get_session() as session:
-        weekly = session.exec(
+    name: str
+    qty: float
+    #: Empty for count-based items ("2 onions"), which have no unit.
+    unit: str
+
+    @property
+    def display_qty(self) -> str:
+        """The amount as shown to a shopper, e.g. "400 g" or "2"."""
+        return f"{units.format_qty(self.qty)} {self.unit}".strip()
+
+    def __str__(self) -> str:
+        return f"{self.name}: {self.display_qty}"
+
+
+def generate_weekly_grocery_list(
+    db: Database, week_start_date: date
+) -> list[GroceryItem]:
+    """Total up everything needed for the meals planned in one week.
+
+    Quantities are scaled when a day's planned servings differ from the
+    meal's base recipe size, converted to a common base unit where that is
+    unambiguous (see :mod:`app.units`), then summed per ingredient.
+
+    An ingredient recorded in units that cannot be converted between each
+    other (say millilitres in one meal and cups in another) yields one line
+    per unit, since combining them would require guessing.
+
+    Returns:
+        Lines sorted by ingredient name, then by unit.
+    """
+    totals: dict[tuple[str, str], float] = {}
+
+    with db.session() as session:
+        plans = session.exec(
             select(WeeklyPlan).where(WeeklyPlan.week_start_date == week_start_date)
         ).all()
 
-        for plan in weekly:
-            meal_id = plan.meal_id
-            if not meal_id:
+        for plan in plans:
+            if not plan.meal_id:
                 continue
 
-            meal = session.get(Meal, meal_id)
-            scale = 1
-            if plan.servings and meal.servings:
-                scale = plan.servings / meal.servings
+            meal = session.get(Meal, plan.meal_id)
+            scale = _serving_scale(plan.servings, meal.servings if meal else None)
 
             links = session.exec(
-                select(MealIngredient).where(MealIngredient.meal_id == meal_id)
+                select(MealIngredient).where(MealIngredient.meal_id == plan.meal_id)
             ).all()
 
             for link in links:
-                name = session.get(Ingredient, link.ingredient_id).name
-                qty, unit = _normalize_unit((link.qty if link.qty else 0) * scale, link.unit)
+                ingredient = session.get(Ingredient, link.ingredient_id)
+                if ingredient is None:
+                    continue
+                qty, unit = units.normalize((link.qty or 0) * scale, link.unit)
+                key = (ingredient.name, unit)
+                totals[key] = totals.get(key, 0.0) + qty
 
-                key = (name, unit)
-                grocery[key] = grocery.get(key, 0) + qty
+    return [
+        GroceryItem(name=name, qty=qty, unit=unit)
+        for (name, unit), qty in sorted(totals.items())
+    ]
 
-    # only disambiguate with the unit when an ingredient has more than
-    # one unit variant across the week's meals
-    name_counts = {}
-    for name, unit in grocery:
-        name_counts[name] = name_counts.get(name, 0) + 1
 
-    result = {}
-    for (name, unit), qty in grocery.items():
-        label = name if name_counts[name] == 1 else f"{name} ({unit})"
-        result[label] = f"{qty} {unit}".strip()
+def _serving_scale(planned: int | None, base: int | None) -> float:
+    """How much to multiply a recipe's quantities by for a given day.
 
-    return result
+    Returns 1.0 when either figure is missing or zero, meaning "use the
+    recipe as written".
+    """
+    if planned and base:
+        return planned / base
+    return 1.0
+
+
+def format_grocery_list(items: list[GroceryItem]) -> str:
+    """Render a grocery list as plain text, for copying or downloading."""
+    return "\n".join(f"- {item}" for item in items)
