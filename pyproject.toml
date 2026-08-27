@@ -15,10 +15,18 @@ dependencies = [
     "streamlit==1.55.0",
     "sqlmodel==0.0.37",
     "streamlit-searchbox==0.1.24",
+    # Postgres driver, needed wherever MEAL_PLANNER_DB_URL points at Neon.
+    "psycopg[binary]==3.3.4",
+    # Schema migrations, applied automatically at application startup.
+    "alembic==1.19.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1"]
+dev = [
+    "pytest==9.1.1",
+    # Loads .env for local work; deployments use real environment variables.
+    "python-dotenv==1.2.3",
+]
 
 [tool.setuptools]
 packages = ["app", "ui", "ui.tabs"]

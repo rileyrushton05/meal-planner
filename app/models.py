@@ -8,7 +8,7 @@ class-creation time, and stringifying them breaks that lookup.
 from datetime import UTC, date, datetime
 from enum import StrEnum
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import DateTime, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -53,7 +53,14 @@ class Meal(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     servings: int = 1
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    # sa_type is explicit because the default maps to a naive column. The
+    # value is timezone-aware UTC, and Postgres would otherwise store it as
+    # `timestamp without time zone`, silently discarding the offset. SQLite
+    # is untyped enough not to care, so this only shows up on Postgres.
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC),
+        sa_type=DateTime(timezone=True),
+    )
 
     ingredients: list["Ingredient"] = Relationship(
         back_populates="meals", link_model=MealIngredient

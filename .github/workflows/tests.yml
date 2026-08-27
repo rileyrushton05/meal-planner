@@ -7,17 +7,92 @@ on:
     branches: [main]
 
 jobs:
+  # The suite runs twice: once on SQLite (what local development uses) and
+  # once on Postgres (what production runs). Passing both is what proves the
+  # data layer is genuinely portable rather than accidentally SQLite-shaped.
   pytest:
+    name: pytest (${{ matrix.database }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mealplanner_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
       - name: Run tests
-        run: pytest
+        env:
+          # Empty for the SQLite leg, which makes conftest fall back to
+          # per-test temporary files.
+          TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://postgres:postgres@localhost:5432/mealplanner_test' || '' }}
+        run: pytest -q
+
+  # Guards against the migrations and the models drifting apart. The tests
+  # build their schema from the models for speed, so without this a model
+  # change could ship with no matching migration and only fail in production.
+  migrations:
+    name: migrations match models
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mealplanner_migrations
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MEAL_PLANNER_DB_URL: postgresql+psycopg://postgres:postgres@localhost:5432/mealplanner_migrations
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Apply every migration from scratch
+        run: alembic upgrade head
+
+      - name: Fail if the models imply an unwritten migration
+        run: alembic check
+
+      - name: Check migrations are reversible
+        run: alembic downgrade base

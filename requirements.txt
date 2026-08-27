@@ -7,3 +7,5 @@
 streamlit==1.55.0
 sqlmodel==0.0.37
 streamlit-searchbox==0.1.24
+psycopg[binary]==3.3.4
+alembic==1.19.1

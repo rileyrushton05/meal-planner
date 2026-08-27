@@ -20,7 +20,8 @@ A lightweight weekly meal planning app built with **Streamlit** and **SQLModel**
 
 - **[Streamlit](https://streamlit.io/)** — the web UI, run directly from a Python script.
 - **[SQLModel](https://sqlmodel.tiangolo.com/)** — ORM layer combining SQLAlchemy and Pydantic for the data models and queries.
-- **SQLite** — file-based database (via Python's built-in `sqlite3`), stored at `data/data.db`.
+- **[Postgres](https://www.postgresql.org/) (hosted on [Neon](https://neon.tech/))** in deployment; **SQLite** locally, with no code difference between them.
+- **[Alembic](https://alembic.sqlalchemy.org/)** — versioned schema migrations, applied automatically at startup.
 - **[streamlit-searchbox](https://github.com/m-wrzr/streamlit-searchbox)** — a custom Streamlit component providing the live-search picker for reusing an existing ingredient.
 
 ## Architecture
@@ -29,8 +30,12 @@ The app is split into a data layer that knows nothing about Streamlit, and a
 presentation layer that knows nothing about SQL.
 
 ```
-ui/  →  Services (repositories)  →  Database  →  SQLite
+ui/  →  Services (repositories)  →  Database  →  SQLite or Postgres
 ```
+
+Nothing above `Database` knows which backend is in use. Swapping SQLite for
+Neon Postgres is a change of one environment variable — no repository,
+planner or UI code refers to a specific database.
 
 - **`app/`** owns the domain. `Database` holds the engine and hands out
   transactional sessions; the repositories in `repositories.py` run each
@@ -50,15 +55,18 @@ meal-planner/
 │   ├── planner.py       # GroceryItem + weekly grocery aggregation
 │   ├── units.py         # Unit conversion and quantity formatting
 │   ├── templates.py     # Starter meals for the Quick Add gallery
+│   ├── migrations.py    # Applies Alembic migrations from Python at startup
 │   └── exceptions.py    # Domain errors carrying user-facing messages
 ├── ui/
 │   ├── streamlit_app.py # Entry point: page setup, week selector, tab routing
 │   ├── services.py      # Builds the Database and repositories for a script run
 │   ├── styles.py        # Theme tokens and the CSS applying them
 │   └── tabs/            # One module per tab: meals, weekly_plan, grocery
-├── tests/               # pytest suite, each test on its own temporary database
-├── data/data.db         # SQLite file, created automatically on first run
+├── migrations/          # Alembic revision history
+├── tests/               # pytest suite, run against both SQLite and Postgres
+├── data/data.db         # Local SQLite file, created automatically on first run
 ├── init_db.py           # Create the schema without launching the UI
+├── alembic.ini          # Migration config; the URL comes from the environment
 ├── pyproject.toml       # Packaging, dependencies and pytest configuration
 └── requirements.txt     # Installs the project (Streamlit Cloud reads this)
 ```
@@ -70,8 +78,34 @@ meal-planner/
 - **MealIngredient** — join table pairing a `Meal` with an `Ingredient`, plus the `qty` and `unit` for that pairing (many-to-many with extra fields).
 - **WeeklyPlan** — maps a `(week_start_date, day_of_week)` pair to a `meal_id` and an optional planned `servings` count, one row per day per week, so different weeks never overwrite each other.
 
-`MEAL_PLANNER_DB_URL` overrides the database location if set — used by the
-tests, and the hook for pointing at a managed database later.
+## Database and migrations
+
+The backend is chosen entirely by `MEAL_PLANNER_DB_URL`:
+
+| Environment | Value | Result |
+|---|---|---|
+| Local development | unset | SQLite at `data/data.db` |
+| Deployment | `postgresql+psycopg://…` | Neon Postgres |
+| Tests | set per test by the fixtures | Temporary SQLite file, or `TEST_DATABASE_URL` |
+
+Note the `postgresql+psycopg://` prefix — Neon hands you a URL starting
+`postgresql://`, and SQLAlchemy needs the driver named explicitly. Copy
+`.env.example` to `.env` to work against Postgres locally; `.env` is
+gitignored and must never be committed.
+
+Schema changes are versioned with Alembic and applied automatically when the
+app starts, because Streamlit Community Cloud has no release phase to run
+them in. To change the schema:
+
+```bash
+# edit app/models.py, then:
+alembic revision --autogenerate -m "what changed"
+alembic upgrade head          # applied automatically on next app start too
+```
+
+CI runs `alembic check` to fail the build if a model change ships without a
+matching migration, and `alembic downgrade base` to prove each migration is
+reversible.
 
 ## Setup
 
@@ -106,7 +140,24 @@ Start the Streamlit app from the project root:
 streamlit run ui/streamlit_app.py
 ```
 
-This opens the app in your browser (typically at `http://localhost:8501`). The SQLite database and tables are created automatically on first run at `data/data.db`.
+This opens the app in your browser (typically at `http://localhost:8501`). The SQLite database is created and migrated automatically on first run at `data/data.db`.
+
+## Deployment
+
+Deployed on Streamlit Community Cloud from `main`, backed by Neon Postgres.
+The only configuration is one secret, set in **Manage app → Settings →
+Secrets**:
+
+```toml
+MEAL_PLANNER_DB_URL = "postgresql+psycopg://user:password@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require"
+```
+
+Use Neon's *pooled* connection string (the host contains `-pooler`), since
+the app opens connections from a long-lived process. Migrations run on
+startup, so a deploy that changes the schema needs no manual step.
+
+Unlike the previous SQLite-on-ephemeral-disk setup, data now survives
+redeploys and the free tier's sleep cycle.
 
 ## Running tests
 

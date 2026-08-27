@@ -2,3 +2,4 @@
 # pyproject.toml; this file exists so CI can install without a build step.
 -r requirements.txt
 pytest==9.1.1
+python-dotenv==1.2.3

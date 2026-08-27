@@ -14,12 +14,25 @@ from sqlmodel import Session, SQLModel, create_engine
 # referenced directly.
 from app import models  # noqa: F401
 
-DEFAULT_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 
-
-#: Overrides the database location. Lets tests point at a temporary file and
-#: would let a deployment target a managed database without a code change.
+#: Overrides the database location. Set to a Neon/Postgres URL in deployment,
+#: to a temporary file by the tests, and left unset for local SQLite.
 DATABASE_URL_ENV_VAR = "MEAL_PLANNER_DB_URL"
+
+
+def load_env_file() -> None:
+    """Load .env into the environment, if python-dotenv is available.
+
+    A convenience for local work; deployments provide real environment
+    variables or Streamlit secrets, so this quietly does nothing there.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(PROJECT_ROOT / ".env")
 
 
 def default_database_url() -> str:
@@ -41,19 +54,42 @@ class Database:
     """Owns a SQLAlchemy engine and hands out transactional sessions.
 
     Constructed with an explicit URL rather than reading module-level
-    globals, so tests can point it at a temporary file and the app can
-    later target a different backend without touching call sites.
+    globals, so tests can point it at a temporary file and a deployment can
+    target Postgres without touching a single call site.
     """
 
     def __init__(self, url: str | None = None, *, echo: bool | None = None) -> None:
-        if url is None:
-            url = default_database_url()
+        self.url = url or default_database_url()
         if echo is None:
             echo = os.getenv("SQL_ECHO", "false").lower() == "true"
-        self._engine = create_engine(url, echo=echo)
+
+        options: dict[str, object] = {}
+        if not self.is_sqlite:
+            # A managed Postgres sits behind a network and a pooler, either of
+            # which can drop an idle connection. pre-ping checks a connection
+            # is alive before handing it out, instead of failing a user's
+            # first query after a quiet period.
+            options["pool_pre_ping"] = True
+
+        self._engine = create_engine(self.url, echo=echo, **options)
+
+    @property
+    def is_sqlite(self) -> bool:
+        """True when backed by a local SQLite file rather than a server."""
+        return self.url.startswith("sqlite")
+
+    @property
+    def engine(self):
+        """The underlying SQLAlchemy engine, for Alembic and diagnostics."""
+        return self._engine
 
     def create_tables(self) -> None:
-        """Create any tables that don't exist yet. Never alters existing ones."""
+        """Create any missing tables directly from the models.
+
+        Used by the tests, where running the full migration history for each
+        of dozens of cases would be needlessly slow. The application itself
+        migrates instead, and CI asserts the two agree.
+        """
         SQLModel.metadata.create_all(self._engine)
 
     @contextmanager
