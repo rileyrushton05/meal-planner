@@ -50,31 +50,33 @@ def generate_weekly_grocery_list(
     Returns:
         Lines sorted by ingredient name, then by unit.
     """
+    # One query, joined across all four tables. Fetching the meal and then
+    # each ingredient row by row instead cost 48 statements for a full week,
+    # which is unnoticeable on a local SQLite file and roughly two and a half
+    # seconds against a database on the other end of a network.
+    statement = (
+        select(
+            Ingredient.name,
+            MealIngredient.qty,
+            MealIngredient.unit,
+            WeeklyPlan.servings,
+            Meal.servings,
+        )
+        .select_from(WeeklyPlan)
+        .join(Meal, Meal.id == WeeklyPlan.meal_id)
+        .join(MealIngredient, MealIngredient.meal_id == Meal.id)
+        .join(Ingredient, Ingredient.id == MealIngredient.ingredient_id)
+        .where(WeeklyPlan.week_start_date == week_start_date)
+    )
+
     totals: dict[tuple[str, str], float] = {}
 
     with db.session() as session:
-        plans = session.exec(
-            select(WeeklyPlan).where(WeeklyPlan.week_start_date == week_start_date)
-        ).all()
-
-        for plan in plans:
-            if not plan.meal_id:
-                continue
-
-            meal = session.get(Meal, plan.meal_id)
-            scale = _serving_scale(plan.servings, meal.servings if meal else None)
-
-            links = session.exec(
-                select(MealIngredient).where(MealIngredient.meal_id == plan.meal_id)
-            ).all()
-
-            for link in links:
-                ingredient = session.get(Ingredient, link.ingredient_id)
-                if ingredient is None:
-                    continue
-                qty, unit = units.normalize((link.qty or 0) * scale, link.unit)
-                key = (ingredient.name, unit)
-                totals[key] = totals.get(key, 0.0) + qty
+        for name, qty, unit, planned_servings, base_servings in session.exec(statement):
+            scale = _serving_scale(planned_servings, base_servings)
+            scaled_qty, base_unit = units.normalize((qty or 0) * scale, unit)
+            key = (name, base_unit)
+            totals[key] = totals.get(key, 0.0) + scaled_qty
 
     return [
         GroceryItem(name=name, qty=qty, unit=unit)

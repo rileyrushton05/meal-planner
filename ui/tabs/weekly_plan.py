@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 import streamlit as st
 
-from app.models import DayOfWeek, Meal
+from app.models import DayOfWeek, Meal, WeeklyPlan
 from ui.services import Services
 from ui.styles import DAY_COLORS
 
@@ -20,15 +20,22 @@ def render(services: Services, week_start: date) -> None:
     st.subheader("Assign Meals to Days")
 
     meals = services.meals.list_all()
+    # Fetched once and passed down. The form and the overview below both
+    # need it, and a second call would be another network round trip on
+    # every single interaction.
+    plans = services.plans.get_week(week_start)
+
     if meals:
         _render_copy_previous_week(services, week_start)
-        _render_plan_form(services, week_start, meals)
+        _render_plan_form(services, week_start, meals, plans)
+        if st.session_state.pop("plan_saved", False):
+            st.success("Weekly plan saved!")
     else:
         st.info("Add a meal first before assigning it to days.")
 
     st.divider()
     st.subheader(f"Week of {week_start.strftime('%b %d, %Y')}")
-    _render_week_overview(services, week_start, meals)
+    _render_week_overview(week_start, meals, plans)
 
 
 def _render_copy_previous_week(services: Services, week_start: date) -> None:
@@ -48,12 +55,17 @@ def _render_copy_previous_week(services: Services, week_start: date) -> None:
         st.success("Copied last week's plan!")
 
 
-def _render_plan_form(services: Services, week_start: date, meals: list[Meal]) -> None:
+def _render_plan_form(
+    services: Services,
+    week_start: date,
+    meals: list[Meal],
+    plans: list[WeeklyPlan],
+) -> None:
     meal_ids_by_name = {meal.name: meal.id for meal in meals}
     names_by_meal_id = {meal.id: meal.name for meal in meals}
     base_servings_by_meal_id = {meal.id: meal.servings for meal in meals}
 
-    existing = {plan.day_of_week: plan for plan in services.plans.get_week(week_start)}
+    existing = {plan.day_of_week: plan for plan in plans}
     options = [UNSET_LABEL, *meal_ids_by_name]
 
     with st.form("weekly_plan_form"):
@@ -92,13 +104,17 @@ def _render_plan_form(services: Services, week_start: date, meals: list[Meal]) -
                 services.plans.set_day(
                     week_start, day, meal_id, servings if meal_id else None
                 )
-            st.success("Weekly plan saved!")
+            # Rerun so the week overview re-reads what was just written. The
+            # plan list is loaded once at the top of the tab and shared, so
+            # without this it would still hold pre-save data. The message is
+            # deferred because st.rerun() discards anything already emitted.
+            st.session_state["plan_saved"] = True
+            st.rerun()
 
 
 def _render_week_overview(
-    services: Services, week_start: date, meals: list[Meal]
+    week_start: date, meals: list[Meal], plans: list[WeeklyPlan]
 ) -> None:
-    plans = services.plans.get_week(week_start)
     if not plans:
         st.info("No meals assigned yet.")
         return
