@@ -1,2 +1,4 @@
-# Development install: the app plus its test tooling.
--e .[dev]
+# Development install. Prefer `pip install -e ".[dev]"`, which reads
+# pyproject.toml; this file exists so CI can install without a build step.
+-r requirements.txt
+pytest==9.1.1
