@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from server import serializers
-from server.deps import Services, get_services
-from server.schemas import GroceryLine, WeekPlanRead, WeekPlanWrite
 from app.planner import generate_weekly_grocery_list
+from server import serializers
+from server.deps import ServicesDep
+from server.schemas import GroceryLine, WeekPlanRead, WeekPlanWrite
 
 router = APIRouter(prefix="/api", tags=["plan"])
 
@@ -23,19 +23,20 @@ def monday_of(day: date) -> date:
 
 
 @router.get("/plan/{week}", response_model=WeekPlanRead)
-def get_plan(week: date, services: Services = Depends(get_services)) -> WeekPlanRead:
+def get_plan(week: date, services: ServicesDep) -> WeekPlanRead:
     """The meals assigned to each day of the week containing `week`."""
     week_start = monday_of(week)
     return WeekPlanRead(
         week_start=week_start,
-        days=[serializers.day_assignment(p) for p in services.plans.get_week(week_start)],
+        days=[
+            serializers.day_assignment(plan)
+            for plan in services.plans.get_week(week_start)
+        ],
     )
 
 
 @router.put("/plan/{week}", response_model=WeekPlanRead)
-def set_plan(
-    week: date, payload: WeekPlanWrite, services: Services = Depends(get_services)
-) -> WeekPlanRead:
+def set_plan(week: date, payload: WeekPlanWrite, services: ServicesDep) -> WeekPlanRead:
     """Assign several days at once, in a single transaction."""
     week_start = monday_of(week)
     services.plans.set_week(
@@ -46,9 +47,7 @@ def set_plan(
 
 
 @router.post("/plan/{week}/copy-previous", response_model=WeekPlanRead)
-def copy_previous_week(
-    week: date, services: Services = Depends(get_services)
-) -> WeekPlanRead:
+def copy_previous_week(week: date, services: ServicesDep) -> WeekPlanRead:
     """Carry the previous week's assignments onto this one.
 
     Days unassigned in the source are skipped rather than clearing the
@@ -60,9 +59,7 @@ def copy_previous_week(
 
 
 @router.get("/grocery-list/{week}", response_model=list[GroceryLine])
-def grocery_list(
-    week: date, services: Services = Depends(get_services)
-) -> list[GroceryLine]:
+def grocery_list(week: date, services: ServicesDep) -> list[GroceryLine]:
     """Consolidated shopping list for the week containing `week`."""
-    items = generate_weekly_grocery_list(services.db, monday_of(week))
+    items = generate_weekly_grocery_list(services.plans, monday_of(week))
     return [serializers.grocery_line(item) for item in items]

@@ -172,6 +172,15 @@ function IngredientChip({
   const [qty, setQty] = useState(String(ingredient.qty));
   const [unit, setUnit] = useState(ingredient.unit);
 
+  // Seeded on opening rather than at mount: the amount can change underneath
+  // this component - re-adding an ingredient accumulates it - and stale
+  // fields would write the old value back on save.
+  const startEditing = () => {
+    setQty(String(ingredient.qty));
+    setUnit(ingredient.unit);
+    setEditing(true);
+  };
+
   if (editing) {
     return (
       <div className="flex items-end gap-2 rounded-lg border bg-card p-2">
@@ -223,7 +232,8 @@ function IngredientChip({
   return (
     <span className="flex items-center gap-2 rounded-lg border bg-card py-1.5 pr-1.5 pl-3 text-sm">
       <button
-        onClick={() => setEditing(true)}
+        type="button"
+        onClick={startEditing}
         aria-label={`Edit ${ingredient.name}`}
         className="hover:text-primary"
       >

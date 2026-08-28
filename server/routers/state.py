@@ -4,21 +4,19 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
-from server import serializers
-from server.deps import Services, get_services
-from server.routers.plans import monday_of
-from server.schemas import AppState, TemplateRead
 from app.templates import MEAL_TEMPLATES
+from server import serializers
+from server.deps import ServicesDep
+from server.routers.plans import monday_of
+from server.schemas import AppState
 
 router = APIRouter(prefix="/api", tags=["state"])
 
 
 @router.get("/state", response_model=AppState)
-def get_state(
-    week: date | None = None, services: Services = Depends(get_services)
-) -> AppState:
+def get_state(services: ServicesDep, week: date | None = None) -> AppState:
     """Everything needed to render the app for one week, in one response.
 
     Deliberately one endpoint rather than four. The Streamlit version issued
@@ -45,9 +43,3 @@ def get_state(
         ],
         templates=[serializers.template_read(t) for t in MEAL_TEMPLATES],
     )
-
-
-@router.get("/templates", response_model=list[TemplateRead])
-def list_templates() -> list[TemplateRead]:
-    """The built-in starter meals. Static, so no database access."""
-    return [serializers.template_read(t) for t in MEAL_TEMPLATES]

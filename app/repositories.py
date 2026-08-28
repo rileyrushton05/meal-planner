@@ -14,9 +14,23 @@ from sqlalchemy import delete, func, insert
 from sqlmodel import Session, col, select
 
 from app.db import Database
-from app.exceptions import DuplicateNameError, MealNotFoundError, UnitMismatchError
+from app.exceptions import (
+    DuplicateNameError,
+    IngredientNotOnMealError,
+    InvalidDayError,
+    MealNotFoundError,
+    UnitMismatchError,
+)
 from app.models import DayOfWeek, Ingredient, Meal, MealIngredient, WeeklyPlan
 from app.templates import MealTemplate
+
+
+def _as_day(day: DayOfWeek | str) -> str:
+    """Validate a weekday, returning its canonical name."""
+    try:
+        return DayOfWeek(day).value
+    except ValueError:
+        raise InvalidDayError(f"'{day}' is not a day of the week.") from None
 
 
 def _find_ingredient_by_name(session: Session, name: str) -> Ingredient | None:
@@ -116,7 +130,9 @@ class MealRepository(_Repository):
             session.flush()
 
             for item in template.ingredients:
-                self._attach_ingredient(session, meal.id, item.name, item.qty, item.unit)
+                self._attach_ingredient(
+                    session, meal.id, item.name, item.qty, item.unit
+                )
             return meal
 
     def update(self, meal_id: int, name: str, servings: int) -> None:
@@ -186,19 +202,23 @@ class MealRepository(_Repository):
     def update_ingredient(
         self, meal_id: int, ingredient_id: int, qty: float, unit: str
     ) -> None:
-        """Overwrite the quantity and unit of one ingredient on a meal."""
+        """Overwrite the quantity and unit of one ingredient on a meal.
+
+        Raises IngredientNotOnMealError if it is not attached. Returning
+        quietly instead would answer 200 to a request that changed nothing.
+        """
         with self._session() as session:
-            link = self._find_link(session, meal_id, ingredient_id)
-            if link:
-                link.qty = qty
-                link.unit = unit
+            link = self._require_link(session, meal_id, ingredient_id)
+            link.qty = qty
+            link.unit = unit
 
     def remove_ingredient(self, meal_id: int, ingredient_id: int) -> None:
-        """Detach an ingredient from a meal, leaving the ingredient itself."""
+        """Detach an ingredient from a meal, leaving the ingredient itself.
+
+        Raises IngredientNotOnMealError if it is not attached.
+        """
         with self._session() as session:
-            link = self._find_link(session, meal_id, ingredient_id)
-            if link:
-                session.delete(link)
+            session.delete(self._require_link(session, meal_id, ingredient_id))
 
     # ----------------------------------------------------------- helpers
 
@@ -230,6 +250,19 @@ class MealRepository(_Repository):
                 MealIngredient.ingredient_id == ingredient_id,
             )
         ).first()
+
+    @classmethod
+    def _require_link(
+        cls, session: Session, meal_id: int, ingredient_id: int
+    ) -> MealIngredient:
+        """The link, or a domain error naming which half is missing."""
+        link = cls._find_link(session, meal_id, ingredient_id)
+        if link is None:
+            cls._get_or_raise(session, meal_id)
+            raise IngredientNotOnMealError(
+                f"Ingredient {ingredient_id} is not on meal {meal_id}."
+            )
+        return link
 
     @classmethod
     def _attach_ingredient(
@@ -298,7 +331,9 @@ class WeeklyPlanRepository(_Repository):
         if not assignments:
             return
 
-        wanted = {str(day): value for day, value in assignments.items()}
+        # Coerced rather than trusted: the column is a plain string, so an
+        # unchecked value here becomes a row nothing can render.
+        wanted = {_as_day(day): value for day, value in assignments.items()}
 
         with self._session() as session:
             # Replace rather than read-then-update: eight round trips for
@@ -325,6 +360,32 @@ class WeeklyPlanRepository(_Repository):
                     for day, (meal_id, servings) in wanted.items()
                 ],
             )
+
+    def ingredient_rows_for_week(
+        self, week_start_date: date
+    ) -> list[tuple[str, float | None, str | None, int | None, int]]:
+        """Every planned ingredient for a week: name, qty, unit, then the
+        planned and recipe serving counts.
+
+        One join rather than a query per meal and per ingredient, which cost
+        48 statements for a full week - free on SQLite, ~2.4s over a network.
+        """
+        statement = (
+            select(
+                Ingredient.name,
+                MealIngredient.qty,
+                MealIngredient.unit,
+                WeeklyPlan.servings,
+                Meal.servings,
+            )
+            .select_from(WeeklyPlan)
+            .join(Meal, Meal.id == WeeklyPlan.meal_id)
+            .join(MealIngredient, MealIngredient.meal_id == Meal.id)
+            .join(Ingredient, Ingredient.id == MealIngredient.ingredient_id)
+            .where(WeeklyPlan.week_start_date == week_start_date)
+        )
+        with self._session() as session:
+            return list(session.exec(statement).all())
 
     def copy_week(self, source_week: date, target_week: date) -> int:
         """Copy assigned days from one week onto another, returning the count.

@@ -9,8 +9,8 @@ description = "Weekly meal planner that turns a week of meals into a consolidate
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-# Mirrored in requirements.txt, which is what Streamlit Community Cloud
-# installs from. Update both together.
+# Mirrored in requirements.txt and api/requirements.txt, which are what the
+# deployment installs from; tests/test_packaging.py fails if they drift.
 # Shared by every entry point: the domain layer and its storage.
 dependencies = [
     "sqlmodel==0.0.37",
@@ -33,10 +33,28 @@ dev = [
     "httpx==0.28.1",
     # Loads .env for local work; deployments use real environment variables.
     "python-dotenv==1.2.3",
+    # Lint and format. The frontend has had both since it was written; this
+    # keeps the Python held to the same standard rather than a lower one.
+    "ruff==0.15.1",
 ]
 
 [tool.setuptools]
 packages = ["app", "server", "server.routers"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+# Beyond the defaults (pyflakes + a subset of pycodestyle): import ordering,
+# bugbear's real-bug checks, comprehension and modernisation rules.
+select = ["E", "F", "W", "I", "B", "C4", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Fixtures and parametrised cases legitimately shadow names and go long.
+"tests/*" = ["E501"]
+# Alembic generates these; leave the generated shape alone.
+"migrations/versions/*" = ["E501", "I001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

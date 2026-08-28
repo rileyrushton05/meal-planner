@@ -1,15 +1,20 @@
 """SQLModel tables and the domain enums they use.
 
-Deliberately omits ``from __future__ import annotations``: SQLAlchemy
-resolves ``Relationship`` targets from real annotation objects, and
-stringifying them breaks that lookup.
+Deliberately omits ``from __future__ import annotations``: SQLModel reads
+these annotations at class-creation time to build the columns, and
+stringifying them breaks that.
+
+There are no ORM ``Relationship`` declarations. Every read that needs a
+meal with its ingredients is an explicit join in
+:mod:`app.repositories`, which is what keeps a week's grocery list to one
+query instead of lazy-loading one per row.
 """
 
 from datetime import UTC, date, datetime
 from enum import StrEnum
 
 from sqlalchemy import DateTime, UniqueConstraint
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 
 class DayOfWeek(StrEnum):
@@ -50,20 +55,12 @@ class Meal(SQLModel, table=True):
         sa_type=DateTime(timezone=True),
     )
 
-    ingredients: list["Ingredient"] = Relationship(
-        back_populates="meals", link_model=MealIngredient
-    )
-
 
 class Ingredient(SQLModel, table=True):
     """A shopping item, shared across every meal that uses it."""
 
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-
-    meals: list[Meal] = Relationship(
-        back_populates="ingredients", link_model=MealIngredient
-    )
 
 
 class WeeklyPlan(SQLModel, table=True):

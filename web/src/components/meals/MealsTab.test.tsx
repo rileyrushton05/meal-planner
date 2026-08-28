@@ -75,9 +75,7 @@ describe("deleting a meal", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete Spaghetti" }));
     const dialog = await screen.findByRole("alertdialog");
-    await user.click(
-      within(dialog).getByRole("button", { name: "Delete" }),
-    );
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
 
     expect(props.onDeleteMeal).toHaveBeenCalledWith(1);
   });
@@ -174,7 +172,9 @@ describe("templates", () => {
 
   it("adds a template on click", async () => {
     const user = userEvent.setup();
-    const { props } = renderTab({ state: makeState({ templates: [template] }) });
+    const { props } = renderTab({
+      state: makeState({ templates: [template] }),
+    });
 
     await user.click(
       screen.getByRole("button", { name: /quick add from templates/i }),
@@ -234,5 +234,31 @@ describe("the ingredient editor's meal picker", () => {
     expect(
       screen.getByRole("combobox", { name: /select meal/i }),
     ).toHaveTextContent("Spaghetti Bolognese");
+  });
+});
+
+describe("editing an ingredient", () => {
+  const withQty = (qty: number) =>
+    makeState({
+      meals: [
+        makeMeal({
+          id: 1,
+          ingredients: [{ ingredient_id: 5, name: "Pasta", qty, unit: "g" }],
+        }),
+      ],
+    });
+
+  it("edits the current quantity, not the one first rendered", async () => {
+    // Re-adding an ingredient accumulates it, so the amount can change
+    // underneath this component. Seeding the fields once at mount meant the
+    // editor wrote the stale value back.
+    const user = userEvent.setup();
+    const { props, rerender } = renderTab({ state: withQty(200) });
+
+    rerender(<MealsTab {...props} state={withQty(400)} />);
+    await user.click(screen.getByRole("button", { name: /edit pasta/i }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    expect(props.onUpdateIngredient).toHaveBeenCalledWith(1, 5, 400, "g");
   });
 });

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from collections.abc import Generator
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
 
 from app.db import Database, load_env_file
 from app.repositories import (
@@ -26,8 +28,8 @@ class Services:
 
 
 @lru_cache(maxsize=1)
-def _database() -> Database:
-    """One engine per process, so the connection pool is actually reused.
+def get_database() -> Database:
+    """The process-wide Database. One engine, so the pool is actually reused.
 
     Establishing a connection costs several network round trips - far more
     than a query - so rebuilding the pool per request would dominate every
@@ -45,7 +47,7 @@ def get_services() -> Generator[Services]:
     each. Against a database a network away that was ~1.5s of the 3.4s a
     week change used to take.
     """
-    db = _database()
+    db = get_database()
     with db.session() as session:
         yield Services(
             db=db,
@@ -55,6 +57,12 @@ def get_services() -> Generator[Services]:
         )
 
 
+#: What route handlers annotate their `services` parameter with. Annotated
+#: rather than a `Depends()` default, which FastAPI still accepts but which
+#: evaluates a call at import time and reads as a mutable default argument.
+ServicesDep = Annotated[Services, Depends(get_services)]
+
+
 def reset_services_cache() -> None:
     """Drop the cached engine. Used by tests between cases."""
-    _database.cache_clear()
+    get_database.cache_clear()

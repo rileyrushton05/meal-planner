@@ -6,7 +6,13 @@ from datetime import date
 
 import pytest
 
-from app.exceptions import DuplicateNameError, MealNotFoundError, UnitMismatchError
+from app.exceptions import (
+    DuplicateNameError,
+    IngredientNotOnMealError,
+    InvalidDayError,
+    MealNotFoundError,
+    UnitMismatchError,
+)
 from app.models import DayOfWeek
 from app.templates import MealTemplate, TemplateIngredient
 
@@ -270,3 +276,26 @@ def test_copy_week_skips_unset_days_instead_of_clearing_the_target(meals, plans)
     target = {p.day_of_week: p.meal_id for p in plans.get_week(WEEK_2)}
     assert target["Monday"] == meal.id
     assert target["Tuesday"] == meal.id
+
+
+def test_updating_an_unattached_ingredient_raises(meals):
+    meal = meals.add("Spaghetti")
+
+    with pytest.raises(IngredientNotOnMealError):
+        meals.update_ingredient(meal.id, 999, qty=5, unit="g")
+
+
+def test_removing_an_unattached_ingredient_raises(meals):
+    meal = meals.add("Spaghetti")
+
+    with pytest.raises(IngredientNotOnMealError):
+        meals.remove_ingredient(meal.id, 999)
+
+
+def test_a_day_that_is_not_a_weekday_is_rejected(plans):
+    """The column is a plain string, so the guard lives in the repository
+    rather than relying on the database to reject it."""
+    with pytest.raises(InvalidDayError):
+        plans.set_day(WEEK_1, "Funday", meal_id=None)
+
+    assert plans.get_week(WEEK_1) == []

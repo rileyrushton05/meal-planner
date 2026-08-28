@@ -1,7 +1,7 @@
 """FastAPI application.
 
 Run locally with:
-    uvicorn api.main:app --reload
+    uvicorn server.main:app --reload
 """
 
 from __future__ import annotations
@@ -13,15 +13,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from server.deps import _database
-from server.routers import meals, plans, state
 from app.exceptions import (
     DuplicateNameError,
+    IngredientNotOnMealError,
+    InvalidDayError,
     MealNotFoundError,
     MealPlannerError,
     UnitMismatchError,
 )
 from app.migrations import upgrade_to_head
+from server.deps import get_database
+from server.routers import meals, plans, state
 
 #: Comma-separated origins allowed to call the API. The deployed frontend's
 #: URL goes here; localhost defaults cover development.
@@ -48,7 +50,7 @@ def _auto_migrate_enabled() -> bool:
 async def lifespan(app: FastAPI):
     """Bring the schema up to date once, before serving any request."""
     if _auto_migrate_enabled():
-        upgrade_to_head(_database().url)
+        upgrade_to_head(get_database().url)
     yield
 
 
@@ -80,8 +82,10 @@ app.include_router(plans.router)
 #: are surfaced verbatim rather than replaced with a generic string.
 _STATUS_BY_ERROR = {
     MealNotFoundError: 404,
+    IngredientNotOnMealError: 404,
     DuplicateNameError: 409,
     UnitMismatchError: 409,
+    InvalidDayError: 422,
 }
 
 

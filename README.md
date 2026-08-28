@@ -38,15 +38,36 @@ web/ (React)  →  server/ (FastAPI)  →  app/ (domain)  →  Postgres / SQLite
 Nothing above `Database` knows which backend is in use — swapping SQLite for
 Postgres is one environment variable.
 
-### Why a single `/api/state` endpoint
+### Latency
 
-The app previously used Streamlit, which re-runs the whole script on every
-interaction. Against a local SQLite file that was free; against a network
-database each click cost roughly five round trips and about a second.
+Most of the design here is a response to one measurement: a round trip to a
+database on another continent cost **325 ms**, so what mattered was the number
+of round trips, not the speed of any query.
 
-The current design loads everything for a week in one request and keeps it in
-memory, so switching tabs or editing a dropdown touches no network at all.
-Only changes hit the API.
+| | Before | After |
+|---|---|---|
+| Grocery list for a week | 48 queries | 1 |
+| Saving a week's plan | 14 statements | 2 |
+| One HTTP request | up to 4 transactions | 1 |
+| Changing week | 3.4 s | 0.11 s |
+
+Four changes, in order of how much they bought:
+
+1. **Colocation.** Functions run in `syd1`, next to the `ap-southeast-2`
+   database and the person using it. Previously the request crossed the
+   Pacific twice. A round trip fell from 325 ms to 41 ms.
+2. **Fetch only what changed.** Meals, templates and ingredient names do not
+   vary by week, so changing week asks for the plan alone. Weeks already
+   visited are served from memory and issue no request at all.
+3. **One transaction per request.** Each repository used to open its own
+   session, so a request touching three of them paid three BEGIN/COMMIT
+   pairs — 1.5 s of the original 3.4 s was transaction overhead alone.
+4. **One query, not N.** The grocery list is a single four-table join rather
+   than a query per meal and per ingredient.
+
+The frontend loads a week in one request and works from memory afterwards, so
+switching tabs or opening a dropdown touches no network at all. Only changes
+hit the API.
 
 ```
 meal-planner/
@@ -124,12 +145,19 @@ The frontend runs on `http://localhost:5173`. Interactive API docs are at
 ## Tests
 
 ```bash
-pytest          # Python: domain, repositories, API
+pytest               # Python: domain, repositories, API
+ruff check . && ruff format --check .
 cd web && npm test   # Frontend: components, client, date handling
+cd web && npm run lint
 ```
 
 Python tests run against SQLite by default and Postgres when
-`TEST_DATABASE_URL` is set. CI runs both, plus the frontend suite, plus two
+`TEST_DATABASE_URL` is set. Running both is what proves the data layer is
+genuinely portable rather than accidentally SQLite-shaped — it caught a
+handler returning 500 instead of 404, because SQLite does not enforce foreign
+keys by default and Postgres does.
+
+CI runs both legs, the frontend suite, `ruff` for lint and formatting, and two
 migration checks: `alembic check` fails the build if a model change ships
 without a migration, and a downgrade proves each migration is reversible.
 
@@ -158,6 +186,9 @@ configuration and the client uses relative paths.
 - **Framework preset:** Other (the build is defined in `vercel.json`)
 - **Root directory:** the repository root
 - **Environment variable:** `MEAL_PLANNER_DB_URL`, Production scope
+- **Region:** `syd1`, set in `vercel.json`. Functions default to `iad1`
+  (Virginia); running them next to the database is worth more than any
+  application-level optimisation here.
 
 `api/requirements.txt` sits next to the serverless entry point deliberately:
 with a custom `buildCommand`, Vercel's Python builder does not pick up the

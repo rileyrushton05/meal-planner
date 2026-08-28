@@ -21,3 +21,11 @@ class MealNotFoundError(MealPlannerError):
 
 class UnitMismatchError(MealPlannerError):
     """An ingredient is already on the meal measured in a different unit."""
+
+
+class IngredientNotOnMealError(MealPlannerError):
+    """The meal exists, but that ingredient is not attached to it."""
+
+
+class InvalidDayError(MealPlannerError):
+    """A day was given that is not one of the seven weekdays."""

@@ -7,6 +7,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
+from sqlalchemy import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 # Registers the tables on SQLModel.metadata for create_tables().
@@ -70,7 +71,7 @@ class Database:
         return self.url.startswith("sqlite")
 
     @property
-    def engine(self):
+    def engine(self) -> Engine:
         """The SQLAlchemy engine, for Alembic and diagnostics."""
         return self._engine
 

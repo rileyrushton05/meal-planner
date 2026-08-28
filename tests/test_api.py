@@ -11,9 +11,9 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from app.templates import MEAL_TEMPLATES
 from server.deps import reset_services_cache
 from server.main import app
-from app.templates import MEAL_TEMPLATES
 
 MONDAY = date(2026, 8, 3)
 WEDNESDAY = MONDAY + timedelta(days=2)
@@ -69,7 +69,9 @@ def test_blank_meal_name_is_rejected_before_reaching_the_database(client):
 
 
 def test_zero_servings_is_rejected(client):
-    assert client.post("/api/meals", json={"name": "X", "servings": 0}).status_code == 422
+    assert (
+        client.post("/api/meals", json={"name": "X", "servings": 0}).status_code == 422
+    )
 
 
 def test_update_meal(client):
@@ -147,9 +149,7 @@ def test_remove_ingredient(client):
     ).json()
     ingredient_id = body["ingredients"][0]["ingredient_id"]
 
-    body = client.delete(
-        f"/api/meals/{meal['id']}/ingredients/{ingredient_id}"
-    ).json()
+    body = client.delete(f"/api/meals/{meal['id']}/ingredients/{ingredient_id}").json()
 
     assert body["ingredients"] == []
 
@@ -288,3 +288,39 @@ def test_operations_on_a_missing_meal_return_404(client, method, path, body):
 
     assert response.status_code == 404
     assert "detail" in response.json()
+
+
+def test_changing_an_ingredient_not_on_the_meal_is_404(client):
+    """The meal exists but the ingredient is not attached to it.
+
+    Both handlers used to return 200 having changed nothing, so a client
+    could not tell a successful edit from one that silently did not happen.
+    """
+    meal = _create_meal(client)
+
+    response = client.patch(
+        f"/api/meals/{meal['id']}/ingredients/999", json={"qty": 5, "unit": "g"}
+    )
+
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+def test_removing_an_ingredient_not_on_the_meal_is_404(client):
+    meal = _create_meal(client)
+
+    response = client.delete(f"/api/meals/{meal['id']}/ingredients/999")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.parametrize("day", ["Funday", "monday ", "", "1"])
+def test_a_day_that_is_not_a_weekday_is_rejected(client, day):
+    """Unvalidated, these were written straight into the plan table, leaving
+    rows no client knows how to render."""
+    response = client.put(
+        f"/api/plan/{MONDAY}", json={"days": [{"day": day, "meal_id": None}]}
+    )
+
+    assert response.status_code == 422
+    assert client.get(f"/api/plan/{MONDAY}").json()["days"] == []

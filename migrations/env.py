@@ -11,11 +11,10 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
-from app.db import default_database_url, load_env_file
-
 # Importing the models registers every table on SQLModel.metadata, which is
 # what autogenerate diffs the live database against.
 from app import models  # noqa: F401
+from app.db import default_database_url, load_env_file
 
 config = context.config
 

@@ -1,5 +1,5 @@
 /**
- * Types mirroring the Pydantic schemas in api/schemas.py.
+ * Types mirroring the Pydantic schemas in server/schemas.py.
  *
  * Hand-written rather than generated so the frontend stays readable, but
  * they are checked against the live API by a test, so drift fails the build
@@ -33,7 +33,9 @@ export interface Meal {
 }
 
 export interface DayAssignment {
-  day: string;
+  /** The union, not `string`: the API rejects anything else with a 422, so
+   *  accepting a wider type here would only hide mistakes until runtime. */
+  day: Day;
   meal_id: number | null;
   servings: number | null;
 }

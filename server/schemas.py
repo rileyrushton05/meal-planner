@@ -11,6 +11,8 @@ from datetime import date
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.models import DayOfWeek
+
 
 class IngredientAmount(BaseModel):
     """One ingredient attached to a meal, with how much of it."""
@@ -75,7 +77,9 @@ class IngredientUpdate(BaseModel):
 class DayAssignment(BaseModel):
     """One day of a week. A null meal_id clears the day."""
 
-    day: str
+    #: The enum, so an unknown day is a 422 rather than a stored row that
+    #: no client knows how to render.
+    day: DayOfWeek
     meal_id: int | None = None
     servings: int | None = Field(default=None, ge=1)
 

@@ -6,7 +6,13 @@
  * the local server, and in production Vercel serves both from one origin.
  */
 
-import type { AppState, GroceryLine, Meal, WeekPlan } from "./types";
+import type {
+  AppState,
+  DayAssignment,
+  GroceryLine,
+  Meal,
+  WeekPlan,
+} from "./types";
 
 /** An error carrying the message the API wrote for the user. */
 export class ApiError extends Error {
@@ -114,10 +120,7 @@ export const api = {
       method: "DELETE",
     }),
 
-  setPlan: (
-    week: string,
-    days: { day: string; meal_id: number | null; servings: number | null }[],
-  ): Promise<WeekPlan> =>
+  setPlan: (week: string, days: DayAssignment[]): Promise<WeekPlan> =>
     request(`/api/plan/${week}`, {
       method: "PUT",
       body: JSON.stringify({ days }),

@@ -12,6 +12,7 @@ vi.mock("@/api/client", async (importOriginal) => ({
     getPlan: vi.fn(),
     setPlan: vi.fn(),
     deleteMeal: vi.fn(),
+    getGroceryList: vi.fn(),
   },
 }));
 
@@ -57,7 +58,9 @@ describe("loading a week", () => {
     const { result } = await renderPlanner();
 
     act(() => result.current.setWeek("2026-08-31"));
-    await waitFor(() => expect(mocked.getPlan).toHaveBeenCalledWith("2026-08-31"));
+    await waitFor(() =>
+      expect(mocked.getPlan).toHaveBeenCalledWith("2026-08-31"),
+    );
 
     expect(mocked.getState).toHaveBeenCalledTimes(1);
   });
@@ -100,7 +103,10 @@ describe("weeks already visited", () => {
 
   it("shows a plan saved since, not the one first fetched", async () => {
     const { result } = await renderPlanner();
-    mocked.setPlan.mockResolvedValue({ week_start: "2026-08-24", days: plan(1) });
+    mocked.setPlan.mockResolvedValue({
+      week_start: "2026-08-24",
+      days: plan(1),
+    });
 
     act(() => result.current.setWeek("2026-08-31"));
     await waitFor(() => expect(mocked.getPlan).toHaveBeenCalledTimes(1));
@@ -109,9 +115,7 @@ describe("weeks already visited", () => {
     act(() => result.current.setWeek("2026-08-24"));
     act(() => result.current.setWeek("2026-08-31"));
 
-    await waitFor(() =>
-      expect(result.current.state?.plan[0].meal_id).toBe(1),
-    );
+    await waitFor(() => expect(result.current.state?.plan[0].meal_id).toBe(1));
     // Still one fetch: the cache was corrected in place, not invalidated.
     expect(mocked.getPlan).toHaveBeenCalledTimes(1);
   });
@@ -126,5 +130,38 @@ describe("weeks already visited", () => {
 
     act(() => result.current.setWeek("2026-08-24"));
     await waitFor(() => expect(mocked.getPlan).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("the grocery list", () => {
+  const lines = [{ name: "Pasta", qty: 400, unit: "g", display: "400 g" }];
+
+  it("belongs to the week it was generated for", async () => {
+    const { result } = await renderPlanner();
+    mocked.getGroceryList.mockResolvedValue(lines);
+
+    await act(() => result.current.generateGroceryList());
+    expect(result.current.grocery).toEqual(lines);
+
+    // A list for last week must not be shown as if it were this week's.
+    act(() => result.current.setWeek("2026-08-31"));
+    await waitFor(() =>
+      expect(result.current.state?.week_start).toBe("2026-08-31"),
+    );
+    expect(result.current.grocery).toBeNull();
+  });
+
+  it("comes back when you return to that week", async () => {
+    const { result } = await renderPlanner();
+    mocked.getGroceryList.mockResolvedValue(lines);
+
+    await act(() => result.current.generateGroceryList());
+    act(() => result.current.setWeek("2026-08-31"));
+    await waitFor(() => expect(result.current.grocery).toBeNull());
+
+    act(() => result.current.setWeek("2026-08-24"));
+
+    await waitFor(() => expect(result.current.grocery).toEqual(lines));
+    expect(mocked.getGroceryList).toHaveBeenCalledTimes(1);
   });
 });

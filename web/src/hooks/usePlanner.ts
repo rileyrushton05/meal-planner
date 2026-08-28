@@ -25,15 +25,24 @@ export function usePlanner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [grocery, setGrocery] = useState<GroceryLine[] | null>(null);
+  // Tagged with the week it was generated for. Deriving visibility from that
+  // is what lets the week-change effect avoid a setState purely to clear it,
+  // and means returning to a week shows the list you already generated.
+  const [grocery, setGrocery] = useState<{
+    week: string;
+    lines: GroceryLine[];
+  } | null>(null);
 
   // Day assignments for weeks already fetched, so going back to one is free.
   // A ref rather than state: reading it must not itself trigger a render.
   const seenWeeks = useRef(new Map<string, AppState["plan"]>());
+  // Whether the one-off bootstrap has happened. A ref, not `state`, so this
+  // effect depends only on `week` - depending on `state` would refetch on
+  // every mutation.
+  const bootstrapped = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
-    setGrocery(null);
 
     const cached = seenWeeks.current.get(week);
     if (cached) {
@@ -47,7 +56,7 @@ export function usePlanner() {
     setLoading(true);
     // Only the very first load needs the meals, templates and ingredient
     // names; after that a week change is just its plan.
-    const load = state
+    const load = bootstrapped.current
       ? api.getPlan(week).then((p) => ({ start: p.week_start, plan: p.days }))
       : api.getState(week).then((next) => ({ full: next }));
 
@@ -56,6 +65,7 @@ export function usePlanner() {
         // A slower earlier request must not overwrite a newer week.
         if (cancelled) return;
         if ("full" in result) {
+          bootstrapped.current = true;
           setState(result.full);
           seenWeeks.current.set(result.full.week_start, result.full.plan);
         } else {
@@ -74,9 +84,6 @@ export function usePlanner() {
     return () => {
       cancelled = true;
     };
-    // `state` is read to decide first-load vs week-change, but must not
-    // re-run this: that would refetch on every mutation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [week]);
 
   /** Record a plan we just wrote, so returning to this week shows it. */
@@ -207,7 +214,7 @@ export function usePlanner() {
 
     generateGroceryList: () =>
       mutate(() => api.getGroceryList(week)).then(
-        (lines) => lines && setGrocery(lines),
+        (lines) => lines && setGrocery({ week, lines }),
       ),
   };
 
@@ -218,7 +225,8 @@ export function usePlanner() {
     loading,
     error,
     busy,
-    grocery,
+    // Only ever the list for the week on screen.
+    grocery: grocery?.week === week ? grocery.lines : null,
     dismissError: () => setError(null),
     ...actions,
   };
