@@ -58,6 +58,29 @@ class MealRepository:
         with self._db.session() as session:
             return list(session.exec(select(Meal)).all())
 
+    def list_all_with_ingredients(
+        self,
+    ) -> list[tuple[Meal, list[tuple[MealIngredient, Ingredient]]]]:
+        """Every meal paired with its ingredients, in two queries total.
+
+        Calling list_ingredients per meal instead would be one query per
+        meal - fine locally, one network round trip each in deployment.
+        """
+        with self._db.session() as session:
+            meals = list(session.exec(select(Meal)).all())
+
+            rows = session.exec(
+                select(MealIngredient, Ingredient).where(
+                    MealIngredient.ingredient_id == Ingredient.id
+                )
+            ).all()
+
+        by_meal: dict[int, list[tuple[MealIngredient, Ingredient]]] = {}
+        for link, ingredient in rows:
+            by_meal.setdefault(link.meal_id, []).append((link, ingredient))
+
+        return [(meal, by_meal.get(meal.id, [])) for meal in meals]
+
     def add(self, name: str, servings: int = 1) -> Meal:
         """Create a meal.
 

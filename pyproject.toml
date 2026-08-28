@@ -11,10 +11,9 @@ requires-python = ">=3.11"
 license = { file = "LICENSE" }
 # Mirrored in requirements.txt, which is what Streamlit Community Cloud
 # installs from. Update both together.
+# Shared by every entry point: the domain layer and its storage.
 dependencies = [
-    "streamlit==1.55.0",
     "sqlmodel==0.0.37",
-    "streamlit-searchbox==0.1.24",
     # Postgres driver, needed wherever MEAL_PLANNER_DB_URL points at Neon.
     "psycopg[binary]==3.3.4",
     # Schema migrations, applied automatically at application startup.
@@ -22,8 +21,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The HTTP API consumed by the React frontend. Deployed on its own.
+api = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.4",
+]
+# The original Streamlit UI, deployed on Streamlit Community Cloud.
+streamlit = [
+    "streamlit==1.55.0",
+    "streamlit-searchbox==0.1.24",
+]
 dev = [
+    "meal-planner[api,streamlit]",
     "pytest==9.1.1",
+    # Drives the API in tests via fastapi.testclient.
+    "httpx==0.28.1",
     # Loads .env for local work; deployments use real environment variables.
     "python-dotenv==1.2.3",
 ]
