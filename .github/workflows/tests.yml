@@ -78,6 +78,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test
+        run: npm test
+
       # `npm run build` runs `tsc -b` first, so this typechecks as well.
       - name: Typecheck and build
         run: npm run build

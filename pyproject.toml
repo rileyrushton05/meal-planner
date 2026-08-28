@@ -26,13 +26,8 @@ api = [
     "fastapi==0.141.1",
     "uvicorn[standard]==0.52.4",
 ]
-# The original Streamlit UI, deployed on Streamlit Community Cloud.
-streamlit = [
-    "streamlit==1.55.0",
-    "streamlit-searchbox==0.1.24",
-]
 dev = [
-    "meal-planner[api,streamlit]",
+    "meal-planner[api]",
     "pytest==9.1.1",
     # Drives the API in tests via fastapi.testclient.
     "httpx==0.28.1",
@@ -41,7 +36,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app", "server", "server.routers", "ui", "ui.tabs"]
+packages = ["app", "server", "server.routers"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

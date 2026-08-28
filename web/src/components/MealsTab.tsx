@@ -93,14 +93,16 @@ function AddMealForm({
   busy: boolean;
 }) {
   const [name, setName] = useState("");
-  const [servings, setServings] = useState(1);
+  // Held as text, not a number. Coercing on every keystroke made the field
+  // impossible to clear: it snapped back to 1, so typing "4" gave "14".
+  const [servings, setServings] = useState("1");
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!name.trim()) return;
-    onAdd(name.trim(), servings);
+    onAdd(name.trim(), Math.max(1, Number(servings) || 1));
     setName("");
-    setServings(1);
+    setServings("1");
   };
 
   return (
@@ -120,7 +122,7 @@ function AddMealForm({
               <NumberInput
                 min={1}
                 value={servings}
-                onChange={(e) => setServings(Math.max(1, +e.target.value))}
+                onChange={(e) => setServings(e.target.value)}
               />
             </Field>
           </div>
@@ -202,7 +204,7 @@ function MealRow({
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [name, setName] = useState(meal.name);
-  const [servings, setServings] = useState(meal.servings);
+  const [servings, setServings] = useState(String(meal.servings));
 
   return (
     <Card>
@@ -225,7 +227,11 @@ function MealRow({
       </div>
 
       {confirming && (
-        <div className="mt-3 rounded-lg border border-edge bg-canvas p-3">
+        <div
+          role="alertdialog"
+          aria-label={`Confirm deleting ${meal.name}`}
+          className="mt-3 rounded-lg border border-edge bg-canvas p-3"
+        >
           <p className="mb-3 text-sm">
             Delete <strong>{meal.name}</strong>? This also removes its
             ingredients and unassigns it from any planned day.
@@ -258,14 +264,14 @@ function MealRow({
               <NumberInput
                 min={1}
                 value={servings}
-                onChange={(e) => setServings(Math.max(1, +e.target.value))}
+                onChange={(e) => setServings(e.target.value)}
               />
             </Field>
           </div>
           <Button
             disabled={busy || !name.trim()}
             onClick={() => {
-              onUpdate(meal.id, name.trim(), servings);
+              onUpdate(meal.id, name.trim(), Math.max(1, Number(servings) || 1));
               setEditing(false);
             }}
           >

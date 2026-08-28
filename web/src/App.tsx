@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { GroceryTab } from "./components/GroceryTab";
+import { TabPanel, Tabs } from "./components/Tabs";
 import { MealsTab } from "./components/MealsTab";
 import { WeeklyPlanTab } from "./components/WeeklyPlanTab";
 import { usePlanner } from "./hooks/usePlanner";
@@ -16,7 +17,9 @@ export default function App() {
   return (
     <div className="mx-auto max-w-5xl px-5 py-10">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Weekly Meal Planner</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Weekly Meal Planner
+        </h1>
         <p className="mt-1 text-sm text-muted">
           Plan your meals, build your week, and generate your grocery list — all
           in one place.
@@ -45,52 +48,47 @@ export default function App() {
         </div>
       )}
 
-      <nav className="mt-6 flex gap-6 border-b border-edge">
-        {TABS.map((name) => (
-          <button
-            key={name}
-            onClick={() => setTab(name)}
-            className={`-mb-px border-b-2 pb-3 text-sm font-semibold transition ${
-              tab === name
-                ? "border-accent text-accent"
-                : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            {name}
-          </button>
-        ))}
-      </nav>
+      <Tabs
+        tabs={TABS}
+        active={tab}
+        onChange={setTab}
+        label="Planner sections"
+      />
 
-      <main className="pt-8">
-        {planner.loading || !planner.state ? (
-          <p className="text-sm text-muted">Loading…</p>
-        ) : tab === "Meals" ? (
-          <MealsTab
-            state={planner.state}
-            busy={planner.busy}
-            onAddMeal={planner.addMeal}
-            onAddFromTemplate={planner.addFromTemplate}
-            onUpdateMeal={planner.updateMeal}
-            onDeleteMeal={planner.deleteMeal}
-            onAddIngredient={planner.addIngredient}
-            onUpdateIngredient={planner.updateIngredient}
-            onRemoveIngredient={planner.removeIngredient}
-          />
-        ) : tab === "Weekly Plan" ? (
-          <WeeklyPlanTab
-            state={planner.state}
-            busy={planner.busy}
-            onSave={planner.savePlan}
-            onCopyPrevious={planner.copyPreviousWeek}
-          />
-        ) : (
-          <GroceryTab
-            weekStart={planner.state.week_start}
-            lines={planner.grocery}
-            busy={planner.busy}
-            onGenerate={planner.generateGroceryList}
-          />
-        )}
+      <main>
+        <TabPanel tab={tab}>
+          {planner.loading || !planner.state ? (
+            <p role="status" className="text-sm text-muted">
+              Loading…
+            </p>
+          ) : tab === "Meals" ? (
+            <MealsTab
+              state={planner.state}
+              busy={planner.busy}
+              onAddMeal={planner.addMeal}
+              onAddFromTemplate={planner.addFromTemplate}
+              onUpdateMeal={planner.updateMeal}
+              onDeleteMeal={planner.deleteMeal}
+              onAddIngredient={planner.addIngredient}
+              onUpdateIngredient={planner.updateIngredient}
+              onRemoveIngredient={planner.removeIngredient}
+            />
+          ) : tab === "Weekly Plan" ? (
+            <WeeklyPlanTab
+              state={planner.state}
+              busy={planner.busy}
+              onSave={planner.savePlan}
+              onCopyPrevious={planner.copyPreviousWeek}
+            />
+          ) : (
+            <GroceryTab
+              weekStart={planner.state.week_start}
+              lines={planner.grocery}
+              busy={planner.busy}
+              onGenerate={planner.generateGroceryList}
+            />
+          )}
+        </TabPanel>
       </main>
     </div>
   );
@@ -119,9 +117,12 @@ function WeekPicker({
         type="date"
         value={week}
         disabled={disabled}
+        aria-label="Week starting"
         // Any date snaps to its Monday, so the user never has to know which
         // day a week officially starts on.
-        onChange={(e) => e.target.value && onChange(mondayOf(new Date(e.target.value)))}
+        onChange={(e) =>
+          e.target.value && onChange(mondayOf(new Date(e.target.value)))
+        }
         className="rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-ink"
       />
 

@@ -7,8 +7,7 @@ accidentally SQLite-shaped.
 
 Isolation comes from constructing :class:`~app.db.Database` with an explicit
 URL, and from setting that URL in the environment so code building its own
-Database (the Streamlit UI) picks it up too. Nothing patches module
-internals.
+Database (the API) picks it up too. Nothing patches module internals.
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ from __future__ import annotations
 import os
 
 import pytest
-import streamlit as st
 from sqlmodel import SQLModel
 
 from app.db import DATABASE_URL_ENV_VAR, Database
@@ -26,6 +24,7 @@ from app.repositories import (
     MealRepository,
     WeeklyPlanRepository,
 )
+from server.deps import reset_services_cache
 
 #: Point the suite at a real Postgres. Unset means local SQLite files.
 TEST_DATABASE_URL_ENV_VAR = "TEST_DATABASE_URL"
@@ -39,9 +38,9 @@ def db(tmp_path, monkeypatch) -> Database:
 
     monkeypatch.setenv(DATABASE_URL_ENV_VAR, url)
 
-    # The UI caches its Database in st.cache_resource, which would otherwise
-    # leak one test's connection - and data - into the next.
-    st.cache_resource.clear()
+    # The API caches its engine per process, which would otherwise leak one
+    # test's connection - and data - into the next.
+    reset_services_cache()
 
     database = Database(url)
     if shared_url:
@@ -57,7 +56,7 @@ def db(tmp_path, monkeypatch) -> Database:
     stamp_head(url)
     yield database
 
-    st.cache_resource.clear()
+    reset_services_cache()
 
 
 @pytest.fixture

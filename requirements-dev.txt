@@ -1,6 +1,6 @@
 # Development install. Prefer `pip install -e ".[dev]"`, which reads
 # pyproject.toml; this file exists so CI can install without a build step.
--r requirements-streamlit.txt
+-r requirements.txt
 uvicorn[standard]==0.52.4
 pytest==9.1.1
 httpx==0.28.1
