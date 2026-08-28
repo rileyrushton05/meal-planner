@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from api import schemas
+from server import schemas
 
 TYPES_FILE = Path(__file__).resolve().parents[1] / "web/src/api/types.ts"
 

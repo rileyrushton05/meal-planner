@@ -6,10 +6,10 @@ from datetime import date
 
 from fastapi import APIRouter, Depends
 
-from api import serializers
-from api.deps import Services, get_services
-from api.routers.plans import monday_of
-from api.schemas import AppState, TemplateRead
+from server import serializers
+from server.deps import Services, get_services
+from server.routers.plans import monday_of
+from server.schemas import AppState, TemplateRead
 from app.templates import MEAL_TEMPLATES
 
 router = APIRouter(prefix="/api", tags=["state"])

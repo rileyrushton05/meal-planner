@@ -11,8 +11,8 @@ from datetime import date, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from api.deps import reset_services_cache
-from api.main import app
+from server.deps import reset_services_cache
+from server.main import app
 from app.templates import MEAL_TEMPLATES
 
 MONDAY = date(2026, 8, 3)

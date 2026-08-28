@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.models import Ingredient, Meal, MealIngredient, WeeklyPlan
 from app.planner import GroceryItem
 from app.templates import MealTemplate
-from api.schemas import (
+from server.schemas import (
     DayAssignment,
     GroceryLine,
     IngredientAmount,

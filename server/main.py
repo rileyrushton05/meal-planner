@@ -13,8 +13,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.deps import _database
-from api.routers import meals, plans, state
+from server.deps import _database
+from server.routers import meals, plans, state
 from app.exceptions import (
     DuplicateNameError,
     MealNotFoundError,

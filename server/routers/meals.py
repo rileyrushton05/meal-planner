@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from api import serializers
-from api.deps import Services, get_services
-from api.schemas import IngredientAdd, IngredientUpdate, MealCreate, MealRead, MealUpdate
+from server import serializers
+from server.deps import Services, get_services
+from server.schemas import IngredientAdd, IngredientUpdate, MealCreate, MealRead, MealUpdate
 from app.templates import MEAL_TEMPLATES
 
 router = APIRouter(prefix="/api/meals", tags=["meals"])

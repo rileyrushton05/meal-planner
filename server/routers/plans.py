@@ -6,9 +6,9 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends
 
-from api import serializers
-from api.deps import Services, get_services
-from api.schemas import GroceryLine, WeekPlanRead, WeekPlanWrite
+from server import serializers
+from server.deps import Services, get_services
+from server.schemas import GroceryLine, WeekPlanRead, WeekPlanWrite
 from app.planner import generate_weekly_grocery_list
 
 router = APIRouter(prefix="/api", tags=["plan"])

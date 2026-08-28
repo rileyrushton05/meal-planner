@@ -1,11 +1,12 @@
-# Runtime dependencies for Streamlit Community Cloud, which installs from
-# this file and then runs ui/streamlit_app.py directly, without installing
-# the project as a package.
+# Runtime dependencies for the API.
 #
-# Keep in sync with [project].dependencies in pyproject.toml, which is what
-# local development and CI install from.
-streamlit==1.55.0
+# Vercel's Python runtime installs the serverless function's dependencies
+# from this file, at the repository root, so it must contain the API's
+# dependencies and nothing heavier.
+#
+# Keep in sync with [project].dependencies + the [api] extra in
+# pyproject.toml.
 sqlmodel==0.0.37
-streamlit-searchbox==0.1.24
 psycopg[binary]==3.3.4
 alembic==1.19.1
+fastapi==0.141.1

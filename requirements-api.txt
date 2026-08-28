@@ -1,7 +1,0 @@
-# Runtime dependencies for the FastAPI backend (deployed to Fly.io).
-# Keep in sync with [project].dependencies + [api] extra in pyproject.toml.
-sqlmodel==0.0.37
-psycopg[binary]==3.3.4
-alembic==1.19.1
-fastapi==0.141.1
-uvicorn[standard]==0.52.4

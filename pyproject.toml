@@ -41,7 +41,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["app", "ui", "ui.tabs"]
+packages = ["app", "server", "server.routers", "ui", "ui.tabs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
