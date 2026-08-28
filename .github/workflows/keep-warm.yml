@@ -1,0 +1,51 @@
+name: Keep database warm
+
+# Neon's free tier suspends compute after ~5 minutes idle, and the first
+# query afterwards pays a cold start (measured at 859ms versus 135ms warm).
+# For an app used in short bursts that means almost every visit starts slow.
+# A trivial query on a schedule keeps the compute awake.
+#
+# This is a workaround, not a guarantee: GitHub's scheduled runs are
+# best-effort and can be delayed under load. Neon's paid tier is the only
+# actual fix for suspension.
+
+on:
+  schedule:
+    # Every 5 minutes during waking hours (UTC), which is when the app is
+    # realistically used. Overnight it is allowed to sleep.
+    - cron: "*/5 20-23,0-12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install driver
+        run: pip install "psycopg[binary]==3.3.4"
+
+      - name: Ping
+        env:
+          MEAL_PLANNER_DB_URL: ${{ secrets.MEAL_PLANNER_DB_URL }}
+        run: |
+          python - <<'PY'
+          import os, sys, time
+          import psycopg
+
+          url = os.environ.get("MEAL_PLANNER_DB_URL", "")
+          if not url:
+              sys.exit("MEAL_PLANNER_DB_URL secret is not set")
+
+          # psycopg does not understand SQLAlchemy's driver suffix.
+          url = url.replace("postgresql+psycopg://", "postgresql://")
+
+          start = time.perf_counter()
+          with psycopg.connect(url, connect_timeout=20) as conn:
+              conn.execute("select 1")
+          print(f"warm in {(time.perf_counter() - start) * 1000:.0f} ms")
+          PY

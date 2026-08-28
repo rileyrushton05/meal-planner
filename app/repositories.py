@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlalchemy import delete, func, insert
+from sqlmodel import Session, col, select
 
 from app.db import Database
 from app.exceptions import DuplicateNameError, MealNotFoundError, UnitMismatchError
@@ -260,25 +260,59 @@ class WeeklyPlanRepository:
         servings: int | None = None,
     ) -> None:
         """Assign (or clear, with meal_id=None) the meal for one day."""
+        self.set_week(week_start_date, {day: (meal_id, servings)})
+
+    def set_week(
+        self,
+        week_start_date: date,
+        assignments: dict[DayOfWeek | str, tuple[int | None, int | None]],
+    ) -> None:
+        """Assign several days of one week in a single transaction.
+
+        Saving a whole week a day at a time meant seven sessions and
+        fourteen statements - unnoticeable against a local file, several
+        seconds against a database across a network. One session handles
+        the lot, and either every day lands or none does.
+
+        Args:
+            assignments: day -> (meal_id, servings). A meal_id of None
+                clears that day.
+        """
+        if not assignments:
+            return
+
+        wanted = {str(day): value for day, value in assignments.items()}
+
         with self._db.session() as session:
-            plan = session.exec(
-                select(WeeklyPlan).where(
+            # Replace rather than read-then-update: a SELECT plus one UPDATE
+            # or INSERT per day is eight round trips for a week, where a
+            # delete and a bulk insert is two. Row ids are not referenced
+            # anywhere, so recreating them costs nothing.
+            #
+            # Days with no meal still get a row, with meal_id NULL - that is
+            # how "explicitly cleared" is distinguished from "never set".
+            session.execute(
+                delete(WeeklyPlan).where(
                     WeeklyPlan.week_start_date == week_start_date,
-                    WeeklyPlan.day_of_week == str(day),
+                    col(WeeklyPlan.day_of_week).in_(wanted),
                 )
-            ).first()
-            if plan:
-                plan.meal_id = meal_id
-                plan.servings = servings
-            else:
-                session.add(
-                    WeeklyPlan(
-                        week_start_date=week_start_date,
-                        day_of_week=str(day),
-                        meal_id=meal_id,
-                        servings=servings,
-                    )
-                )
+            )
+            # A Core insert with a list of rows becomes one executemany.
+            # Adding ORM objects instead makes SQLAlchemy issue an INSERT per
+            # row so it can read back each generated id - ids nothing here
+            # needs.
+            session.execute(
+                insert(WeeklyPlan),
+                [
+                    {
+                        "week_start_date": week_start_date,
+                        "day_of_week": day,
+                        "meal_id": meal_id,
+                        "servings": servings,
+                    }
+                    for day, (meal_id, servings) in wanted.items()
+                ],
+            )
 
     def copy_week(self, source_week: date, target_week: date) -> int:
         """Copy every assigned day from one week onto another.

@@ -99,11 +99,17 @@ def _render_plan_form(
             chosen[day] = (selected, int(servings))
 
         if st.form_submit_button("Set Weekly Plan", type="primary"):
-            for day, (meal_name, servings) in chosen.items():
-                meal_id = meal_ids_by_name.get(meal_name)
-                services.plans.set_day(
-                    week_start, day, meal_id, servings if meal_id else None
-                )
+            # One transaction for all seven days, rather than one per day.
+            services.plans.set_week(
+                week_start,
+                {
+                    day: (
+                        meal_ids_by_name.get(meal_name),
+                        servings if meal_ids_by_name.get(meal_name) else None,
+                    )
+                    for day, (meal_name, servings) in chosen.items()
+                },
+            )
             # Rerun so the week overview re-reads what was just written. The
             # plan list is loaded once at the top of the tab and shared, so
             # without this it would still hold pre-save data. The message is
