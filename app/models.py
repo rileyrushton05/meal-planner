@@ -1,8 +1,8 @@
-"""SQLModel table definitions and the domain enums they rely on.
+"""SQLModel tables and the domain enums they use.
 
-Note: this module deliberately omits ``from __future__ import annotations``.
-SQLAlchemy resolves ``Relationship`` targets from real annotation objects at
-class-creation time, and stringifying them breaks that lookup.
+Deliberately omits ``from __future__ import annotations``: SQLAlchemy
+resolves ``Relationship`` targets from real annotation objects, and
+stringifying them breaks that lookup.
 """
 
 from datetime import UTC, date, datetime
@@ -13,13 +13,8 @@ from sqlmodel import Field, Relationship, SQLModel
 
 
 class DayOfWeek(StrEnum):
-    """The seven days, in the order the planner displays them.
-
-    Declaration order is the display order, so `list(DayOfWeek)` is the
-    single source of truth for "Monday first" and callers never hand-roll
-    a day list. Stored in the database as its plain string value, which
-    keeps existing rows readable and needs no migration.
-    """
+    """The seven days. Declaration order is display order, so `list(DayOfWeek)`
+    is the single source of truth for "Monday first"."""
 
     MONDAY = "Monday"
     TUESDAY = "Tuesday"
@@ -29,14 +24,9 @@ class DayOfWeek(StrEnum):
     SATURDAY = "Saturday"
     SUNDAY = "Sunday"
 
-    @property
-    def short_name(self) -> str:
-        """Three-letter abbreviation, e.g. "Mon"."""
-        return self.value[:3]
-
 
 class MealIngredient(SQLModel, table=True):
-    """Join row pairing a meal with an ingredient, plus how much of it."""
+    """Pairs a meal with an ingredient, and how much of it."""
 
     meal_id: int | None = Field(default=None, foreign_key="meal.id", primary_key=True)
     ingredient_id: int | None = Field(
@@ -53,10 +43,8 @@ class Meal(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     servings: int = 1
-    # sa_type is explicit because the default maps to a naive column. The
-    # value is timezone-aware UTC, and Postgres would otherwise store it as
-    # `timestamp without time zone`, silently discarding the offset. SQLite
-    # is untyped enough not to care, so this only shows up on Postgres.
+    # sa_type is explicit because the default maps to a naive column, and
+    # Postgres would then drop the UTC offset. Invisible on SQLite.
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_type=DateTime(timezone=True),
@@ -68,7 +56,7 @@ class Meal(SQLModel, table=True):
 
 
 class Ingredient(SQLModel, table=True):
-    """A single shopping item, shared across every meal that uses it."""
+    """A shopping item, shared across every meal that uses it."""
 
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True)
@@ -79,10 +67,10 @@ class Ingredient(SQLModel, table=True):
 
 
 class WeeklyPlan(SQLModel, table=True):
-    """One day of one week, and the meal assigned to it.
+    """The meal assigned to one day of one week.
 
-    Keyed by (week_start_date, day_of_week) so each week is independent
-    and planning next week never overwrites this one.
+    Keyed by (week_start_date, day_of_week), so planning next week never
+    overwrites this one.
     """
 
     __table_args__ = (
@@ -95,7 +83,5 @@ class WeeklyPlan(SQLModel, table=True):
     week_start_date: date = Field(index=True)
     day_of_week: str = Field(index=True)
     meal_id: int | None = Field(default=None, foreign_key="meal.id")
-    #: Servings actually planned for this day, which may differ from the
-    #: meal's own base servings (e.g. cooking a serves-4 recipe for 2).
-    #: None means "use the meal's base servings unscaled".
+    #: Servings planned for this day. None means use the recipe unscaled.
     servings: int | None = None

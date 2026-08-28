@@ -1,4 +1,4 @@
-"""Database engine ownership and transactional session handling."""
+"""Database engine ownership and transactional sessions."""
 
 from __future__ import annotations
 
@@ -9,25 +9,16 @@ from pathlib import Path
 
 from sqlmodel import Session, SQLModel, create_engine
 
-# Imported for the side effect of registering the table models with
-# SQLModel.metadata, so create_tables() below knows about them. Never
-# referenced directly.
+# Registers the tables on SQLModel.metadata for create_tables().
 from app import models  # noqa: F401
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
-
-#: Overrides the database location. Set to a Neon/Postgres URL in deployment,
-#: to a temporary file by the tests, and left unset for local SQLite.
 DATABASE_URL_ENV_VAR = "MEAL_PLANNER_DB_URL"
 
 
 def load_env_file() -> None:
-    """Load .env into the environment, if python-dotenv is available.
-
-    A convenience for local work; deployments provide real environment
-    variables or Streamlit secrets, so this quietly does nothing there.
-    """
+    """Load .env for local development. A no-op if python-dotenv is absent."""
     try:
         from dotenv import load_dotenv
     except ImportError:
@@ -36,19 +27,13 @@ def load_env_file() -> None:
 
 
 def default_database_url() -> str:
-    """Where the app stores its data, unless overridden by the environment.
-
-    The on-disk fallback is resolved from this file's location rather than
-    the working directory, so the path is identical however the app is
-    launched (terminal, IDE run button, Streamlit Cloud).
-    """
+    """The configured database URL, falling back to a local SQLite file."""
     configured = os.getenv(DATABASE_URL_ENV_VAR)
     if configured:
         return configured
 
     # Serverless filesystems are read-only outside /tmp, so the SQLite
-    # fallback cannot work there. Without this the failure surfaces as an
-    # OSError from mkdir, which says nothing about the missing setting.
+    # fallback cannot work there; say so rather than failing in mkdir.
     if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
         raise RuntimeError(
             f"{DATABASE_URL_ENV_VAR} is not set. A serverless deployment has no "
@@ -61,11 +46,10 @@ def default_database_url() -> str:
 
 
 class Database:
-    """Owns a SQLAlchemy engine and hands out transactional sessions.
+    """Owns an engine and hands out transactional sessions.
 
-    Constructed with an explicit URL rather than reading module-level
-    globals, so tests can point it at a temporary file and a deployment can
-    target Postgres without touching a single call site.
+    Takes an explicit URL rather than reading a global, so tests can point it
+    at a temporary file and deployments at Postgres without touching callers.
     """
 
     def __init__(self, url: str | None = None, *, echo: bool | None = None) -> None:
@@ -75,43 +59,34 @@ class Database:
 
         options: dict[str, object] = {}
         if not self.is_sqlite:
-            # A managed Postgres sits behind a network and a pooler, either of
-            # which can drop an idle connection. pre-ping checks a connection
-            # is alive before handing it out, instead of failing a user's
-            # first query after a quiet period.
+            # A pooler or network can drop an idle connection; check one is
+            # alive rather than failing the first query after a quiet period.
             options["pool_pre_ping"] = True
 
         self._engine = create_engine(self.url, echo=echo, **options)
 
     @property
     def is_sqlite(self) -> bool:
-        """True when backed by a local SQLite file rather than a server."""
         return self.url.startswith("sqlite")
 
     @property
     def engine(self):
-        """The underlying SQLAlchemy engine, for Alembic and diagnostics."""
+        """The SQLAlchemy engine, for Alembic and diagnostics."""
         return self._engine
 
     def create_tables(self) -> None:
-        """Create any missing tables directly from the models.
+        """Create missing tables straight from the models.
 
-        Used by the tests, where running the full migration history for each
-        of dozens of cases would be needlessly slow. The application itself
-        migrates instead, and CI asserts the two agree.
+        For tests only - replaying the migration history per test would be
+        needlessly slow. The app migrates instead, and CI asserts they agree.
         """
         SQLModel.metadata.create_all(self._engine)
 
     @contextmanager
     def session(self) -> Generator[Session]:
-        """Yield a session that commits on success and rolls back on error.
-
-        Every repository method runs inside one of these, which is what
-        makes multi-step writes (a meal plus all its ingredients) atomic.
-        """
-        # expire_on_commit=False keeps attributes readable after the
-        # session closes, so repository methods can return ORM objects
-        # to callers that have no session of their own.
+        """Yield a session that commits on success and rolls back on error."""
+        # expire_on_commit=False keeps attributes readable after close, so
+        # repositories can return ORM objects to callers with no session.
         session = Session(self._engine, expire_on_commit=False)
         try:
             yield session

@@ -68,7 +68,7 @@ meal-planner/
 ├── web/                  # React + TypeScript + Tailwind frontend
 │   └── src/
 │       ├── api/          #   Typed client and shared types
-│       ├── components/   #   Tabs and the three views
+│       ├── components/   #   Tabs, the three views, meals/ sub-components
 │       ├── hooks/        #   usePlanner: one week of state
 │       └── lib/          #   Week arithmetic
 ├── migrations/           # Alembic revision history

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { GroceryTab } from "./components/GroceryTab";
 import { TabPanel, Tabs } from "./components/Tabs";
-import { MealsTab } from "./components/MealsTab";
+import { MealsTab } from "./components/meals/MealsTab";
 import { WeeklyPlanTab } from "./components/WeeklyPlanTab";
 import { usePlanner } from "./hooks/usePlanner";
 import { addDays, formatWeekRange, mondayOf } from "./lib/dates";

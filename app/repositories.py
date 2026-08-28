@@ -1,8 +1,7 @@
 """Data-access layer.
 
-Each repository is constructed with a :class:`~app.db.Database` and runs
-every method inside a single transaction, so multi-step writes either land
-completely or not at all. Callers never open sessions themselves.
+Each repository takes a :class:`~app.db.Database` and runs every method in
+one transaction, so multi-step writes either land completely or not at all.
 """
 
 from __future__ import annotations
@@ -36,14 +35,6 @@ class IngredientRepository:
         with self._db.session() as session:
             return list(session.exec(select(Ingredient)).all())
 
-    def search_names(self, term: str) -> list[str]:
-        """Ingredient names containing `term`, for the autocomplete picker."""
-        names = [ingredient.name for ingredient in self.list_all()]
-        if not term:
-            return names
-        lowered = term.lower()
-        return [name for name in names if lowered in name.lower()]
-
 
 class MealRepository:
     """Creates, reads and edits meals and the ingredients attached to them."""
@@ -61,11 +52,8 @@ class MealRepository:
     def list_all_with_ingredients(
         self,
     ) -> list[tuple[Meal, list[tuple[MealIngredient, Ingredient]]]]:
-        """Every meal paired with its ingredients, in two queries total.
-
-        Calling list_ingredients per meal instead would be one query per
-        meal - fine locally, one network round trip each in deployment.
-        """
+        """Every meal with its ingredients, in two queries rather than one
+        per meal - which would be a network round trip each in deployment."""
         with self._db.session() as session:
             meals = list(session.exec(select(Meal)).all())
 
@@ -84,11 +72,7 @@ class MealRepository:
     def get_with_ingredients(
         self, meal_id: int
     ) -> tuple[Meal, list[tuple[MealIngredient, Ingredient]]]:
-        """One meal and its ingredients.
-
-        Raises:
-            MealNotFoundError: if the meal doesn't exist.
-        """
+        """One meal and its ingredients. Raises MealNotFoundError."""
         with self._db.session() as session:
             meal = self._get_or_raise(session, meal_id)
             rows = session.exec(
@@ -99,11 +83,7 @@ class MealRepository:
             return meal, list(rows)
 
     def add(self, name: str, servings: int = 1) -> Meal:
-        """Create a meal.
-
-        Raises:
-            DuplicateNameError: if a meal with that name already exists.
-        """
+        """Create a meal. Raises DuplicateNameError if the name is taken."""
         with self._db.session() as session:
             self._assert_name_available(session, name)
             meal = Meal(name=name, servings=servings)
@@ -112,11 +92,7 @@ class MealRepository:
             return meal
 
     def add_from_template(self, template: MealTemplate) -> Meal:
-        """Create a meal and all of its template ingredients in one transaction.
-
-        Raises:
-            DuplicateNameError: if a meal with that name already exists.
-        """
+        """Create a meal and its template ingredients in one transaction."""
         with self._db.session() as session:
             self._assert_name_available(session, template.name)
             meal = Meal(name=template.name, servings=template.servings)
@@ -128,11 +104,9 @@ class MealRepository:
             return meal
 
     def update(self, meal_id: int, name: str, servings: int) -> None:
-        """Rename a meal and/or change its base serving size.
+        """Rename a meal or change its serving size.
 
-        Raises:
-            MealNotFoundError: if the meal doesn't exist.
-            DuplicateNameError: if another meal already has that name.
+        Raises MealNotFoundError, or DuplicateNameError if the name is taken.
         """
         with self._db.session() as session:
             meal = self._get_or_raise(session, meal_id)
@@ -142,13 +116,10 @@ class MealRepository:
             meal.servings = servings
 
     def delete(self, meal_id: int) -> None:
-        """Delete a meal, its ingredient links, and any day assignments.
+        """Delete a meal and its ingredient links.
 
-        Days the meal was planned on are left in place but unassigned,
-        rather than being deleted outright.
-
-        Raises:
-            MealNotFoundError: if the meal doesn't exist.
+        Days it was planned on are unassigned rather than deleted.
+        Raises MealNotFoundError.
         """
         with self._db.session() as session:
             meal = self._get_or_raise(session, meal_id)
@@ -183,14 +154,10 @@ class MealRepository:
     def add_ingredient(
         self, meal_id: int, ingredient_name: str, qty: float, unit: str
     ) -> None:
-        """Attach an ingredient to a meal, creating the ingredient if new.
+        """Attach an ingredient, creating it if new.
 
-        Adding an ingredient the meal already has accumulates the quantity
-        rather than creating a second row.
-
-        Raises:
-            UnitMismatchError: if the meal already measures that ingredient
-                in a different unit.
+        Re-adding an existing one accumulates the quantity. Raises
+        UnitMismatchError if the meal already uses a different unit.
         """
         with self._db.session() as session:
             self._attach_ingredient(session, meal_id, ingredient_name, qty, unit)
@@ -247,11 +214,8 @@ class MealRepository:
     def _attach_ingredient(
         cls, session: Session, meal_id: int, name: str, qty: float, unit: str
     ) -> None:
-        """Shared by add_ingredient and add_from_template.
-
-        Takes the caller's session so the whole operation stays in one
-        transaction rather than opening a nested one.
-        """
+        """Takes the caller's session so the operation stays in one
+        transaction rather than opening a nested one."""
         ingredient = _find_ingredient_by_name(session, name)
         if ingredient is None:
             ingredient = Ingredient(name=name)
@@ -285,7 +249,7 @@ class WeeklyPlanRepository:
         self._db = db
 
     def get_week(self, week_start_date: date) -> list[WeeklyPlan]:
-        """Every stored day for one week. Days never set are simply absent."""
+        """Every stored day for one week. Days never set are absent."""
         with self._db.session() as session:
             statement = select(WeeklyPlan).where(
                 WeeklyPlan.week_start_date == week_start_date
@@ -309,14 +273,9 @@ class WeeklyPlanRepository:
     ) -> None:
         """Assign several days of one week in a single transaction.
 
-        Saving a whole week a day at a time meant seven sessions and
-        fourteen statements - unnoticeable against a local file, several
-        seconds against a database across a network. One session handles
-        the lot, and either every day lands or none does.
-
-        Args:
-            assignments: day -> (meal_id, servings). A meal_id of None
-                clears that day.
+        `assignments` maps day -> (meal_id, servings); a None meal_id clears
+        the day. A day at a time meant 14 statements and several seconds
+        against a remote database.
         """
         if not assignments:
             return
@@ -324,23 +283,18 @@ class WeeklyPlanRepository:
         wanted = {str(day): value for day, value in assignments.items()}
 
         with self._db.session() as session:
-            # Replace rather than read-then-update: a SELECT plus one UPDATE
-            # or INSERT per day is eight round trips for a week, where a
-            # delete and a bulk insert is two. Row ids are not referenced
-            # anywhere, so recreating them costs nothing.
-            #
-            # Days with no meal still get a row, with meal_id NULL - that is
-            # how "explicitly cleared" is distinguished from "never set".
+            # Replace rather than read-then-update: eight round trips for
+            # a week becomes two. Row ids are referenced nowhere. Cleared
+            # days keep a row with a NULL meal_id, distinguishing them from
+            # days never set.
             session.execute(
                 delete(WeeklyPlan).where(
                     WeeklyPlan.week_start_date == week_start_date,
                     col(WeeklyPlan.day_of_week).in_(wanted),
                 )
             )
-            # A Core insert with a list of rows becomes one executemany.
-            # Adding ORM objects instead makes SQLAlchemy issue an INSERT per
-            # row so it can read back each generated id - ids nothing here
-            # needs.
+            # A Core insert becomes one executemany; adding ORM objects
+            # would emit an INSERT per row to read back ids nothing uses.
             session.execute(
                 insert(WeeklyPlan),
                 [
@@ -355,13 +309,9 @@ class WeeklyPlanRepository:
             )
 
     def copy_week(self, source_week: date, target_week: date) -> int:
-        """Copy every assigned day from one week onto another.
+        """Copy assigned days from one week onto another, returning the count.
 
-        Unassigned days in the source are skipped rather than clearing the
-        target, so copying never destroys work already done on the target.
-
-        Returns:
-            How many days were copied. Zero means the source week was empty.
+        Unassigned source days are skipped rather than clearing the target.
         """
         copied = 0
         with self._db.session() as session:

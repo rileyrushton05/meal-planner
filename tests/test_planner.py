@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.models import DayOfWeek
-from app.planner import format_grocery_list, generate_weekly_grocery_list
+from app.planner import generate_weekly_grocery_list
 
 WEEK_1 = date(2026, 8, 3)
 WEEK_2 = date(2026, 8, 10)
@@ -140,12 +140,3 @@ def test_results_are_sorted_by_ingredient_name(db, meals, plans):
     names = [item.name for item in generate_weekly_grocery_list(db, WEEK_1)]
     assert names == sorted(names)
 
-
-def test_format_grocery_list_renders_one_line_per_item(db, meals, plans):
-    meal = meals.add("Spaghetti")
-    meals.add_ingredient(meal.id, "Pasta", 200, "g")
-    plans.set_day(WEEK_1, DayOfWeek.MONDAY, meal.id)
-
-    text = format_grocery_list(generate_weekly_grocery_list(db, WEEK_1))
-
-    assert text == "- Pasta: 200 g"

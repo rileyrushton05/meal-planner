@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { makeMeal, makeState, makeTemplate } from "../test/factories";
+import { makeMeal, makeState, makeTemplate } from "../../test/factories";
 import { MealsTab } from "./MealsTab";
 
 function renderTab(overrides = {}) {

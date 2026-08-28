@@ -1,14 +1,10 @@
-"""Normalizing measurement units so equivalent amounts can be summed."""
+"""Normalising measurement units so equivalent amounts can be summed."""
 
 from __future__ import annotations
 
-#: Conversions to a canonical base unit per family. Deliberately limited to
-#: metric mass and volume, whose ratios are exact and universal.
-#:
-#: tsp/tbsp/cup are intentionally absent: their real size varies by region
-#: (an Australian metric cup is 250 ml, a US cup is ~237 ml), so converting
-#: them would silently produce a wrong number. Leaving them unconverted
-#: merely fails to merge, which is visible and harmless.
+#: Metric mass and volume only. tsp/tbsp/cup vary by region (an Australian
+#: cup is 250 ml, a US cup ~237 ml), so converting them would produce a
+#: silently wrong number; leaving them alone merely fails to merge.
 _CONVERSIONS_TO_BASE: dict[str, tuple[str, float]] = {
     "mg": ("g", 0.001),
     "g": ("g", 1.0),
@@ -21,11 +17,8 @@ _CONVERSIONS_TO_BASE: dict[str, tuple[str, float]] = {
 def normalize(qty: float, unit: str | None) -> tuple[float, str]:
     """Convert an amount to its family's base unit.
 
-    Units outside the convertible families are returned unchanged apart
-    from being lower-cased and stripped, so "Tbsp" and "tbsp" still merge
-    with each other even though neither is converted.
-
-    Returns the (quantity, unit) pair to accumulate under.
+    Unconvertible units are returned lower-cased and stripped, so "Tbsp" and
+    "tbsp" still merge with each other.
     """
     unit_key = (unit or "").strip().lower()
     if unit_key in _CONVERSIONS_TO_BASE:
@@ -35,11 +28,7 @@ def normalize(qty: float, unit: str | None) -> tuple[float, str]:
 
 
 def format_qty(qty: float) -> str:
-    """Render a quantity without a trailing ".0" on whole numbers.
-
-    Grocery lists read better as "400 g" and "2 cloves" than as
-    "400.0 g" and "2.0 cloves".
-    """
+    """Render a quantity without a trailing ".0" - "400 g", not "400.0 g"."""
     rounded = round(qty, 2)
     if rounded == int(rounded):
         return str(int(rounded))

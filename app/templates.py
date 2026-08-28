@@ -26,11 +26,6 @@ class MealTemplate(NamedTuple):
     servings: int
     ingredients: tuple[TemplateIngredient, ...]
 
-    @property
-    def ingredient_summary(self) -> str:
-        """Comma-separated ingredient names, for the gallery card."""
-        return ", ".join(item.name for item in self.ingredients)
-
 
 def _template(name: str, servings: int, *ingredients: tuple) -> MealTemplate:
     """Build a MealTemplate from terse (name, qty, unit) tuples."""
