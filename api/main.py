@@ -29,10 +29,26 @@ CORS_ORIGINS_ENV_VAR = "MEAL_PLANNER_CORS_ORIGINS"
 _DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 
 
+#: Whether to apply migrations at startup. Sensible for a long-lived server,
+#: wrong for serverless: every cold start would re-check the schema, and two
+#: functions starting at once could try to migrate concurrently. On Vercel
+#: this is set to "false" and migrations are applied from CI instead.
+AUTO_MIGRATE_ENV_VAR = "MEAL_PLANNER_AUTO_MIGRATE"
+
+
+def _auto_migrate_enabled() -> bool:
+    configured = os.getenv(AUTO_MIGRATE_ENV_VAR)
+    if configured is not None:
+        return configured.lower() == "true"
+    # Vercel sets this for every deployment; default off there.
+    return os.getenv("VERCEL") is None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Bring the schema up to date once, before serving any request."""
-    upgrade_to_head(_database().url)
+    if _auto_migrate_enabled():
+        upgrade_to_head(_database().url)
     yield
 
 

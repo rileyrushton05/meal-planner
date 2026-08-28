@@ -1,0 +1,6 @@
+# Vercel installs Python dependencies for the serverless function from this
+# file. Keep in sync with requirements-api.txt.
+sqlmodel==0.0.37
+psycopg[binary]==3.3.4
+alembic==1.19.1
+fastapi==0.141.1

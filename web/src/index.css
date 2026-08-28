@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* Design tokens carried over from the Streamlit build, so the app keeps its
+   identity across the rewrite. */
+@theme {
+  --color-canvas: #14151d;
+  --color-surface: #1c1e27;
+  --color-edge: #2b2e3a;
+  --color-ink: #e5e7eb;
+  --color-muted: #9ca3af;
+  --color-accent: #818cf8;
+  --color-accent-strong: #6366f1;
+
+  --color-mon: #6366f1;
+  --color-tue: #0d9488;
+  --color-wed: #d97706;
+  --color-thu: #2563eb;
+  --color-fri: #db2777;
+  --color-sat: #16a34a;
+  --color-sun: #7c3aed;
+
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-body: "Manrope", system-ui, sans-serif;
+}
+
+html {
+  background-color: var(--color-canvas);
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+}
