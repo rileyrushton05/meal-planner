@@ -56,7 +56,8 @@ def test_convertible_units_merge_via_their_base_unit(db, meals, plans):
     plans.set_day(WEEK_1, DayOfWeek.MONDAY, first.id)
     plans.set_day(WEEK_1, DayOfWeek.TUESDAY, second.id)
 
-    assert as_pairs(generate_weekly_grocery_list(db, WEEK_1)) == {"Milk": "2200 ml"}
+    # Summed in millilitres, then shown in the unit a shopper would use.
+    assert as_pairs(generate_weekly_grocery_list(db, WEEK_1)) == {"Milk": "2.2 L"}
 
 
 def test_inconvertible_units_stay_as_separate_lines(db, meals, plans):

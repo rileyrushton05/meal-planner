@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.units import format_qty, normalize
+from app.units import format_qty, humanize, normalize
 
 
 @pytest.mark.parametrize(
@@ -40,3 +40,19 @@ def test_units_are_cased_and_trimmed_consistently(unit, expected):
 )
 def test_whole_numbers_render_without_a_decimal_tail(qty, expected):
     assert format_qty(qty) == expected
+
+
+@pytest.mark.parametrize(
+    ("qty", "unit", "expected"),
+    [
+        (1500, "g", (1.5, "kg")),
+        (1000, "g", (1.0, "kg")),
+        (999, "g", (999, "g")),
+        (2000, "ml", (2.0, "L")),
+        (250, "ml", (250, "ml")),
+        (3, "", (3, "")),
+        (5, "cloves", (5, "cloves")),
+    ],
+)
+def test_amounts_scale_up_past_a_thousand(qty, unit, expected):
+    assert humanize(qty, unit) == expected

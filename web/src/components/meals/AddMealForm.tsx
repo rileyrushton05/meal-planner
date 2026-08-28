@@ -1,6 +1,9 @@
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import { Button, Card, Field, NumberInput, SectionTitle, TextInput } from "../ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function AddMealForm({
   onAdd,
@@ -10,8 +13,8 @@ export function AddMealForm({
   busy: boolean;
 }) {
   const [name, setName] = useState("");
-  // Held as text, not a number. Coercing on every keystroke made the field
-  // impossible to clear: it snapped back to 1, so typing "4" gave "14".
+  // Held as text so the field can be cleared; coercing per keystroke made it
+  // snap back to 1, so typing "4" gave "14".
   const [servings, setServings] = useState("1");
 
   const submit = (event: React.FormEvent) => {
@@ -23,31 +26,33 @@ export function AddMealForm({
   };
 
   return (
-    <section>
-      <SectionTitle>Add a Meal</SectionTitle>
-      <Card>
-        <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-          <Field label="Meal name">
-            <TextInput
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Spaghetti Bolognese"
-            />
-          </Field>
-          <div className="w-28">
-            <Field label="Servings">
-              <NumberInput
-                min={1}
-                value={servings}
-                onChange={(e) => setServings(e.target.value)}
-              />
-            </Field>
-          </div>
-          <Button type="submit" disabled={busy || !name.trim()}>
-            Add Meal
-          </Button>
-        </form>
-      </Card>
-    </section>
+    <form
+      onSubmit={submit}
+      className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
+    >
+      <div className="min-w-48 flex-1 space-y-2">
+        <Label htmlFor="meal-name">Meal name</Label>
+        <Input
+          id="meal-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Spaghetti Bolognese"
+        />
+      </div>
+      <div className="w-24 space-y-2">
+        <Label htmlFor="meal-servings">Servings</Label>
+        <Input
+          id="meal-servings"
+          type="number"
+          min={1}
+          value={servings}
+          onChange={(e) => setServings(e.target.value)}
+        />
+      </div>
+      <Button type="submit" disabled={busy || !name.trim()}>
+        <Plus className="size-4" />
+        Add meal
+      </Button>
+    </form>
   );
 }

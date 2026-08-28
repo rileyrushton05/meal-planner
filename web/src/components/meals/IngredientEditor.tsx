@@ -1,7 +1,17 @@
+import { Plus, X } from "lucide-react";
 import { useState } from "react";
 
-import type { AppState, Meal } from "../../api/types";
-import { Button, Card, Field, NumberInput, SectionTitle, Select, TextInput } from "../ui";
+import type { AppState, IngredientAmount, Meal } from "@/api/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function IngredientEditor({
   state,
@@ -42,87 +52,105 @@ export function IngredientEditor({
   };
 
   return (
-    <section>
-      <SectionTitle>Add Ingredients to a Meal</SectionTitle>
-      <Card className="flex flex-col gap-4">
-        <Field label="Select meal">
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Ingredients</h2>
+        <div className="w-56">
           <Select
-            value={meal.id}
-            onChange={(e) => onSelectMeal(Number(e.target.value))}
+            value={String(meal.id)}
+            onValueChange={(value) => onSelectMeal(Number(value))}
           >
-            {state.meals.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-
-        <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
-          <Field label="Ingredient">
-            {/* A datalist gives native autocomplete over known ingredients
-                while still accepting anything typed - the exact behaviour
-                the Streamlit searchbox could not manage. */}
-            <TextInput
-              list="known-ingredients"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Search or type a new one"
-            />
-            <datalist id="known-ingredients">
-              {state.ingredient_names.map((n) => (
-                <option key={n} value={n} />
+            <SelectTrigger aria-label="Select meal" className="w-full">
+              {/* Base UI hands the raw value to the trigger, so without this
+                  render function the meal's id shows instead of its name. */}
+              <SelectValue>
+                {(value: string) =>
+                  state.meals.find((m) => String(m.id) === value)?.name ?? ""
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {state.meals.map((m) => (
+                <SelectItem key={m.id} value={String(m.id)}>
+                  {m.name}
+                </SelectItem>
               ))}
-            </datalist>
-          </Field>
-          <div className="w-28">
-            <Field label="Quantity">
-              <NumberInput
-                min={0}
-                step="any"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-                placeholder="200"
-              />
-            </Field>
-          </div>
-          <div className="w-32">
-            <Field label="Unit">
-              <TextInput
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                placeholder="g, ml, tbsp"
-              />
-            </Field>
-          </div>
-          <Button type="submit" disabled={busy || !valid}>
-            Add Ingredient
-          </Button>
-        </form>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-        {meal.ingredients.length === 0 ? (
-          <p className="text-sm text-muted">No ingredients added yet.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {meal.ingredients.map((ingredient) => (
-              <IngredientRow
-                key={ingredient.ingredient_id}
-                mealId={meal.id}
-                ingredient={ingredient}
-                busy={busy}
-                onUpdate={onUpdate}
-                onRemove={onRemove}
-              />
+      <form
+        onSubmit={submit}
+        className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
+      >
+        <div className="min-w-40 flex-1 space-y-2">
+          <Label htmlFor="ingredient-name">Ingredient</Label>
+          {/* A datalist gives suggestions while still accepting anything
+              typed, which a closed dropdown would not. */}
+          <Input
+            id="ingredient-name"
+            list="known-ingredients"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Search or type a new one"
+          />
+          <datalist id="known-ingredients">
+            {state.ingredient_names.map((n) => (
+              <option key={n} value={n} />
             ))}
-          </div>
-        )}
-      </Card>
+          </datalist>
+        </div>
+        <div className="w-24 space-y-2">
+          <Label htmlFor="ingredient-qty">Quantity</Label>
+          <Input
+            id="ingredient-qty"
+            type="number"
+            min={0}
+            step="any"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            placeholder="200"
+          />
+        </div>
+        <div className="w-28 space-y-2">
+          <Label htmlFor="ingredient-unit">Unit</Label>
+          <Input
+            id="ingredient-unit"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            placeholder="g, ml"
+          />
+        </div>
+        <Button type="submit" disabled={busy || !valid}>
+          <Plus className="size-4" />
+          Add ingredient
+        </Button>
+      </form>
+
+      {meal.ingredients.length === 0 ? (
+        <p className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+          No ingredients on {meal.name} yet.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {meal.ingredients.map((ingredient) => (
+            <IngredientChip
+              key={ingredient.ingredient_id}
+              mealId={meal.id}
+              ingredient={ingredient}
+              busy={busy}
+              onUpdate={onUpdate}
+              onRemove={onRemove}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
 
-
-export function IngredientRow({
+function IngredientChip({
   mealId,
   ingredient,
   busy,
@@ -130,7 +158,7 @@ export function IngredientRow({
   onRemove,
 }: {
   mealId: number;
-  ingredient: AppState["meals"][number]["ingredients"][number];
+  ingredient: IngredientAmount;
   busy: boolean;
   onUpdate: (
     mealId: number,
@@ -144,59 +172,76 @@ export function IngredientRow({
   const [qty, setQty] = useState(String(ingredient.qty));
   const [unit, setUnit] = useState(ingredient.unit);
 
-  const quantity = Number(qty);
+  if (editing) {
+    return (
+      <div className="flex items-end gap-2 rounded-lg border bg-card p-2">
+        <div className="w-20 space-y-1">
+          <Label
+            htmlFor={`qty-${ingredient.ingredient_id}`}
+            className="text-xs text-muted-foreground"
+          >
+            Quantity
+          </Label>
+          <Input
+            id={`qty-${ingredient.ingredient_id}`}
+            type="number"
+            min={0}
+            step="any"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className="h-8"
+          />
+        </div>
+        <div className="w-20 space-y-1">
+          <Label
+            htmlFor={`unit-${ingredient.ingredient_id}`}
+            className="text-xs text-muted-foreground"
+          >
+            Unit
+          </Label>
+          <Input
+            id={`unit-${ingredient.ingredient_id}`}
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            className="h-8"
+          />
+        </div>
+        <Button
+          size="sm"
+          disabled={busy || !(Number(qty) > 0)}
+          onClick={() => {
+            onUpdate(mealId, ingredient.ingredient_id, Number(qty), unit.trim());
+            setEditing(false);
+          }}
+        >
+          Save
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="rounded-lg border border-edge bg-canvas px-3 py-2">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-sm">
-          {ingredient.name} — {ingredient.qty} {ingredient.unit}
+    <span className="flex items-center gap-2 rounded-lg border bg-card py-1.5 pr-1.5 pl-3 text-sm">
+      <button
+        onClick={() => setEditing(true)}
+        aria-label={`Edit ${ingredient.name}`}
+        className="hover:text-primary"
+      >
+        {ingredient.name}
+        <span className="ml-2 font-mono text-xs text-muted-foreground">
+          {ingredient.qty} {ingredient.unit}
         </span>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="secondary" onClick={() => setEditing(!editing)}>
-            Edit
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => onRemove(mealId, ingredient.ingredient_id)}
-          >
-            Remove
-          </Button>
-        </div>
-      </div>
-
-      {editing && (
-        <div className="mt-2 flex flex-wrap items-end gap-3">
-          <div className="w-28">
-            <Field label="Quantity">
-              <NumberInput
-                min={0}
-                step="any"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="w-32">
-            <Field label="Unit">
-              <TextInput
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-              />
-            </Field>
-          </div>
-          <Button
-            disabled={busy || !(quantity > 0)}
-            onClick={() => {
-              onUpdate(mealId, ingredient.ingredient_id, quantity, unit.trim());
-              setEditing(false);
-            }}
-          >
-            Save
-          </Button>
-        </div>
-      )}
-    </div>
+      </button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-6"
+        disabled={busy}
+        aria-label={`Remove ${ingredient.name}`}
+        onClick={() => onRemove(mealId, ingredient.ingredient_id)}
+      >
+        <X className="size-3.5" />
+      </Button>
+    </span>
   );
 }

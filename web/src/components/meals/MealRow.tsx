@@ -1,7 +1,21 @@
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import type { Meal } from "../../api/types";
-import { Button, Card, Field, NumberInput, TextInput } from "../ui";
+import type { Meal } from "@/api/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function MealRow({
   meal,
@@ -15,71 +29,83 @@ export function MealRow({
   onDelete: (id: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [name, setName] = useState(meal.name);
   const [servings, setServings] = useState(String(meal.servings));
 
   return (
-    <Card>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="font-bold">{meal.name}</p>
-          <p className="text-xs text-muted">
-            serves {meal.servings} · {meal.ingredients.length} ingredient
+    <div className="rounded-xl border bg-card">
+      <div className="flex items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <p className="truncate font-medium">{meal.name}</p>
+          <p className="text-sm text-muted-foreground">
+            Serves {meal.servings} · {meal.ingredients.length} ingredient
             {meal.ingredients.length === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="secondary" onClick={() => setEditing(!editing)}>
-            Edit
+
+        <div className="flex shrink-0 gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Edit ${meal.name}`}
+            onClick={() => setEditing(!editing)}
+          >
+            <Pencil className="size-4" />
           </Button>
-          <Button variant="secondary" onClick={() => setConfirming(true)}>
-            Delete
-          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Delete ${meal.name}`}
+                />
+              }
+            >
+              <Trash2 className="size-4" />
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete {meal.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This also removes its ingredients and unassigns it from any
+                  planned day.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={busy}
+                  onClick={() => onDelete(meal.id)}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
-      {confirming && (
-        <div
-          role="alertdialog"
-          aria-label={`Confirm deleting ${meal.name}`}
-          className="mt-3 rounded-lg border border-edge bg-canvas p-3"
-        >
-          <p className="mb-3 text-sm">
-            Delete <strong>{meal.name}</strong>? This also removes its
-            ingredients and unassigns it from any planned day.
-          </p>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={busy}
-              onClick={() => {
-                setConfirming(false);
-                onDelete(meal.id);
-              }}
-            >
-              Yes, delete
-            </Button>
-          </div>
-        </div>
-      )}
-
       {editing && (
-        <div className="mt-3 flex flex-wrap items-end gap-3 border-t border-edge pt-3">
-          <Field label="Meal name">
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <div className="w-28">
-            <Field label="Servings">
-              <NumberInput
-                min={1}
-                value={servings}
-                onChange={(e) => setServings(e.target.value)}
-              />
-            </Field>
+        <div className="flex flex-wrap items-end gap-3 border-t p-4">
+          <div className="min-w-48 flex-1 space-y-2">
+            <Label htmlFor={`name-${meal.id}`}>Meal name</Label>
+            <Input
+              id={`name-${meal.id}`}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="w-24 space-y-2">
+            <Label htmlFor={`servings-${meal.id}`}>Servings</Label>
+            <Input
+              id={`servings-${meal.id}`}
+              type="number"
+              min={1}
+              value={servings}
+              onChange={(e) => setServings(e.target.value)}
+            />
           </div>
           <Button
             disabled={busy || !name.trim()}
@@ -90,8 +116,11 @@ export function MealRow({
           >
             Save
           </Button>
+          <Button variant="ghost" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
         </div>
       )}
-    </Card>
+    </div>
   );
 }

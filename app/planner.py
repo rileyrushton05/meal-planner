@@ -27,7 +27,9 @@ class GroceryItem:
 
     @property
     def display_qty(self) -> str:
-        return f"{units.format_qty(self.qty)} {self.unit}".strip()
+        """The amount as a shopper reads it, e.g. "1.5 kg" rather than "1500 g"."""
+        qty, unit = units.humanize(self.qty, self.unit)
+        return f"{units.format_qty(qty)} {unit}".strip()
 
     def __str__(self) -> str:
         return f"{self.name}: {self.display_qty}"

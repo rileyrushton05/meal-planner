@@ -32,7 +32,8 @@ web/ (React)  →  server/ (FastAPI)  →  app/ (domain)  →  Postgres / SQLite
 - **`server/`** translates HTTP to repository calls and contains no SQL. Domain
   errors map to status codes, so messages written for users surface verbatim.
 - **`web/`** renders and holds state. It loads a week in a single request and
-  works from memory afterwards.
+  works from memory afterwards. Built on shadcn/ui over Base UI primitives,
+  so dialogs, selects and tabs are accessible without hand-rolling them.
 
 Nothing above `Database` knows which backend is in use — swapping SQLite for
 Postgres is one environment variable.
@@ -68,7 +69,7 @@ meal-planner/
 ├── web/                  # React + TypeScript + Tailwind frontend
 │   └── src/
 │       ├── api/          #   Typed client and shared types
-│       ├── components/   #   Tabs, the three views, meals/ sub-components
+│       ├── components/   #   The three views; ui/ holds shadcn primitives
 │       ├── hooks/        #   usePlanner: one week of state
 │       └── lib/          #   Week arithmetic
 ├── migrations/           # Alembic revision history

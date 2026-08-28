@@ -63,6 +63,10 @@ export const api = {
   getState: (week: string): Promise<AppState> =>
     request(`/api/state?week=${week}`),
 
+  /** Just the day assignments. Meals and templates do not vary by week, so
+   *  changing week fetches this rather than the whole of getState. */
+  getPlan: (week: string): Promise<WeekPlan> => request(`/api/plan/${week}`),
+
   createMeal: (name: string, servings: number): Promise<Meal> =>
     request("/api/meals", {
       method: "POST",

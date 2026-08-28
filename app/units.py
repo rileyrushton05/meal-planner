@@ -27,6 +27,26 @@ def normalize(qty: float, unit: str | None) -> tuple[float, str]:
     return qty, unit_key
 
 
+#: Base unit -> the larger unit to switch to, and the threshold for doing so.
+#: A shopping list reads better as "1.5 kg" than "1500 g".
+_SCALE_UP = {
+    "g": ("kg", 1000.0),
+    "ml": ("L", 1000.0),
+}
+
+
+def humanize(qty: float, unit: str) -> tuple[float, str]:
+    """Express an amount in the largest unit that keeps it above 1.
+
+    Totals stay summed in the base unit, so this only affects presentation.
+    """
+    larger = _SCALE_UP.get(unit)
+    if larger and qty >= larger[1]:
+        name, factor = larger
+        return qty / factor, name
+    return qty, unit
+
+
 def format_qty(qty: float) -> str:
     """Render a quantity without a trailing ".0" - "400 g", not "400.0 g"."""
     rounded = round(qty, 2)

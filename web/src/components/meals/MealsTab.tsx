@@ -1,7 +1,6 @@
 import { useState } from "react";
 
-import type { AppState } from "../../api/types";
-import { Empty, SectionTitle } from "../ui";
+import type { AppState } from "@/api/types";
 import { AddMealForm } from "./AddMealForm";
 import { IngredientEditor } from "./IngredientEditor";
 import { MealRow } from "./MealRow";
@@ -38,20 +37,24 @@ export function MealsTab(props: Props) {
     state.meals.find((m) => m.id === selectedMealId) ?? state.meals[0] ?? null;
 
   return (
-    <div className="flex flex-col gap-8">
-      <AddMealForm onAdd={props.onAddMeal} busy={props.busy} />
-      <TemplateGallery
-        state={state}
-        busy={props.busy}
-        onAdd={props.onAddFromTemplate}
-      />
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <AddMealForm onAdd={props.onAddMeal} busy={props.busy} />
+        <TemplateGallery
+          state={state}
+          busy={props.busy}
+          onAdd={props.onAddFromTemplate}
+        />
+      </div>
 
-      <section>
-        <SectionTitle>Your Meals</SectionTitle>
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Your meals</h2>
         {state.meals.length === 0 ? (
-          <Empty>No meals yet — add your first one above.</Empty>
+          <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+            No meals yet — add one above, or start from a template.
+          </p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="grid gap-2 lg:grid-cols-2">
             {state.meals.map((meal) => (
               <MealRow
                 key={meal.id}

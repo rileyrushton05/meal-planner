@@ -1,14 +1,19 @@
 /**
  * Application state for one week.
  *
- * The whole week is fetched in a single request and then held in memory.
- * Mutations return the updated resource, so state is patched from the
+ * The first load fetches everything in a single request and then holds it in
+ * memory. Mutations return the updated resource, so state is patched from the
  * response rather than triggering a refetch. That is what makes clicking
  * around feel instant: the network is touched when data actually changes,
  * not on every interaction.
+ *
+ * Changing week is the one exception, and it fetches only the day
+ * assignments - meals, templates and ingredient names do not vary by week, so
+ * refetching them cost three extra queries per arrow click. Weeks already
+ * seen are served from `seenWeeks` and cost nothing at all.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, api } from "../api/client";
 import type { AppState, GroceryLine, Meal } from "../api/types";
@@ -22,19 +27,46 @@ export function usePlanner() {
   const [busy, setBusy] = useState(false);
   const [grocery, setGrocery] = useState<GroceryLine[] | null>(null);
 
+  // Day assignments for weeks already fetched, so going back to one is free.
+  // A ref rather than state: reading it must not itself trigger a render.
+  const seenWeeks = useRef(new Map<string, AppState["plan"]>());
+
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     setGrocery(null);
 
-    api
-      .getState(week)
-      .then((next) => {
+    const cached = seenWeeks.current.get(week);
+    if (cached) {
+      // week_start moves too, or the heading keeps naming the week we left.
+      setState((current) =>
+        current ? { ...current, week_start: week, plan: cached } : current,
+      );
+      return;
+    }
+
+    setLoading(true);
+    // Only the very first load needs the meals, templates and ingredient
+    // names; after that a week change is just its plan.
+    const load = state
+      ? api.getPlan(week).then((p) => ({ start: p.week_start, plan: p.days }))
+      : api.getState(week).then((next) => ({ full: next }));
+
+    load
+      .then((result) => {
         // A slower earlier request must not overwrite a newer week.
-        if (!cancelled) {
-          setState(next);
-          setError(null);
+        if (cancelled) return;
+        if ("full" in result) {
+          setState(result.full);
+          seenWeeks.current.set(result.full.week_start, result.full.plan);
+        } else {
+          setState((current) =>
+            current
+              ? { ...current, week_start: result.start, plan: result.plan }
+              : current,
+          );
+          seenWeeks.current.set(result.start, result.plan);
         }
+        setError(null);
       })
       .catch((err) => !cancelled && setError(describe(err)))
       .finally(() => !cancelled && setLoading(false));
@@ -42,7 +74,21 @@ export function usePlanner() {
     return () => {
       cancelled = true;
     };
+    // `state` is read to decide first-load vs week-change, but must not
+    // re-run this: that would refetch on every mutation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [week]);
+
+  /** Record a plan we just wrote, so returning to this week shows it. */
+  const rememberPlan = useCallback(
+    (weekStart: string, plan: AppState["plan"]) => {
+      seenWeeks.current.set(weekStart, plan);
+    },
+    [],
+  );
+
+  /** Drop every cached week, after a change that can affect all of them. */
+  const forgetWeeks = useCallback(() => seenWeeks.current.clear(), []);
 
   /** Run a mutation, surface any error, and keep the UI responsive. */
   const mutate = useCallback(async <T,>(action: () => Promise<T>) => {
@@ -111,6 +157,9 @@ export function usePlanner() {
               }
             : current,
         );
+        // The meal is unassigned from every week, not just this one, so no
+        // cached plan can be trusted.
+        forgetWeeks();
         setGrocery(null);
       }),
 
@@ -140,6 +189,7 @@ export function usePlanner() {
           setState((current) =>
             current ? { ...current, plan: plan.days } : current,
           );
+          rememberPlan(week, plan.days);
           setGrocery(null);
         }
       }),
@@ -150,6 +200,7 @@ export function usePlanner() {
           setState((current) =>
             current ? { ...current, plan: plan.days } : current,
           );
+          rememberPlan(week, plan.days);
           setGrocery(null);
         }
       }),

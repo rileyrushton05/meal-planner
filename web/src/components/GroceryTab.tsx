@@ -1,8 +1,9 @@
+import { Check, Copy, Download, ShoppingBasket } from "lucide-react";
 import { useState } from "react";
 
-import type { GroceryLine } from "../api/types";
-import { formatDate } from "../lib/dates";
-import { Button, Card, Empty, SectionTitle } from "./ui";
+import type { GroceryLine } from "@/api/types";
+import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/dates";
 
 interface Props {
   weekStart: string;
@@ -13,6 +14,7 @@ interface Props {
 
 export function GroceryTab({ weekStart, lines, busy, onGenerate }: Props) {
   const [copied, setCopied] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
 
   const asText = (lines ?? [])
     .map((line) => `- ${line.name}: ${line.display}`)
@@ -24,14 +26,13 @@ export function GroceryTab({ weekStart, lines, busy, onGenerate }: Props) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard access can be blocked; the textarea below is the fallback.
+      // Clipboard access can be blocked; the list is still on screen.
       setCopied(false);
     }
   };
 
   const download = () => {
-    const blob = new Blob([asText], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(new Blob([asText], { type: "text/plain" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = `grocery-list-${weekStart}.txt`;
@@ -39,53 +40,99 @@ export function GroceryTab({ weekStart, lines, busy, onGenerate }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const toggle = (key: string) =>
+    setChecked((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionTitle>Grocery List — Week of {formatDate(weekStart)}</SectionTitle>
-        <Button disabled={busy} onClick={onGenerate}>
-          {lines ? "Regenerate" : "Generate Grocery List"}
-        </Button>
-      </div>
-
-      {lines === null ? (
-        <Empty>Generate a list to see everything you need for this week.</Empty>
-      ) : lines.length === 0 ? (
-        <Empty>No meals assigned this week yet.</Empty>
-      ) : (
-        <>
-          <div className="flex flex-col gap-2">
-            {lines.map((line) => (
-              <div
-                key={`${line.name}-${line.unit}`}
-                className="flex items-center justify-between rounded-xl border border-edge bg-surface px-4 py-3"
-              >
-                <span>{line.name}</span>
-                <span className="font-bold text-accent tabular-nums">
-                  {line.display}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <Card className="flex flex-col gap-3">
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={copy}>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight">Grocery list</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {lines?.length
+              ? `${lines.length} item${lines.length === 1 ? "" : "s"} · ${checked.size} in the basket`
+              : `Everything planned for the week of ${formatDate(weekStart)}`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {lines && lines.length > 0 && (
+            <>
+              <Button variant="outline" onClick={copy}>
+                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                 {copied ? "Copied" : "Copy"}
               </Button>
-              <Button variant="secondary" onClick={download}>
-                Download .txt
+              <Button variant="outline" onClick={download}>
+                <Download className="size-4" />
+                Download
               </Button>
-            </div>
-            <textarea
-              readOnly
-              value={asText}
-              rows={Math.min(lines.length + 1, 12)}
-              className="w-full rounded-lg border border-edge bg-canvas p-3 font-mono text-xs text-ink"
-            />
-          </Card>
-        </>
+            </>
+          )}
+          <Button disabled={busy} onClick={onGenerate}>
+            {lines ? "Regenerate" : "Generate list"}
+          </Button>
+        </div>
+      </div>
+
+      {lines === null || lines.length === 0 ? (
+        <EmptyState
+          message={
+            lines === null
+              ? "Generate a list to see everything you need this week."
+              : "No meals assigned this week yet."
+          }
+        />
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {lines.map((line) => {
+            const key = `${line.name}-${line.unit}`;
+            const done = checked.has(key);
+            return (
+              <li key={key}>
+                {/* Ticking items off is local to the browser: a shopping aid,
+                    not something worth a round trip or a database column. */}
+                <button
+                  onClick={() => toggle(key)}
+                  aria-pressed={done}
+                  className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+                    done
+                      ? "border-transparent bg-card/40 text-muted-foreground"
+                      : "bg-card hover:border-primary/40 hover:bg-accent/40"
+                  }`}
+                >
+                  <span
+                    className={`flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                      done ? "border-primary bg-primary" : "border-muted-foreground/40"
+                    }`}
+                  >
+                    {done && (
+                      <Check className="size-3.5 text-primary-foreground" />
+                    )}
+                  </span>
+                  <span className={`flex-1 text-sm ${done ? "line-through" : ""}`}>
+                    {line.name}
+                  </span>
+                  <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                    {line.display}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       )}
+    </div>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border border-dashed px-6 py-10 text-center">
+      <ShoppingBasket className="size-8 text-muted-foreground/50" />
+      <p className="text-sm text-muted-foreground">{message}</p>
     </div>
   );
 }

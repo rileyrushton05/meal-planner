@@ -4,6 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: { "@": new URL("./src", import.meta.url).pathname },
+  },
   server: {
     // In development the API runs separately on :8000. Proxying it under the
     // same origin means no CORS handling and the same relative URLs the

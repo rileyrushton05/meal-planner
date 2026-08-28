@@ -1,39 +1,164 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
 
-/* Design tokens carried over from the Streamlit build, so the app keeps its
-   identity across the rewrite. */
+@custom-variant dark (&:is(.dark *));
+
+/* A hue per weekday, so a filled week reads at a glance. Warm-biased to
+   match the amber primary; chroma is held low enough to read as a palette
+   rather than a rainbow. */
 @theme {
-  --color-canvas: #14151d;
-  --color-surface: #1c1e27;
-  --color-edge: #2b2e3a;
-  --color-ink: #e5e7eb;
-  --color-muted: #9ca3af;
-  --color-accent: #818cf8;
-  --color-accent-strong: #6366f1;
-
-  --color-mon: #6366f1;
-  --color-tue: #0d9488;
-  --color-wed: #d97706;
-  --color-thu: #2563eb;
-  --color-fri: #db2777;
-  --color-sat: #16a34a;
-  --color-sun: #7c3aed;
-
-  --font-display: "Sora", system-ui, sans-serif;
-  --font-body: "Manrope", system-ui, sans-serif;
+  --color-mon: oklch(0.70 0.16 25);
+  --color-tue: oklch(0.74 0.15 60);
+  --color-wed: oklch(0.76 0.14 100);
+  --color-thu: oklch(0.72 0.15 150);
+  --color-fri: oklch(0.72 0.13 205);
+  --color-sat: oklch(0.68 0.15 285);
+  --color-sun: oklch(0.70 0.16 330);
 }
 
-html {
-  background-color: var(--color-canvas);
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-body {
-  margin: 0;
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-body);
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
 }
 
-h1, h2, h3 {
-  font-family: var(--font-display);
+.dark {
+  /* Blue-grey slate. The chroma is low enough to read as neutral but not
+     zero, which is what keeps it from looking like flat black. */
+  --background: oklch(0.16 0.012 250);
+  --foreground: oklch(0.96 0.005 250);
+  --card: oklch(0.20 0.014 250);
+  --card-foreground: oklch(0.96 0.005 250);
+  --popover: oklch(0.20 0.014 250);
+  --popover-foreground: oklch(0.96 0.005 250);
+  /* Emerald: the one warm-adjacent hue with an honest link to the subject. */
+  --primary: oklch(0.76 0.16 160);
+  --primary-foreground: oklch(0.18 0.03 160);
+  --secondary: oklch(0.25 0.016 250);
+  --secondary-foreground: oklch(0.96 0.005 250);
+  --muted: oklch(0.25 0.016 250);
+  --muted-foreground: oklch(0.70 0.02 250);
+  --accent: oklch(0.28 0.02 250);
+  --accent-foreground: oklch(0.97 0.006 250);
+  --destructive: oklch(0.64 0.19 25);
+  --border: oklch(0.75 0.03 250 / 14%);
+  --input: oklch(0.75 0.03 250 / 16%);
+  --ring: oklch(0.76 0.16 160);
+  --sidebar: oklch(0.20 0.014 250);
+  --sidebar-foreground: oklch(0.96 0.005 250);
+  --sidebar-primary: oklch(0.76 0.16 160);
+  --sidebar-primary-foreground: oklch(0.18 0.03 160);
+  --sidebar-accent: oklch(0.28 0.02 250);
+  --sidebar-accent-foreground: oklch(0.97 0.006 250);
+  --sidebar-border: oklch(0.75 0.03 250 / 14%);
+  --sidebar-ring: oklch(0.76 0.16 160);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    /* A single warm wash behind the header stops the page reading as a flat
+       slab. Fixed, so it stays put while content scrolls. */
+    background-image: radial-gradient(
+      120rem 40rem at 50% -18rem,
+      oklch(0.76 0.16 160 / 7%),
+      transparent 70%
+    );
+    background-attachment: fixed;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+@layer base {
+  /* Tailwind v4 drops v3's preflight rule giving buttons a pointer cursor,
+     so without this nothing in the app feels clickable. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }

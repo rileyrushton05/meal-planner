@@ -2,9 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { DayAssignment } from "../api/types";
-import { makeMeal, makeState } from "../test/factories";
-import { WeeklyPlanTab } from "./WeeklyPlanTab";
+import type { DayAssignment } from "@/api/types";
+import { WeeklyPlanTab } from "@/components/WeeklyPlanTab";
+import { makeMeal, makeState } from "@/test/factories";
+import { chooseOption } from "@/test/select";
 
 const spaghetti = makeMeal({ id: 1, name: "Spaghetti", servings: 4 });
 const stirFry = makeMeal({ id: 2, name: "Chicken Stir Fry", servings: 2 });
@@ -21,13 +22,13 @@ function renderTab(overrides = {}) {
 }
 
 describe("editing the plan", () => {
-  it("keeps changes local until Save is pressed", async () => {
+  it("keeps changes local until the plan is saved", async () => {
     const user = userEvent.setup();
     const { props } = renderTab();
 
-    await user.selectOptions(screen.getByLabelText("Monday"), "1");
+    await chooseOption(user, "Monday", "Spaghetti");
 
-    // The whole point of the draft: no network call from changing a dropdown.
+    // The point of the draft: choosing a meal makes no network call.
     expect(props.onSave).not.toHaveBeenCalled();
   });
 
@@ -35,8 +36,8 @@ describe("editing the plan", () => {
     const user = userEvent.setup();
     const { props } = renderTab();
 
-    await user.selectOptions(screen.getByLabelText("Monday"), "1");
-    await user.click(screen.getByRole("button", { name: "Set Weekly Plan" }));
+    await chooseOption(user, "Monday", "Spaghetti");
+    await user.click(screen.getByRole("button", { name: "Save plan" }));
 
     const days = props.onSave.mock.calls[0][0] as DayAssignment[];
     expect(days).toHaveLength(7);
@@ -44,12 +45,12 @@ describe("editing the plan", () => {
     expect(days.find((d) => d.day === "Tuesday")?.meal_id).toBeNull();
   });
 
-  it("defaults servings to the recipe's own size when a meal is picked", async () => {
+  it("defaults servings to the recipe's own size", async () => {
     const user = userEvent.setup();
     const { props } = renderTab();
 
-    await user.selectOptions(screen.getByLabelText("Tuesday"), "2");
-    await user.click(screen.getByRole("button", { name: "Set Weekly Plan" }));
+    await chooseOption(user, "Tuesday", "Chicken Stir Fry");
+    await user.click(screen.getByRole("button", { name: "Save plan" }));
 
     const days = props.onSave.mock.calls[0][0] as DayAssignment[];
     expect(days.find((d) => d.day === "Tuesday")?.servings).toBe(2);
@@ -57,27 +58,41 @@ describe("editing the plan", () => {
 
   it("clears servings when a day is unset", async () => {
     const user = userEvent.setup();
-    const plan = [{ day: "Monday", meal_id: 1, servings: 4 }];
     const { props } = renderTab({
-      state: makeState({ meals: [spaghetti, stirFry], plan }),
+      state: makeState({
+        meals: [spaghetti, stirFry],
+        plan: [{ day: "Monday", meal_id: 1, servings: 4 }],
+      }),
     });
 
-    await user.selectOptions(screen.getByLabelText("Monday"), "");
-    await user.click(screen.getByRole("button", { name: "Set Weekly Plan" }));
+    await chooseOption(user, "Monday", "No meal");
+    await user.click(screen.getByRole("button", { name: "Save plan" }));
 
-    const days = props.onSave.mock.calls[0][0] as DayAssignment[];
-    const monday = days.find((d) => d.day === "Monday");
+    const monday = (props.onSave.mock.calls[0][0] as DayAssignment[]).find(
+      (d) => d.day === "Monday",
+    );
     expect(monday?.meal_id).toBeNull();
     expect(monday?.servings).toBeNull();
+  });
+
+  it("disables Save until something changes", async () => {
+    const user = userEvent.setup();
+    renderTab();
+
+    expect(screen.getByRole("button", { name: "Save plan" })).toBeDisabled();
+
+    await chooseOption(user, "Monday", "Spaghetti");
+
+    expect(screen.getByRole("button", { name: "Save plan" })).toBeEnabled();
   });
 });
 
 describe("re-seeding the draft", () => {
+  const meals = [spaghetti, stirFry];
+
   it("adopts a new plan returned by the server", () => {
     // Regression test: the draft was re-seeded inside an effect, which
-    // renders once with stale data before correcting. It is now derived
-    // during render.
-    const meals = [spaghetti, stirFry];
+    // rendered once with stale data before correcting.
     const { rerender } = render(
       <WeeklyPlanTab
         state={makeState({ meals })}
@@ -86,8 +101,9 @@ describe("re-seeding the draft", () => {
         onCopyPrevious={vi.fn()}
       />,
     );
-
-    expect(screen.getByLabelText("Monday")).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "Monday" })).toHaveTextContent(
+      "No meal",
+    );
 
     rerender(
       <WeeklyPlanTab
@@ -101,12 +117,13 @@ describe("re-seeding the draft", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Monday")).toHaveValue("1");
+    expect(screen.getByRole("combobox", { name: "Monday" })).toHaveTextContent(
+      "Spaghetti",
+    );
   });
 
   it("does not discard an in-progress edit when unrelated state changes", async () => {
     const user = userEvent.setup();
-    const meals = [spaghetti, stirFry];
     const plan: DayAssignment[] = [];
     const { rerender } = render(
       <WeeklyPlanTab
@@ -117,59 +134,75 @@ describe("re-seeding the draft", () => {
       />,
     );
 
-    await user.selectOptions(screen.getByLabelText("Wednesday"), "2");
+    await chooseOption(user, "Wednesday", "Chicken Stir Fry");
 
-    // A meal being added elsewhere must not wipe the day the user just set.
+    // A meal added elsewhere must not wipe the day just set.
     rerender(
       <WeeklyPlanTab
-        state={makeState({ meals: [...meals, makeMeal({ id: 3, name: "Tacos" })], plan })}
+        state={makeState({
+          meals: [...meals, makeMeal({ id: 3, name: "Tacos" })],
+          plan,
+        })}
         busy={false}
         onSave={vi.fn()}
         onCopyPrevious={vi.fn()}
       />,
     );
 
-    expect(screen.getByLabelText("Wednesday")).toHaveValue("2");
+    expect(
+      screen.getByRole("combobox", { name: "Wednesday" }),
+    ).toHaveTextContent("Chicken Stir Fry");
   });
 });
 
-describe("week overview", () => {
-  it("shows an em dash for days with no meal", () => {
+describe("the week grid", () => {
+  it("shows a card for every day", () => {
     renderTab();
-    expect(screen.getAllByText("—").length).toBe(7);
+    expect(screen.getAllByRole("combobox")).toHaveLength(7);
   });
 
-  it("shows the meal and its planned servings", () => {
+  it("only offers a servings field once a meal is assigned", () => {
     renderTab({
       state: makeState({
-        meals: [spaghetti, stirFry],
+        meals: [spaghetti],
         plan: [{ day: "Monday", meal_id: 1, servings: 2 }],
       }),
     });
 
-    expect(screen.getByText("Spaghetti", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByText("2 servings")).toBeInTheDocument();
+    expect(screen.getByLabelText("Serves")).toHaveValue(2);
   });
 
-  it("uses the singular for one serving", () => {
-    renderTab({
-      state: makeState({
-        meals: [spaghetti],
-        plan: [{ day: "Monday", meal_id: 1, servings: 1 }],
-      }),
-    });
+  it("copies the previous week on request", async () => {
+    const user = userEvent.setup();
+    const { props } = renderTab();
 
-    expect(screen.getByText("1 serving")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /copy previous/i }));
+
+    expect(props.onCopyPrevious).toHaveBeenCalled();
   });
 });
 
 describe("empty state", () => {
-  it("asks for a meal before offering the form", () => {
+  it("asks for a meal before showing the grid", () => {
     renderTab({ state: makeState({ meals: [] }) });
 
     expect(screen.getByText(/add a meal first/i)).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Set Weekly Plan" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+});
+
+
+describe("the day dropdown", () => {
+  it("shows the meal's name, not its id", async () => {
+    // Regression test: Base UI's Select.Value renders the raw value, so an
+    // id-valued select displayed "1" where the meal name belonged.
+    const user = userEvent.setup();
+    renderTab();
+
+    await chooseOption(user, "Monday", "Spaghetti");
+
+    const trigger = screen.getByRole("combobox", { name: "Monday" });
+    expect(trigger).toHaveTextContent("Spaghetti");
+    expect(trigger).not.toHaveTextContent(/^\d/);
   });
 });

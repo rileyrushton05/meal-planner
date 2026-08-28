@@ -1,95 +1,114 @@
-import { useState } from "react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
-import { GroceryTab } from "./components/GroceryTab";
-import { TabPanel, Tabs } from "./components/Tabs";
-import { MealsTab } from "./components/meals/MealsTab";
-import { WeeklyPlanTab } from "./components/WeeklyPlanTab";
-import { usePlanner } from "./hooks/usePlanner";
-import { addDays, formatWeekRange, mondayOf } from "./lib/dates";
+import { GroceryTab } from "@/components/GroceryTab";
+import { MealsTab } from "@/components/meals/MealsTab";
+import { WeeklyPlanTab } from "@/components/WeeklyPlanTab";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usePlanner } from "@/hooks/usePlanner";
+import { addDays, formatWeekRange, mondayOf } from "@/lib/dates";
 
-const TABS = ["Meals", "Weekly Plan", "Grocery List"] as const;
-type Tab = (typeof TABS)[number];
+const TABS = [
+  { value: "meals", label: "Meals" },
+  { value: "plan", label: "Weekly Plan" },
+  { value: "grocery", label: "Grocery List" },
+] as const;
 
 export default function App() {
   const planner = usePlanner();
-  const [tab, setTab] = useState<Tab>("Meals");
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-10">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Weekly Meal Planner
-        </h1>
-        <p className="mt-1 text-sm text-muted">
-          Plan your meals, build your week, and generate your grocery list — all
-          in one place.
-        </p>
+    <div className="mx-auto max-w-[1400px] px-6 py-10 lg:px-10">
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Weekly Meal Planner
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Plan your week, then take the grocery list with you.
+          </p>
+        </div>
+        <WeekPicker
+          week={planner.week}
+          onChange={planner.setWeek}
+          disabled={planner.loading}
+        />
       </header>
-
-      <WeekPicker
-        week={planner.week}
-        onChange={planner.setWeek}
-        disabled={planner.loading}
-      />
 
       {planner.error && (
         <div
           role="alert"
-          className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-fri/40 bg-fri/10 px-4 py-3 text-sm"
+          className="mb-6 flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
         >
           <span>{planner.error}</span>
           <button
             onClick={planner.dismissError}
-            className="shrink-0 text-muted hover:text-ink"
             aria-label="Dismiss"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
           >
-            ✕
+            <X className="size-4" />
           </button>
         </div>
       )}
 
-      <Tabs
-        tabs={TABS}
-        active={tab}
-        onChange={setTab}
-        label="Planner sections"
-      />
+      <Tabs defaultValue="meals">
+        <TabsList>
+          {TABS.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <main>
-        <TabPanel tab={tab}>
-          {planner.loading || !planner.state ? (
-            <p role="status" className="text-sm text-muted">
-              Loading…
-            </p>
-          ) : tab === "Meals" ? (
-            <MealsTab
-              state={planner.state}
-              busy={planner.busy}
-              onAddMeal={planner.addMeal}
-              onAddFromTemplate={planner.addFromTemplate}
-              onUpdateMeal={planner.updateMeal}
-              onDeleteMeal={planner.deleteMeal}
-              onAddIngredient={planner.addIngredient}
-              onUpdateIngredient={planner.updateIngredient}
-              onRemoveIngredient={planner.removeIngredient}
-            />
-          ) : tab === "Weekly Plan" ? (
-            <WeeklyPlanTab
-              state={planner.state}
-              busy={planner.busy}
-              onSave={planner.savePlan}
-              onCopyPrevious={planner.copyPreviousWeek}
-            />
-          ) : (
-            <GroceryTab
-              weekStart={planner.state.week_start}
-              lines={planner.grocery}
-              busy={planner.busy}
-              onGenerate={planner.generateGroceryList}
-            />
-          )}
-        </TabPanel>
-      </main>
+        {/* Only the first load has nothing to show. Later loads keep the
+            current week on screen and dim it, so changing week does not blank
+            the page. */}
+        {!planner.state ? (
+          <p role="status" className="py-10 text-sm text-muted-foreground">
+            Loading…
+          </p>
+        ) : (
+          <div
+            aria-busy={planner.loading}
+            className={
+              planner.loading ? "opacity-60 transition-opacity" : undefined
+            }
+          >
+            <TabsContent value="meals" className="pt-6">
+              <MealsTab
+                state={planner.state}
+                busy={planner.busy}
+                onAddMeal={planner.addMeal}
+                onAddFromTemplate={planner.addFromTemplate}
+                onUpdateMeal={planner.updateMeal}
+                onDeleteMeal={planner.deleteMeal}
+                onAddIngredient={planner.addIngredient}
+                onUpdateIngredient={planner.updateIngredient}
+                onRemoveIngredient={planner.removeIngredient}
+              />
+            </TabsContent>
+
+            <TabsContent value="plan" className="pt-6">
+              <WeeklyPlanTab
+                state={planner.state}
+                busy={planner.busy}
+                onSave={planner.savePlan}
+                onCopyPrevious={planner.copyPreviousWeek}
+              />
+            </TabsContent>
+
+            <TabsContent value="grocery" className="pt-6">
+              <GroceryTab
+                weekStart={planner.state.week_start}
+                lines={planner.grocery}
+                busy={planner.busy}
+                onGenerate={planner.generateGroceryList}
+              />
+            </TabsContent>
+          </div>
+        )}
+      </Tabs>
     </div>
   );
 }
@@ -104,37 +123,42 @@ function WeekPicker({
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <button
-        onClick={() => onChange(addDays(week, -7))}
-        disabled={disabled}
-        className="rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-muted hover:text-ink disabled:opacity-50"
-      >
-        ← Previous
-      </button>
+    <div className="flex flex-col items-end gap-1.5">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={disabled}
+          aria-label="Previous week"
+          onClick={() => onChange(addDays(week, -7))}
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
 
-      <input
-        type="date"
-        value={week}
-        disabled={disabled}
-        aria-label="Week starting"
-        // Any date snaps to its Monday, so the user never has to know which
-        // day a week officially starts on.
-        onChange={(e) =>
-          e.target.value && onChange(mondayOf(new Date(e.target.value)))
-        }
-        className="rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-ink"
-      />
+        <Input
+          type="date"
+          value={week}
+          disabled={disabled}
+          aria-label="Week starting"
+          // Any date snaps to its Monday, so the user never has to know which
+          // day a week officially starts on.
+          onChange={(e) =>
+            e.target.value && onChange(mondayOf(new Date(e.target.value)))
+          }
+          className="w-40"
+        />
 
-      <button
-        onClick={() => onChange(addDays(week, 7))}
-        disabled={disabled}
-        className="rounded-lg border border-edge bg-surface px-3 py-2 text-sm text-muted hover:text-ink disabled:opacity-50"
-      >
-        Next →
-      </button>
-
-      <span className="text-sm text-muted">{formatWeekRange(week)}</span>
+        <Button
+          variant="outline"
+          size="icon"
+          disabled={disabled}
+          aria-label="Next week"
+          onClick={() => onChange(addDays(week, 7))}
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">{formatWeekRange(week)}</p>
     </div>
   );
 }

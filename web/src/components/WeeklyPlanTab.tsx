@@ -1,11 +1,22 @@
+import { CopyIcon } from "lucide-react";
 import { useState } from "react";
 
-import type { AppState, Day, DayAssignment } from "../api/types";
-import { DAYS } from "../api/types";
-import { formatDate } from "../lib/dates";
-import { Button, Card, Empty, Field, NumberInput, SectionTitle, Select } from "./ui";
+import type { AppState, Day, DayAssignment, Meal } from "@/api/types";
+import { DAYS } from "@/api/types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { formatDate } from "@/lib/dates";
 
-const DAY_COLOR: Record<Day, string> = {
+/** A hue per day, so a filled week reads at a glance. */
+const DAY_ACCENT: Record<Day, string> = {
   Monday: "bg-mon",
   Tuesday: "bg-tue",
   Wednesday: "bg-wed",
@@ -15,7 +26,7 @@ const DAY_COLOR: Record<Day, string> = {
   Sunday: "bg-sun",
 };
 
-const UNSET = "";
+const UNSET = "unset";
 
 interface Props {
   state: AppState;
@@ -25,16 +36,14 @@ interface Props {
 }
 
 export function WeeklyPlanTab({ state, busy, onSave, onCopyPrevious }: Props) {
-  // Draft lives in the browser: changing a dropdown is instant and nothing
+  // The draft lives in the browser: editing a day is instant, and nothing
   // reaches the network until Save.
   const [draft, setDraft] = useState<Record<Day, DayAssignment>>(() =>
     buildDraft(state),
   );
 
-  // Re-seed when the server plan changes - a week switch, a save, or a copy.
-  // Adjusting state during render rather than in an effect: React re-runs
-  // this component immediately without committing the stale draft to the
-  // DOM, where an effect would render once with the wrong data first.
+  // Re-seed when the server plan changes. Adjusting state during render
+  // rather than in an effect, so a stale draft never reaches the DOM.
   const [seededFrom, setSeededFrom] = useState(state.plan);
   if (seededFrom !== state.plan) {
     setSeededFrom(state.plan);
@@ -42,110 +51,156 @@ export function WeeklyPlanTab({ state, busy, onSave, onCopyPrevious }: Props) {
   }
 
   const mealsById = new Map(state.meals.map((m) => [m.id, m]));
+  const dirty = DAYS.some((day) => !sameAssignment(draft[day], state.plan, day));
 
   const update = (day: Day, patch: Partial<DayAssignment>) =>
     setDraft((current) => ({ ...current, [day]: { ...current[day], ...patch } }));
 
+  if (state.meals.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+        Add a meal first, then you can plan your week.
+      </p>
+    );
+  }
+
   return (
-    <div className="flex flex-col gap-8">
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <SectionTitle>Assign Meals to Days</SectionTitle>
-          <Button variant="secondary" disabled={busy} onClick={onCopyPrevious}>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">
+            Week of {formatDate(state.week_start)}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Pick a meal for each day, then save.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={busy} onClick={onCopyPrevious}>
+            <CopyIcon className="size-4" />
             Copy previous week
           </Button>
+          <Button
+            disabled={busy || !dirty}
+            onClick={() => onSave(Object.values(draft))}
+          >
+            Save plan
+          </Button>
         </div>
+      </div>
 
-        {state.meals.length === 0 ? (
-          <Empty>Add a meal first before assigning it to days.</Empty>
-        ) : (
-          <Card className="flex flex-col gap-3">
-            {DAYS.map((day) => {
-              const assignment = draft[day];
-              const mealId = assignment.meal_id;
-              return (
-                <div key={day} className="flex flex-wrap items-end gap-3">
-                  <Field label={day}>
-                    <Select
-                      value={mealId ?? UNSET}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const nextId = value === UNSET ? null : Number(value);
-                        update(day, {
-                          meal_id: nextId,
-                          // Default to the recipe's own serving size.
-                          servings:
-                            nextId === null
-                              ? null
-                              : (assignment.servings ??
-                                mealsById.get(nextId)?.servings ??
-                                1),
-                        });
-                      }}
-                    >
-                      <option value={UNSET}>— Unset —</option>
-                      {state.meals.map((meal) => (
-                        <option key={meal.id} value={meal.id}>
-                          {meal.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <div className="w-28">
-                    <Field label="Servings">
-                      <NumberInput
-                        min={1}
-                        disabled={mealId === null}
-                        value={assignment.servings ?? ""}
-                        onChange={(e) =>
-                          update(day, {
-                            servings: Math.max(1, +e.target.value),
-                          })
-                        }
-                      />
-                    </Field>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Column-flow so the week reads Mon-Thu down the left and Fri-Sun down
+          the right, rather than zig-zagging across two columns. */}
+      <div className="grid gap-2 xl:grid-flow-col xl:grid-cols-2 xl:grid-rows-4">
+        {DAYS.map((day) => (
+          <DayRow
+            key={day}
+            day={day}
+            assignment={draft[day]}
+            meals={state.meals}
+            mealsById={mealsById}
+            onChange={(patch) => update(day, patch)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-            <div>
-              <Button disabled={busy} onClick={() => onSave(Object.values(draft))}>
-                Set Weekly Plan
-              </Button>
-            </div>
-          </Card>
+function DayRow({
+  day,
+  assignment,
+  meals,
+  mealsById,
+  onChange,
+}: {
+  day: Day;
+  assignment: DayAssignment;
+  meals: Meal[];
+  mealsById: Map<number, Meal>;
+  onChange: (patch: Partial<DayAssignment>) => void;
+}) {
+  const mealId = assignment.meal_id;
+  const assigned = mealId !== null;
+
+  return (
+    <div
+      className={`flex items-stretch gap-3 overflow-hidden rounded-xl border bg-card p-3 transition-colors ${
+        assigned ? "border-border" : "border-dashed bg-card/40"
+      }`}
+    >
+      <span
+        aria-hidden
+        className={`w-1 shrink-0 rounded-full ${
+          assigned ? DAY_ACCENT[day] : "bg-border"
+        }`}
+      />
+
+      {/* Wraps rather than squeezing the meal name: on a narrow screen the
+          servings field drops to a second line instead. */}
+      <div className="flex flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+        <p
+          className={`w-24 shrink-0 text-sm font-semibold ${
+            assigned ? "text-foreground" : "text-muted-foreground"
+          }`}
+        >
+          {day}
+        </p>
+
+        <Select
+          value={mealId === null ? UNSET : String(mealId)}
+          onValueChange={(value) => {
+            const nextId = value === UNSET ? null : Number(value);
+            onChange({
+              meal_id: nextId,
+              // Default to the recipe's own serving size.
+              servings:
+                nextId === null
+                  ? null
+                  : (assignment.servings ??
+                    mealsById.get(nextId)?.servings ??
+                    1),
+            });
+          }}
+        >
+          <SelectTrigger aria-label={day} className="h-9 min-w-40 flex-1">
+            <SelectValue>
+              {(value: string) =>
+                value === UNSET
+                  ? "No meal"
+                  : (mealsById.get(Number(value))?.name ?? "No meal")
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNSET}>No meal</SelectItem>
+            {meals.map((meal) => (
+              <SelectItem key={meal.id} value={String(meal.id)}>
+                {meal.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {assigned && (
+          <div className="flex shrink-0 items-center gap-2">
+            <Label
+              htmlFor={`servings-${day}`}
+              className="text-xs text-muted-foreground"
+            >
+              Serves
+            </Label>
+            <Input
+              id={`servings-${day}`}
+              type="number"
+              min={1}
+              value={assignment.servings ?? ""}
+              onChange={(e) => onChange({ servings: Math.max(1, +e.target.value) })}
+              className="h-9 w-16"
+            />
+          </div>
         )}
-      </section>
-
-      <section>
-        <SectionTitle>Week of {formatDate(state.week_start)}</SectionTitle>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          {DAYS.map((day) => {
-            const assignment = state.plan.find((p) => p.day === day);
-            const meal = assignment?.meal_id
-              ? mealsById.get(assignment.meal_id)
-              : undefined;
-            return (
-              <div
-                key={day}
-                className={`rounded-xl p-3 text-center text-white ${DAY_COLOR[day]}`}
-              >
-                <p className="text-[0.65rem] font-bold tracking-widest uppercase opacity-85">
-                  {day.slice(0, 3)}
-                </p>
-                <p className="mt-1 font-semibold">{meal?.name ?? "—"}</p>
-                {meal && assignment?.servings ? (
-                  <p className="text-[0.65rem] tracking-wide uppercase opacity-85">
-                    {assignment.servings} serving
-                    {assignment.servings === 1 ? "" : "s"}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
@@ -158,4 +213,16 @@ function buildDraft(state: AppState): Record<Day, DayAssignment> {
       byDay.get(day) ?? { day, meal_id: null, servings: null },
     ]),
   ) as Record<Day, DayAssignment>;
+}
+
+function sameAssignment(
+  draft: DayAssignment,
+  plan: DayAssignment[],
+  day: Day,
+): boolean {
+  const saved = plan.find((p) => p.day === day);
+  return (
+    (saved?.meal_id ?? null) === draft.meal_id &&
+    (saved?.servings ?? null) === draft.servings
+  );
 }

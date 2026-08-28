@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { makeMeal, makeState, makeTemplate } from "../../test/factories";
-import { MealsTab } from "./MealsTab";
+import { MealsTab } from "@/components/meals/MealsTab";
+import { makeMeal, makeState, makeTemplate } from "@/test/factories";
 
 function renderTab(overrides = {}) {
   const props = {
@@ -29,7 +29,7 @@ describe("adding a meal", () => {
     await user.type(screen.getByLabelText("Meal name"), "  Spaghetti  ");
     await user.clear(screen.getByLabelText("Servings"));
     await user.type(screen.getByLabelText("Servings"), "4");
-    await user.click(screen.getByRole("button", { name: "Add Meal" }));
+    await user.click(screen.getByRole("button", { name: /add meal/i }));
 
     expect(props.onAddMeal).toHaveBeenCalledWith("Spaghetti", 4);
   });
@@ -39,7 +39,7 @@ describe("adding a meal", () => {
     const { props } = renderTab();
 
     await user.type(screen.getByLabelText("Meal name"), "   ");
-    await user.click(screen.getByRole("button", { name: "Add Meal" }));
+    await user.click(screen.getByRole("button", { name: /add meal/i }));
 
     expect(props.onAddMeal).not.toHaveBeenCalled();
   });
@@ -50,7 +50,7 @@ describe("adding a meal", () => {
 
     const name = screen.getByLabelText("Meal name");
     await user.type(name, "Tacos");
-    await user.click(screen.getByRole("button", { name: "Add Meal" }));
+    await user.click(screen.getByRole("button", { name: /add meal/i }));
 
     expect(name).toHaveValue("");
   });
@@ -63,18 +63,21 @@ describe("deleting a meal", () => {
     const user = userEvent.setup();
     const { props } = renderTab({ state });
 
-    await user.click(screen.getByRole("button", { name: "Delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete Spaghetti" }));
 
     expect(props.onDeleteMeal).not.toHaveBeenCalled();
-    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
   });
 
   it("deletes once confirmed", async () => {
     const user = userEvent.setup();
     const { props } = renderTab({ state });
 
-    await user.click(screen.getByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "Yes, delete" }));
+    await user.click(screen.getByRole("button", { name: "Delete Spaghetti" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(
+      within(dialog).getByRole("button", { name: "Delete" }),
+    );
 
     expect(props.onDeleteMeal).toHaveBeenCalledWith(1);
   });
@@ -83,11 +86,11 @@ describe("deleting a meal", () => {
     const user = userEvent.setup();
     const { props } = renderTab({ state });
 
-    await user.click(screen.getByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await user.click(screen.getByRole("button", { name: "Delete Spaghetti" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
 
     expect(props.onDeleteMeal).not.toHaveBeenCalled();
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });
 
@@ -104,7 +107,9 @@ describe("adding an ingredient", () => {
     await user.type(screen.getByLabelText("Ingredient"), "Pasta");
     await user.type(screen.getByLabelText("Quantity"), "0");
 
-    expect(screen.getByRole("button", { name: "Add Ingredient" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /add ingredient/i }),
+    ).toBeDisabled();
     expect(props.onAddIngredient).not.toHaveBeenCalled();
   });
 
@@ -115,21 +120,21 @@ describe("adding an ingredient", () => {
     await user.type(screen.getByLabelText("Ingredient"), "Pasta");
     await user.type(screen.getByLabelText("Quantity"), "200");
     await user.type(screen.getByLabelText("Unit"), "g");
-    await user.click(screen.getByRole("button", { name: "Add Ingredient" }));
+    await user.click(screen.getByRole("button", { name: /add ingredient/i }));
 
     expect(props.onAddIngredient).toHaveBeenCalledWith(1, "Pasta", 200, "g");
   });
 
   it("accepts an ingredient that is not in the known list", async () => {
-    // Regression test: an earlier autocomplete-only field made it
-    // impossible to add anything without an existing match.
+    // Regression test: an autocomplete-only field once made it impossible
+    // to add anything without an existing match.
     const user = userEvent.setup();
     const { props } = renderTab({ state });
 
     await user.type(screen.getByLabelText("Ingredient"), "Bread");
     await user.type(screen.getByLabelText("Quantity"), "4");
     await user.type(screen.getByLabelText("Unit"), "slices");
-    await user.click(screen.getByRole("button", { name: "Add Ingredient" }));
+    await user.click(screen.getByRole("button", { name: /add ingredient/i }));
 
     expect(props.onAddIngredient).toHaveBeenCalledWith(1, "Bread", 4, "slices");
   });
@@ -141,6 +146,26 @@ describe("adding an ingredient", () => {
     const list = document.getElementById(input.getAttribute("list") ?? "");
     const options = Array.from(list?.querySelectorAll("option") ?? []);
     expect(options.map((o) => o.value)).toEqual(["Pasta"]);
+  });
+
+  it("removes an ingredient", async () => {
+    const user = userEvent.setup();
+    const { props } = renderTab({
+      state: makeState({
+        meals: [
+          makeMeal({
+            id: 1,
+            ingredients: [
+              { ingredient_id: 7, name: "Pasta", qty: 200, unit: "g" },
+            ],
+          }),
+        ],
+      }),
+    });
+
+    await user.click(screen.getByRole("button", { name: "Remove Pasta" }));
+
+    expect(props.onRemoveIngredient).toHaveBeenCalledWith(1, 7);
   });
 });
 
@@ -154,7 +179,7 @@ describe("templates", () => {
     await user.click(
       screen.getByRole("button", { name: /quick add from templates/i }),
     );
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await user.click(screen.getByRole("button", { name: "Add Omelette" }));
 
     expect(props.onAddFromTemplate).toHaveBeenCalledWith("Omelette");
   });
@@ -172,8 +197,21 @@ describe("templates", () => {
       screen.getByRole("button", { name: /quick add from templates/i }),
     );
 
-    // Matched case-insensitively, the same way the API rejects duplicates.
-    expect(screen.getByRole("button", { name: "Added" })).toBeDisabled();
+    // Matched case-insensitively, as the API rejects duplicates.
+    expect(
+      screen.getByRole("button", { name: "Omelette (added)" }),
+    ).toBeDisabled();
+  });
+
+  it("keeps the gallery collapsed until asked", () => {
+    renderTab({ state: makeState({ templates: [template] }) });
+
+    expect(
+      screen.getByRole("button", { name: /quick add from templates/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("button", { name: "Add Omelette" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -181,5 +219,20 @@ describe("empty state", () => {
   it("prompts for a first meal", () => {
     renderTab();
     expect(screen.getByText(/no meals yet/i)).toBeInTheDocument();
+  });
+});
+
+describe("the ingredient editor's meal picker", () => {
+  it("shows the meal's name, not its id", () => {
+    // Base UI passes the raw value to the trigger; without a render function
+    // this showed "1".
+    const state = makeState({
+      meals: [makeMeal({ id: 7, name: "Spaghetti Bolognese" })],
+    });
+    renderTab({ state });
+
+    expect(
+      screen.getByRole("combobox", { name: /select meal/i }),
+    ).toHaveTextContent("Spaghetti Bolognese");
   });
 });
