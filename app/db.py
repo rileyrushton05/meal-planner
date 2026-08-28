@@ -46,6 +46,16 @@ def default_database_url() -> str:
     if configured:
         return configured
 
+    # Serverless filesystems are read-only outside /tmp, so the SQLite
+    # fallback cannot work there. Without this the failure surfaces as an
+    # OSError from mkdir, which says nothing about the missing setting.
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        raise RuntimeError(
+            f"{DATABASE_URL_ENV_VAR} is not set. A serverless deployment has no "
+            "writable disk for the SQLite fallback, so a Postgres URL is "
+            "required. Set it for this environment in the platform's settings."
+        )
+
     DEFAULT_DATA_DIR.mkdir(exist_ok=True)
     return f"sqlite:///{DEFAULT_DATA_DIR / 'data.db'}"
 
