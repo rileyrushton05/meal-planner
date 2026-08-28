@@ -81,6 +81,23 @@ class MealRepository:
 
         return [(meal, by_meal.get(meal.id, [])) for meal in meals]
 
+    def get_with_ingredients(
+        self, meal_id: int
+    ) -> tuple[Meal, list[tuple[MealIngredient, Ingredient]]]:
+        """One meal and its ingredients.
+
+        Raises:
+            MealNotFoundError: if the meal doesn't exist.
+        """
+        with self._db.session() as session:
+            meal = self._get_or_raise(session, meal_id)
+            rows = session.exec(
+                select(MealIngredient, Ingredient)
+                .where(MealIngredient.meal_id == meal_id)
+                .where(MealIngredient.ingredient_id == Ingredient.id)
+            ).all()
+            return meal, list(rows)
+
     def add(self, name: str, servings: int = 1) -> Meal:
         """Create a meal.
 

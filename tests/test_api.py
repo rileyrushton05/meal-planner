@@ -266,3 +266,25 @@ def test_state_defaults_to_the_current_week(client):
 
     today = date.today()
     assert body["week_start"] == (today - timedelta(days=today.weekday())).isoformat()
+
+
+# ------------------------------------------------- missing meal handling
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("post", "/api/meals/999/ingredients", {"name": "X", "qty": 1, "unit": "g"}),
+        ("patch", "/api/meals/999/ingredients/1", {"qty": 5, "unit": "g"}),
+        ("delete", "/api/meals/999/ingredients/1", None),
+        ("delete", "/api/meals/999", None),
+    ],
+)
+def test_operations_on_a_missing_meal_return_404(client, method, path, body):
+    """Regression test: these handlers scanned every meal and picked one with
+    a bare next(), which raised StopIteration for an unknown id and surfaced
+    as a 500 rather than a 404."""
+    response = getattr(client, method)(path, **({"json": body} if body else {}))
+
+    assert response.status_code == 404
+    assert "detail" in response.json()

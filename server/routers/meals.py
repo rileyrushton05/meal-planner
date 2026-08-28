@@ -12,6 +12,18 @@ from app.templates import MEAL_TEMPLATES
 router = APIRouter(prefix="/api/meals", tags=["meals"])
 
 
+def _meal_response(services: Services, meal_id: int) -> MealRead:
+    """Serialise a meal after a change.
+
+    Goes through the repository rather than scanning every meal: the scan
+    cost an extra query, and `next()` over it raised StopIteration for an
+    unknown id, surfacing as a 500 where a 404 was meant.
+    """
+    meal, ingredients = services.meals.get_with_ingredients(meal_id)
+    return serializers.meal_read(meal, ingredients)
+
+
+
 @router.get("", response_model=list[MealRead])
 def list_meals(services: Services = Depends(get_services)) -> list[MealRead]:
     """Every meal, each with its ingredients."""
@@ -56,10 +68,7 @@ def update_meal(
 ) -> MealRead:
     """Rename a meal or change its base serving size."""
     services.meals.update(meal_id, payload.name, payload.servings)
-    return serializers.meal_read(
-        next(m for m in services.meals.list_all() if m.id == meal_id),
-        services.meals.list_ingredients(meal_id),
-    )
+    return _meal_response(services, meal_id)
 
 
 @router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -75,10 +84,7 @@ def add_ingredient(
 ) -> MealRead:
     """Attach an ingredient, creating it if the name is new."""
     services.meals.add_ingredient(meal_id, payload.name, payload.qty, payload.unit)
-    return serializers.meal_read(
-        next(m for m in services.meals.list_all() if m.id == meal_id),
-        services.meals.list_ingredients(meal_id),
-    )
+    return _meal_response(services, meal_id)
 
 
 @router.patch("/{meal_id}/ingredients/{ingredient_id}", response_model=MealRead)
@@ -92,10 +98,7 @@ def update_ingredient(
     services.meals.update_ingredient(
         meal_id, ingredient_id, payload.qty, payload.unit
     )
-    return serializers.meal_read(
-        next(m for m in services.meals.list_all() if m.id == meal_id),
-        services.meals.list_ingredients(meal_id),
-    )
+    return _meal_response(services, meal_id)
 
 
 @router.delete("/{meal_id}/ingredients/{ingredient_id}", response_model=MealRead)
@@ -104,7 +107,4 @@ def remove_ingredient(
 ) -> MealRead:
     """Detach an ingredient from a meal, leaving the ingredient itself."""
     services.meals.remove_ingredient(meal_id, ingredient_id)
-    return serializers.meal_read(
-        next(m for m in services.meals.list_all() if m.id == meal_id),
-        services.meals.list_ingredients(meal_id),
-    )
+    return _meal_response(services, meal_id)

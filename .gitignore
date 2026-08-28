@@ -24,3 +24,5 @@ data/
 # Editor/OS
 .DS_Store
 .vscode/
+.vercel
+.env*

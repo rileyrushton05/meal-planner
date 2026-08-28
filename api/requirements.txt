@@ -1,0 +1,12 @@
+# Dependencies for the Vercel serverless function.
+#
+# Deliberately duplicated alongside the entrypoint rather than relying only
+# on the repository root: with a custom buildCommand in vercel.json, the
+# Python builder did not pick up the root file and the function crashed with
+# ModuleNotFoundError: No module named 'fastapi'.
+#
+# Keep in sync with requirements.txt.
+sqlmodel==0.0.37
+psycopg[binary]==3.3.4
+alembic==1.19.1
+fastapi==0.141.1

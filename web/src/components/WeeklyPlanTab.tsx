@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { AppState, Day, DayAssignment } from "../api/types";
 import { DAYS } from "../api/types";
@@ -31,8 +31,15 @@ export function WeeklyPlanTab({ state, busy, onSave, onCopyPrevious }: Props) {
     buildDraft(state),
   );
 
-  // Re-seed when the week changes or a save/copy returns new server state.
-  useEffect(() => setDraft(buildDraft(state)), [state.week_start, state.plan]);
+  // Re-seed when the server plan changes - a week switch, a save, or a copy.
+  // Adjusting state during render rather than in an effect: React re-runs
+  // this component immediately without committing the stale draft to the
+  // DOM, where an effect would render once with the wrong data first.
+  const [seededFrom, setSeededFrom] = useState(state.plan);
+  if (seededFrom !== state.plan) {
+    setSeededFrom(state.plan);
+    setDraft(buildDraft(state));
+  }
 
   const mealsById = new Map(state.meals.map((m) => [m.id, m]));
 
