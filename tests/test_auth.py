@@ -114,8 +114,9 @@ def test_a_guest_session_is_a_real_account_with_no_credentials(anonymous):
     response = anonymous.post("/api/auth/guest")
 
     assert response.status_code == 201
-    assert response.json() == {"email": None, "is_guest": True}
-    assert anonymous.get("/api/auth/me").json() == {"email": None, "is_guest": True}
+    guest = {"email": None, "is_guest": True, "has_recovery_code": False}
+    assert response.json() == guest
+    assert anonymous.get("/api/auth/me").json() == guest
     assert anonymous.get("/api/meals").json() == []
 
 
@@ -175,7 +176,10 @@ def test_a_guest_who_signs_up_keeps_their_meals_under_a_new_token(guest):
     response = _sign_up(guest)
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"email": EMAIL, "is_guest": False}
+    body = response.json()
+    # The recovery code is in this response only; tests/test_recovery.py.
+    assert body.pop("recovery_code")
+    assert body == {"email": EMAIL, "is_guest": False, "has_recovery_code": True}
     assert _token(guest) != guest_token
     assert [m["name"] for m in guest.get("/api/meals").json()] == ["Spaghetti"]
 
@@ -194,7 +198,11 @@ def test_signing_up_without_a_session_creates_a_signed_in_account(anonymous):
     response = _sign_up(anonymous)
 
     assert response.status_code == 200
-    assert anonymous.get("/api/auth/me").json() == {"email": EMAIL, "is_guest": False}
+    assert anonymous.get("/api/auth/me").json() == {
+        "email": EMAIL,
+        "is_guest": False,
+        "has_recovery_code": True,
+    }
 
 
 def test_emails_are_stored_trimmed_and_lower_case(anonymous):
@@ -257,7 +265,11 @@ def test_the_right_password_signs_in(account, anonymous):
     response = _log_in(anonymous, email="COOK@example.com")
 
     assert response.status_code == 200
-    assert response.json() == {"email": EMAIL, "is_guest": False}
+    assert response.json() == {
+        "email": EMAIL,
+        "is_guest": False,
+        "has_recovery_code": True,
+    }
     assert anonymous.get("/api/meals").status_code == 200
 
 

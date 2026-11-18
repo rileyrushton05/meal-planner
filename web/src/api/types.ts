@@ -32,6 +32,10 @@ export type AppState = Schemas["AppState"];
 export type WeekPlan = Schemas["WeekPlanRead"];
 /** Who is signed in: a guest (no email) or an account. */
 export type Account = Schemas["Account"];
+/** An account just signed up to or recovered, with its new recovery code:
+ *  in this response only, to be shown once. */
+export type SignedUp = Schemas["SignedUp"];
+export type RecoveryCode = Schemas["RecoveryCode"];
 /** A download of everything that is the caller's own. */
 export type AccountExport = Schemas["AccountExport"];
 /** The body of every error response (RFC 9457). */

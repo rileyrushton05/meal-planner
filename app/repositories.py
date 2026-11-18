@@ -563,6 +563,10 @@ class UserRepository:
         user.password_hash = password_hash
         self._session.flush()
 
+    def set_recovery_code_hash(self, user: User, recovery_code_hash: str) -> None:
+        user.recovery_code_hash = recovery_code_hash
+        self._session.flush()
+
     def unclaimed_owners(self) -> list[User]:
         """Accounts with no credentials that are not guests: the one the
         accounts migration created to hold the data from before accounts,

@@ -4,7 +4,15 @@ import type { Page } from "@playwright/test";
 
 import { expect, test, watchForCspViolations } from "./fixtures.ts";
 
-import { addMeal, dayPicker, goTo, mealRow, openWeek, uniqueName } from "./helpers.ts";
+import {
+  addMeal,
+  dayPicker,
+  goTo,
+  mealRow,
+  openWeek,
+  saveRecoveryCode,
+  uniqueName,
+} from "./helpers.ts";
 
 test("each visitor gets their own guest session, invisible to anyone else", async ({
   browser,
@@ -77,6 +85,7 @@ test("signing up keeps everything made as a guest, under a new session", async (
   await signUp.getByLabel("Email").fill(email);
   await signUp.getByLabel("Password").fill(password);
   await signUp.getByRole("button", { name: "Create account" }).click();
+  await saveRecoveryCode(page);
 
   await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
   await expect(mealRow(page, mine)).toBeVisible();
@@ -119,6 +128,7 @@ test("take a copy of everything, then delete the account for good", async ({ pag
   await signUp.getByLabel("Email").fill(email);
   await signUp.getByLabel("Password").fill(password);
   await signUp.getByRole("button", { name: "Create account" }).click();
+  await saveRecoveryCode(page);
   await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
 
   await page.getByRole("link", { name: "Account" }).click();
@@ -158,5 +168,47 @@ test("take a copy of everything, then delete the account for good", async ({ pag
   await logIn.getByRole("button", { name: "Log in" }).click();
   await expect(logIn.getByRole("alert")).toHaveText(
     "That email and password don't match an account.",
+  );
+});
+
+test("a forgotten password is reset with the recovery code from signup", async ({ page }) => {
+  const email = `${uniqueName("forgetful").replace(" ", "-")}@example.com`;
+  const mine = uniqueName("Remembered Stew");
+
+  await openWeek(page, "2026-04-20");
+  await addMeal(page, mine);
+  await page.getByRole("button", { name: "Sign up to keep your meals" }).click();
+  const signUp = page.getByRole("dialog", { name: "Create an account" });
+  await signUp.getByLabel("Email").fill(email);
+  await signUp.getByLabel("Password").fill("lettuce harbour spoon");
+  await signUp.getByRole("button", { name: "Create account" }).click();
+  const code = await saveRecoveryCode(page);
+  await page.getByRole("button", { name: "Log out" }).click();
+  await expect(page.getByText("You're using a guest session.")).toBeVisible();
+
+  // The password is forgotten; the code, typed carelessly, gets back in.
+  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Forgot your password?" }).click();
+  const reset = page.getByRole("dialog", { name: "Reset your password" });
+  await reset.getByLabel("Email").fill(email);
+  await reset.getByLabel("Recovery code").fill(code.toLowerCase().replaceAll("-", " "));
+  await reset.getByLabel("New password").fill("copper kettle meadow");
+  await reset.getByRole("button", { name: "Reset password" }).click();
+
+  const next = await saveRecoveryCode(page);
+  expect(next).not.toBe(code);
+  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expect(mealRow(page, mine)).toBeVisible();
+
+  // The code was used up: it cannot reset the password again.
+  await page.getByRole("button", { name: "Log out" }).click();
+  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Forgot your password?" }).click();
+  await reset.getByLabel("Email").fill(email);
+  await reset.getByLabel("Recovery code").fill(code);
+  await reset.getByLabel("New password").fill("another fine password");
+  await reset.getByRole("button", { name: "Reset password" }).click();
+  await expect(reset.getByRole("alert")).toHaveText(
+    "That email and recovery code don't match an account.",
   );
 });

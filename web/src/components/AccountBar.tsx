@@ -3,11 +3,12 @@ import { useState } from "react";
 
 import { AppLink } from "@/components/AppLink";
 import { AuthDialog, type AuthMode } from "@/components/AuthDialog";
+import { RecoveryCodeDialog } from "@/components/RecoveryCodeDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { usePathname } from "@/lib/location";
 import { cn } from "@/lib/utils";
 import type { Account } from "@/api/types";
-import type { Credentials } from "@/hooks/useAccount";
+import type { Credentials, RecoveryRequest } from "@/hooks/useAccount";
 
 /**
  * Who is signed in, at the foot of the sidebar: a guest is invited to sign
@@ -17,18 +18,24 @@ export function AccountBar({
   account,
   onSignUp,
   onLogIn,
+  onRecover,
   onLogOut,
   loggingOut,
 }: {
   account: Account | null;
-  onSignUp: (credentials: Credentials) => Promise<unknown>;
+  /** Resolves with the new account's recovery code. */
+  onSignUp: (credentials: Credentials) => Promise<string>;
   onLogIn: (credentials: Credentials) => Promise<unknown>;
+  /** Resolves with the next recovery code. */
+  onRecover: (request: RecoveryRequest) => Promise<string>;
   onLogOut: () => Promise<unknown>;
   loggingOut: boolean;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const onAccountPage = usePathname() === "/account";
   const [mode, setMode] = useState<AuthMode>("signup");
+  // A code just issued, and why: shown once, until saved.
+  const [issued, setIssued] = useState<{ code: string; reason: string } | null>(null);
 
   const open = (next: AuthMode) => {
     setMode(next);
@@ -101,9 +108,24 @@ export function AccountBar({
         mode={mode}
         onModeChange={setMode}
         onOpenChange={setDialogOpen}
-        onSubmit={(chosen, credentials) =>
-          chosen === "signup" ? onSignUp(credentials) : onLogIn(credentials)
-        }
+        onSubmit={async (chosen, { email, password, recoveryCode }) => {
+          if (chosen === "login") return onLogIn({ email, password });
+          if (chosen === "signup") {
+            const code = await onSignUp({ email, password });
+            setIssued({ code, reason: "Your account is ready." });
+            return;
+          }
+          const code = await onRecover({ email, recoveryCode, newPassword: password });
+          setIssued({
+            code,
+            reason: "Your password is reset, and the code you used no longer works.",
+          });
+        }}
+      />
+      <RecoveryCodeDialog
+        code={issued?.code ?? null}
+        reason={issued?.reason ?? ""}
+        onDone={() => setIssued(null)}
       />
     </div>
   );

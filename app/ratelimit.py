@@ -144,6 +144,13 @@ def _key() -> bytes:
     return _DEVELOPMENT_KEY.encode()
 
 
+def check_configured() -> None:
+    """Raise RuntimeError if the hashing key is missing where it is required
+    (on Vercel). For the readiness check, so a deployment missing it says so
+    in its health check rather than failing on a visitor's first click."""
+    _key()
+
+
 def network_of(address: str) -> str:
     """The unit a network is throttled by.
 

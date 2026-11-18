@@ -18,6 +18,8 @@ from server.schemas import (
     ExportedDay,
     ExportedIngredient,
     ExportedMeal,
+    PasswordConfirmation,
+    RecoveryCode,
 )
 
 router = APIRouter(prefix="/api/account", tags=["account"])
@@ -69,6 +71,17 @@ def export_account(
     return JSONResponse(
         export.model_dump(mode="json"),
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/recovery-code")
+def replace_recovery_code(
+    payload: PasswordConfirmation, current: CurrentUserDep, auth: AuthDep
+) -> RecoveryCode:
+    """A new recovery code, confirmed with the password; the old one stops
+    working. For a code that was lost, or never made."""
+    return RecoveryCode(
+        recovery_code=auth.replace_recovery_code(current, payload.password)
     )
 
 

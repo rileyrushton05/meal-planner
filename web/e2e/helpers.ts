@@ -91,3 +91,18 @@ export async function planDay(page: Page, day: string, meal: string) {
   await expect(dayPicker(page, day)).toHaveAccessibleName(`${day}: ${meal}`);
   await expect(search).toHaveCount(0);
 }
+
+/**
+ * After signing up or recovering: read the recovery code from the dialog
+ * that shows it once, then say it is saved and close it, as a person must
+ * before they can carry on.
+ */
+export async function saveRecoveryCode(page: Page): Promise<string> {
+  const dialog = page.getByRole("alertdialog", { name: "Save your recovery code" });
+  const code = (await dialog.getByLabel("Recovery code").textContent())?.trim() ?? "";
+  expect(code).toMatch(/^[0-9A-Z]{4}(-[0-9A-Z]{4}){3}$/);
+  await dialog.getByLabel(/I've saved it/).check();
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toHaveCount(0);
+  return code;
+}

@@ -18,7 +18,7 @@ from server.deps import (
     CurrentUserDep,
     OptionalUserDep,
 )
-from server.schemas import Account, Credentials, GuestStart
+from server.schemas import Account, Credentials, GuestStart, Recovery, SignedUp
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -51,7 +51,20 @@ def clear_session_cookie(response: Response) -> None:
 
 
 def _account(user: CurrentUser) -> Account:
-    return Account(email=user.email, is_guest=user.is_guest)
+    return Account(
+        email=user.email,
+        is_guest=user.is_guest,
+        has_recovery_code=user.has_recovery_code,
+    )
+
+
+def _signed_up(response: Response, result: SignedIn) -> SignedUp:
+    """Signed in, with the new recovery code to show the person once."""
+    assert result.recovery_code is not None, "a recovery code was issued"
+    _set_session_cookie(response, result.token)
+    return SignedUp(
+        **_account(result.user).model_dump(), recovery_code=result.recovery_code
+    )
 
 
 def _signed_in(response: Response, result: SignedIn) -> Account:
@@ -87,9 +100,32 @@ def start_guest(
 @router.post("/signup")
 def sign_up(
     payload: Credentials, response: Response, auth: AuthDep, current: OptionalUserDep
-) -> Account:
-    """Create an account. A guest becomes the account, keeping their data."""
-    return _signed_in(response, auth.sign_up(current, payload.email, payload.password))
+) -> SignedUp:
+    """Create an account. A guest becomes the account, keeping their data.
+
+    The response carries the account's recovery code, shown once: the only
+    way back in if the password is forgotten.
+    """
+    return _signed_up(response, auth.sign_up(current, payload.email, payload.password))
+
+
+@router.post("/recover")
+def recover(
+    payload: Recovery, response: Response, auth: AuthDep, current: OptionalUserDep
+) -> SignedUp:
+    """Set a new password with the email and recovery code, and sign in.
+
+    Ends every other session of the account, and replaces the recovery code
+    (each works once): the response carries the new one. The refusal is the
+    same whether the email or the code is wrong, 401 invalid-credentials,
+    throttled with login.
+    """
+    return _signed_up(
+        response,
+        auth.recover(
+            current, payload.email, payload.recovery_code, payload.new_password
+        ),
+    )
 
 
 @router.post("/login")

@@ -33,7 +33,13 @@ export interface paths {
         };
         /**
          * Ready
-         * @description The database answers a trivial query.
+         * @description The configuration is complete and the database answers a trivial
+         *     query.
+         *
+         *     Configuration first: a deployment missing a required secret can reach
+         *     its database and serve reads, then fail on the first sign-in. That
+         *     happened to preview deployments, which had the database URL but not the
+         *     rate-limit key; this makes it visible to anyone who checks.
          *
          *     The wait is bounded by the engine's connect timeout, so a probe never
          *     hangs on an unreachable database.
@@ -84,8 +90,36 @@ export interface paths {
         /**
          * Sign Up
          * @description Create an account. A guest becomes the account, keeping their data.
+         *
+         *     The response carries the account's recovery code, shown once: the only
+         *     way back in if the password is forgotten.
          */
         post: operations["sign_up_api_auth_signup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recover
+         * @description Set a new password with the email and recovery code, and sign in.
+         *
+         *     Ends every other session of the account, and replaces the recovery code
+         *     (each works once): the response carries the new one. The refusal is the
+         *     same whether the email or the code is wrong, 401 invalid-credentials,
+         *     throttled with login.
+         */
+        post: operations["recover_api_auth_recover_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -167,6 +201,27 @@ export interface paths {
         get: operations["export_account_api_account_export_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account/recovery-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace Recovery Code
+         * @description A new recovery code, confirmed with the password; the old one stops
+         *     working. For a code that was lost, or never made.
+         */
+        post: operations["replace_recovery_code_api_account_recovery_code_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -418,6 +473,8 @@ export interface components {
             email: string | null;
             /** Is Guest */
             is_guest: boolean;
+            /** Has Recovery Code */
+            has_recovery_code: boolean;
         };
         /**
          * AccountDeletion
@@ -664,6 +721,47 @@ export interface components {
              */
             servings: number;
         };
+        /** PasswordConfirmation */
+        PasswordConfirmation: {
+            /** Password */
+            password: string;
+        };
+        /**
+         * Recovery
+         * @description A forgotten password replaced, proven with the recovery code.
+         */
+        Recovery: {
+            /** Email */
+            email: string;
+            /** Recovery Code */
+            recovery_code: string;
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * RecoveryCode
+         * @description A new recovery code; the one before it no longer works.
+         */
+        RecoveryCode: {
+            /** Recovery Code */
+            recovery_code: string;
+        };
+        /**
+         * SignedUp
+         * @description The account just signed up to, or recovered, with its new recovery
+         *     code. The code is in this one response and nowhere else, not even the
+         *     database (which keeps a hash): the client must show it to be saved.
+         */
+        SignedUp: {
+            /** Email */
+            email: string | null;
+            /** Is Guest */
+            is_guest: boolean;
+            /** Has Recovery Code */
+            has_recovery_code: boolean;
+            /** Recovery Code */
+            recovery_code: string;
+        };
         /** TemplateIngredientRead */
         TemplateIngredientRead: {
             /** Name */
@@ -864,7 +962,49 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Account"];
+                    "application/json": components["schemas"]["SignedUp"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    recover_api_auth_recover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Recovery"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedUp"];
                 };
             };
             /** @description Validation Error */
@@ -1001,6 +1141,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountExport"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    replace_recovery_code_api_account_recovery_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordConfirmation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCode"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Problem Details (RFC 9457) */

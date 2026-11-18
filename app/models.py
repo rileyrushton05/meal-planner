@@ -122,6 +122,11 @@ class User(_Timestamps, table=True):
             "(email IS NULL) = (password_hash IS NULL)", name="credentials_complete"
         ),
         CheckConstraint("NOT is_guest OR email IS NULL", name="guests_have_no_email"),
+        # Only an account with a login can recover it.
+        CheckConstraint(
+            "recovery_code_hash IS NULL OR email IS NOT NULL",
+            name="recovery_code_needs_login",
+        ),
     )
 
     id: int | None = Field(default=None, primary_key=True)
@@ -129,6 +134,10 @@ class User(_Timestamps, table=True):
     email: str | None = None
     #: NULL exactly when email is.
     password_hash: str | None = None
+    #: SHA-256 of the recovery code (app/security.py), which only the person
+    #: was ever shown. NULL for guests, and for accounts that have not made
+    #: one yet (those from before recovery codes existed).
+    recovery_code_hash: str | None = None
     is_guest: bool = Field(default=True, sa_column_kwargs={"server_default": true()})
     #: Drives guest cleanup.
     last_seen_at: datetime | None = _timestamp()

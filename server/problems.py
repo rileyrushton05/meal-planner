@@ -33,6 +33,7 @@ from app.exceptions import (
     InvalidEmailError,
     MealNotFoundError,
     MealPlannerError,
+    NoLoginError,
     NotSignedInError,
     TooManyAttemptsError,
     UnitMismatchError,
@@ -108,6 +109,7 @@ _DOMAIN_ERRORS: dict[type[MealPlannerError], tuple[int, str]] = {
     CrossSiteRequestError: (403, "cross-site-request"),
     EmailTakenError: (409, "email-taken"),
     AlreadySignedUpError: (409, "already-signed-up"),
+    NoLoginError: (409, "no-login"),
     TooManyAttemptsError: (429, "too-many-attempts"),
 }
 

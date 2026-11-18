@@ -9,9 +9,15 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Credentials } from "@/hooks/useAccount";
+export type AuthMode = "signup" | "login" | "recover";
 
-export type AuthMode = "signup" | "login";
+/** What the form holds. `recoveryCode` is used only to recover, where
+ *  `password` is the new password. */
+export interface AuthValues {
+  email: string;
+  password: string;
+  recoveryCode: string;
+}
 
 const COPY = {
   signup: {
@@ -30,12 +36,27 @@ const COPY = {
     switchPrompt: "New here?",
     switchTo: "Create an account",
   },
+  recover: {
+    title: "Reset your password",
+    description:
+      "Use the recovery code you saved when you signed up to set a new password. You'll be signed in, and given a new code.",
+    submit: "Reset password",
+    switchPrompt: "Remembered it?",
+    switchTo: "Log in",
+  },
 } as const;
 
+const SWITCH_TO: Record<AuthMode, AuthMode> = {
+  signup: "login",
+  login: "signup",
+  recover: "login",
+};
+
 /**
- * Sign up or log in, in one dialog: the two forms are identical but for
- * what the server does with them. The error shown is the server's own
- * sentence (a weak password, a taken email, wrong credentials, a wait).
+ * Sign up, log in, or reset a forgotten password with the recovery code, in
+ * one dialog: the forms differ by a field at most. The error shown is the
+ * server's own sentence (a weak password, a taken email, wrong
+ * credentials, a wait).
  */
 export function AuthDialog({
   open,
@@ -48,17 +69,25 @@ export function AuthDialog({
   mode: AuthMode;
   onOpenChange: (open: boolean) => void;
   onModeChange: (mode: AuthMode) => void;
-  onSubmit: (mode: AuthMode, credentials: Credentials) => Promise<unknown>;
+  onSubmit: (mode: AuthMode, values: AuthValues) => Promise<unknown>;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const copy = COPY[mode];
 
   const reset = () => {
     setPassword("");
+    setRecoveryCode("");
     setError(null);
+  };
+
+  const switchTo = (next: AuthMode) => {
+    setError(null);
+    setPassword("");
+    onModeChange(next);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -66,7 +95,7 @@ export function AuthDialog({
     setPending(true);
     setError(null);
     try {
-      await onSubmit(mode, { email, password });
+      await onSubmit(mode, { email, password, recoveryCode });
       reset();
       onOpenChange(false);
     } catch (err) {
@@ -102,20 +131,38 @@ export function AuthDialog({
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
+          {mode === "recover" && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="auth-recovery-code">Recovery code</Label>
+              <Input
+                id="auth-recovery-code"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="XXXX-XXXX-XXXX-XXXX"
+                required
+                value={recoveryCode}
+                onChange={(e) => setRecoveryCode(e.target.value)}
+                className="font-mono uppercase placeholder:normal-case"
+              />
+            </div>
+          )}
           <div className="grid gap-1.5">
-            <Label htmlFor="auth-password">Password</Label>
+            <Label htmlFor="auth-password">
+              {mode === "recover" ? "New password" : "Password"}
+            </Label>
             <Input
               id="auth-password"
               type="password"
               // Lets password managers offer a new password at signup and
               // the saved one at login.
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              aria-describedby={mode === "signup" ? "auth-password-hint" : undefined}
+              aria-describedby={mode === "login" ? undefined : "auth-password-hint"}
             />
-            {mode === "signup" && (
+            {mode !== "login" && (
               <p id="auth-password-hint" className="text-xs text-muted-foreground">
                 At least 8 characters. A few unrelated words work well.
               </p>
@@ -128,24 +175,33 @@ export function AuthDialog({
             </p>
           )}
 
-          <Button type="submit" disabled={pending || !email || !password}>
+          <Button
+            type="submit"
+            disabled={pending || !email || !password || (mode === "recover" && !recoveryCode)}
+          >
             {pending ? "Please wait…" : copy.submit}
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground">
-          {copy.switchPrompt}{" "}
-          <Button
-            variant="link"
-            className="h-auto p-0"
-            onClick={() => {
-              setError(null);
-              onModeChange(mode === "signup" ? "login" : "signup");
-            }}
-          >
-            {copy.switchTo}
-          </Button>
-        </p>
+        <div className="grid gap-1 text-center text-sm text-muted-foreground">
+          {mode === "login" && (
+            <p>
+              <Button variant="link" className="h-auto p-0" onClick={() => switchTo("recover")}>
+                Forgot your password?
+              </Button>
+            </p>
+          )}
+          <p>
+            {copy.switchPrompt}{" "}
+            <Button
+              variant="link"
+              className="h-auto p-0"
+              onClick={() => switchTo(SWITCH_TO[mode])}
+            >
+              {copy.switchTo}
+            </Button>
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );

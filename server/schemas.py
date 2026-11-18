@@ -180,6 +180,35 @@ class Account(ResponseSchema):
 
     email: str | None
     is_guest: bool
+    #: Whether a forgotten password could be recovered. False for guests, and
+    #: for accounts from before recovery codes, which should make one.
+    has_recovery_code: bool
+
+
+class SignedUp(Account):
+    """The account just signed up to, or recovered, with its new recovery
+    code. The code is in this one response and nowhere else, not even the
+    database (which keeps a hash): the client must show it to be saved."""
+
+    recovery_code: str
+
+
+class Recovery(RequestSchema):
+    """A forgotten password replaced, proven with the recovery code."""
+
+    email: str = Field(min_length=1, max_length=320)
+    recovery_code: str = Field(min_length=1, max_length=64)
+    new_password: str = Field(min_length=1, max_length=1024)
+
+
+class PasswordConfirmation(RequestSchema):
+    password: str = Field(min_length=1, max_length=1024)
+
+
+class RecoveryCode(ResponseSchema):
+    """A new recovery code; the one before it no longer works."""
+
+    recovery_code: str
 
 
 class GuestStart(RequestSchema):

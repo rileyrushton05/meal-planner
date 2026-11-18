@@ -286,3 +286,23 @@ def test_readiness_fails_as_a_problem_when_the_database_is_down(
 
     body = _assert_problem(client.get("/health/ready"), 503)
     assert body["type"] == "urn:meal-planner:problem:not-ready"
+
+
+def test_readiness_fails_when_required_configuration_is_missing(client, monkeypatch):
+    """As preview deployments did: the database reachable, but no key to
+    hash emails and addresses with, so every sign-in would fail."""
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.delenv("MEAL_PLANNER_RATE_LIMIT_KEY", raising=False)
+
+    response = client.get("/health/ready")
+
+    body = _assert_problem(response, 503)
+    assert body["detail"] == "The service is missing required configuration."
+    assert "MEAL_PLANNER_RATE_LIMIT_KEY" not in response.text
+
+
+def test_readiness_passes_with_the_configuration_on_vercel(client, monkeypatch):
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("MEAL_PLANNER_RATE_LIMIT_KEY", "test-only-key")
+
+    assert client.get("/health/ready").json() == {"status": "ok"}

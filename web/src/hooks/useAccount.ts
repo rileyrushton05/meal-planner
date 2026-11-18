@@ -14,9 +14,10 @@ import { useEffect, useState } from "react";
 
 import { api, onGuestSessionStarted } from "../api/client";
 import { queryKeys } from "../api/queryClient";
-import type { Account } from "../api/types";
+import type { Account, SignedUp } from "../api/types";
 
 export type Credentials = { email: string; password: string };
+export type RecoveryRequest = { email: string; recoveryCode: string; newPassword: string };
 
 export const ACCOUNT_DELETED_NOTICE =
   "Your account and everything in it have been deleted. You're in a new guest session.";
@@ -50,9 +51,25 @@ export function useAccount() {
     await queryClient.resetQueries();
   };
 
+  // The recovery code is handed back to the caller to show, and kept out
+  // of the cache: once shown, it should exist nowhere in the app.
   const signUp = useMutation({
     mutationFn: ({ email, password }: Credentials) => api.signUp(email, password),
-    onSuccess: (signedUp) => queryClient.setQueryData(queryKeys.account, signedUp),
+    onSuccess: ({ recovery_code: _shown, ...account }) =>
+      queryClient.setQueryData<Account>(queryKeys.account, account),
+  });
+
+  // Possibly a different account from the one on screen (a guest who
+  // remembered they had one), so everything is fetched again.
+  const recover = useMutation({
+    mutationFn: ({ email, recoveryCode, newPassword }: RecoveryRequest) =>
+      api.recover(email, recoveryCode, newPassword),
+    onSuccess: startOver,
+  });
+
+  const replaceRecoveryCode = useMutation({
+    mutationFn: (password: string) => api.replaceRecoveryCode(password),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.account }),
   });
 
   const logIn = useMutation({
@@ -77,8 +94,15 @@ export function useAccount() {
     account: account.data ?? null,
     notice,
     dismissNotice: () => setNotice(null),
-    signUp: (credentials: Credentials): Promise<Account> =>
-      signUp.mutateAsync(credentials),
+    /** Resolves with the new account's recovery code, to show once. */
+    signUp: (credentials: Credentials): Promise<string> =>
+      signUp.mutateAsync(credentials).then((signedUp: SignedUp) => signedUp.recovery_code),
+    /** Resolves with the next recovery code, to show once. */
+    recover: (request: RecoveryRequest): Promise<string> =>
+      recover.mutateAsync(request).then((signedIn) => signedIn.recovery_code),
+    /** Resolves with the new recovery code, to show once. */
+    replaceRecoveryCode: (password: string): Promise<string> =>
+      replaceRecoveryCode.mutateAsync(password).then((made) => made.recovery_code),
     logIn: (credentials: Credentials): Promise<void> =>
       logIn.mutateAsync(credentials).then(() => undefined),
     logOut: (): Promise<void> => logOut.mutateAsync(),

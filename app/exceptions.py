@@ -75,6 +75,12 @@ class AlreadySignedUpError(MealPlannerError):
     """Signup while signed in to an account (rather than a guest)."""
 
 
+class NoLoginError(MealPlannerError):
+    """Something only an account with a login can do (a recovery code),
+    asked by a guest. Not "not signed in": the guest is signed in, and the
+    client starts a new guest session on that answer."""
+
+
 class CrossSiteRequestError(MealPlannerError):
     """A state-changing request sent from another website."""
 

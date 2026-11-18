@@ -226,6 +226,7 @@ def test_each_step_of_an_accounts_life_is_a_security_event(anonymous, log_lines)
     assert [e["event"] for e in found] == [
         "guest_started",
         "signed_up",
+        "recovery_code_issued",
         "logged_out",
         "login_failed",
         "logged_in",
@@ -233,7 +234,8 @@ def test_each_step_of_an_accounts_life_is_a_security_event(anonymous, log_lines)
     ]
     assert found[1]["outcome"] == "guest_upgraded"
     assert all(e["request_id"] for e in found)
-    assert found[0]["user_id"] == found[1]["user_id"] == found[4]["user_id"]
+    assert found[0]["user_id"] == found[1]["user_id"] == found[2]["user_id"]
+    assert found[0]["user_id"] == found[5]["user_id"]
 
 
 def test_throttling_starting_and_refusing_is_logged(account, anonymous, log_lines):

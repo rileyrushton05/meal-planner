@@ -72,6 +72,7 @@ export default function App() {
             account={session.account}
             onSignUp={session.signUp}
             onLogIn={session.logIn}
+            onRecover={session.recover}
             onLogOut={session.logOut}
             loggingOut={session.loggingOut}
           />
@@ -153,6 +154,7 @@ export default function App() {
             {page.id === "account" && session.account && (
               <AccountPage
                 account={session.account}
+                onReplaceRecoveryCode={session.replaceRecoveryCode}
                 onExport={session.exportAccount}
                 onDelete={async (password) => {
                   await session.deleteAccount(password);

@@ -77,3 +77,44 @@ describe("a session that ends mid-use", () => {
     expect(result.current.notice).toBeNull();
   });
 });
+
+describe("a recovery code", () => {
+  it("goes to whoever shows it, and is kept nowhere in the app", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (path: string) => {
+        if (path === "/api/auth/me") {
+          return respond(200, { email: null, is_guest: true, has_recovery_code: false });
+        }
+        if (path === "/api/auth/signup") {
+          return respond(200, {
+            email: "a@b.co",
+            is_guest: false,
+            has_recovery_code: true,
+            recovery_code: "K7QM-3XRD-9PWT-HB2F",
+          });
+        }
+        return respond(200);
+      }),
+    );
+    const { queryClient, result } = setup();
+    await waitFor(() => expect(result.current.account?.is_guest).toBe(true));
+
+    let shown = "";
+    await act(async () => {
+      shown = await result.current.signUp({ email: "a@b.co", password: "lettuce harbour spoon" });
+    });
+
+    expect(shown).toBe("K7QM-3XRD-9PWT-HB2F");
+    await waitFor(() =>
+      expect(result.current.account).toEqual({
+        email: "a@b.co",
+        is_guest: false,
+        has_recovery_code: true,
+      }),
+    );
+    expect(JSON.stringify(queryClient.getQueryCache().getAll().map((q) => q.state.data))).not.toContain(
+      "K7QM",
+    );
+  });
+});

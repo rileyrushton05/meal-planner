@@ -158,3 +158,40 @@ def hash_session_token(token: str) -> str:
     no help in forging a token.
     """
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+# --- Recovery codes --------------------------------------------------------------
+
+#: Crockford's base 32: digits and capitals without I, L, O and U, which are
+#: easily misread or mistyped (and U, which avoids accidental words).
+RECOVERY_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+#: 16 characters of 5 bits each: 80 bits. Far beyond guessing even without
+#: the throttle that also guards it, and short enough to write down.
+RECOVERY_CODE_LENGTH = 16
+RECOVERY_GROUP = 4
+#: What people type for what was shown: O for 0, I and L for 1.
+_RECOVERY_MISREADINGS = str.maketrans({"O": "0", "I": "1", "L": "1"})
+
+
+def new_recovery_code() -> str:
+    """A fresh recovery code, grouped for writing down: "K7QM-3XRD-9PWT-HB2F".
+    Shown to the person once; only its hash is stored."""
+    raw = "".join(
+        secrets.choice(RECOVERY_ALPHABET) for _ in range(RECOVERY_CODE_LENGTH)
+    )
+    return "-".join(
+        raw[i : i + RECOVERY_GROUP]
+        for i in range(0, RECOVERY_CODE_LENGTH, RECOVERY_GROUP)
+    )
+
+
+def hash_recovery_code(code: str) -> str:
+    """The `users.recovery_code_hash` for a code as typed: SHA-256, hex.
+
+    Typing is forgiven before hashing: case, spaces, dashes, and the
+    letters most often typed for digits. A plain hash, like a session
+    token's, is enough: the code is 80 random bits, not a password a person
+    chose, so there is no dictionary to try against a stolen hash.
+    """
+    typed = "".join(code.upper().split()).replace("-", "")
+    return hashlib.sha256(typed.translate(_RECOVERY_MISREADINGS).encode()).hexdigest()

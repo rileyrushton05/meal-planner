@@ -18,17 +18,24 @@ The rules, and why:
 - **Login never says which half was wrong**, and costs the same time either
   way (`verify_password`), so it cannot be used to discover who has an
   account. Signup, unavoidably, says an email is taken; how often one
-  network may hear that is limited, and it is the trade-off every signup
-  form makes until email verification exists (Phase 2).
+  network may hear that is limited. Signup forms that send a verification
+  email can avoid saying it; this app sends no email at all (recovery is by
+  code, below), so the limit is the defence.
 - **Guessing is throttled** (app/ratelimit.py): per account and network,
   with a higher ceiling per account. While throttled, even the right
   password is refused, without being checked.
+- **A forgotten password is recovered with a code**, shown once at signup
+  and stored only as a hash, rather than a link sent by email: no third
+  party receives anyone's address. Each code works once, and recovering
+  ends every session. Guesses share login's throttle.
 - **Each of these is a security event** (app/events.py).
 """
 
 from __future__ import annotations
 
+import hmac
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
@@ -41,6 +48,7 @@ from app.exceptions import (
     EmailTakenError,
     InvalidCredentialsError,
     InvalidEmailError,
+    NoLoginError,
     NotSignedInError,
     TooManyAttemptsError,
 )
@@ -60,8 +68,10 @@ from app.samples import add_samples
 from app.security import (
     check_password_policy,
     hash_password,
+    hash_recovery_code,
     hash_session_token,
     needs_rehash,
+    new_recovery_code,
     new_session_token,
     verify_password,
 )
@@ -84,6 +94,8 @@ class CurrentUser:
     is_guest: bool
     #: Identifies the session itself, so logout and token rotation can end it.
     token_hash: str
+    #: Whether the account can be recovered if its password is forgotten.
+    has_recovery_code: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,14 +105,17 @@ class SignedIn:
 
     user: CurrentUser
     token: str
+    #: A new recovery code, when one was just issued (signup, recovery). Like
+    #: the token, it exists nowhere else: show it once.
+    recovery_code: str | None = None
 
 
 def normalise_email(raw: str) -> str:
     """Trimmed, lower-cased, and checked to be shaped like an address.
 
-    Deliberately loose: the only real test of an address is sending to it
-    (email verification, Phase 2). This catches typos such as a missing @,
-    not unusual but valid addresses.
+    Deliberately loose: the only real test of an address is sending to it,
+    and the app never does (it is a login name; recovery is by code). This
+    catches typos such as a missing @, not unusual but valid addresses.
     """
     email = raw.strip().lower()
     local, at, domain = email.rpartition("@")
@@ -221,7 +236,8 @@ class AuthService:
             self._sessions.delete(current.token_hash)
             outcome = "guest_upgraded"
         events.record("signed_up", user_id=persisted_id(user), outcome=outcome)
-        return self._start_session(user)
+        code = self._issue_recovery_code(user)
+        return self._start_session(user, recovery_code=code)
 
     def claim(self, user_id: int, email: str, password: str) -> None:
         """Give the unclaimed owner (the account holding the data from before
@@ -237,8 +253,9 @@ class AuthService:
 
     def set_password(self, user_id: int, password: str) -> int:
         """Replace an account's password and end all of its sessions,
-        returning how many were ended. For `app.cli`, run by whoever deploys,
-        until password reset by email exists (Phase 2).
+        returning how many were ended. For `app.cli`, run by whoever deploys:
+        the way back for someone who has lost both their password and their
+        recovery code.
 
         Every session goes, because a new password is often the answer to
         "someone else may have it": a browser signed in with the old one
@@ -270,6 +287,10 @@ class AuthService:
             password,
             refusal="That email and password don't match an account.",
         )
+        # Hashes made under older parameters are upgraded now, the one time
+        # the password is in hand.
+        if user.password_hash is not None and needs_rehash(user.password_hash):
+            self._users.set_password_hash(user, hash_password(password))
 
         # A new token, never the one presented: this is where session
         # fixation is stopped. A guest who logs in leaves their guest data
@@ -316,7 +337,83 @@ class AuthService:
         events.record("account_deleted", user_id=current.id, removed=removed)
         return removed
 
+    # --- Recovery codes -------------------------------------------------------------
+
+    def replace_recovery_code(self, current: CurrentUser, password: str) -> str:
+        """A new recovery code for the account, confirmed with its password;
+        the old one stops working. For a code lost, or never made (accounts
+        from before recovery codes)."""
+        user = self._users.get(current.id)
+        if user is None:
+            raise NotSignedInError("Your session has ended. Sign in again.")
+        if user.email is None:
+            raise NoLoginError(
+                "A guest session has no password to recover. Sign up first."
+            )
+        self._check_password(
+            user.email,
+            user,
+            password,
+            refusal="That password isn't right.",
+            outcome="replace_recovery_code",
+        )
+        return self._issue_recovery_code(user)
+
+    def recover(
+        self,
+        current: CurrentUser | None,
+        email: str,
+        recovery_code: str,
+        new_password: str,
+    ) -> SignedIn:
+        """Set a new password with the email and recovery code, for someone
+        who has forgotten theirs. Signs them in, with a new recovery code.
+
+        The code is single-use: a new one replaces it, which is the only
+        copy the person now has. Every existing session ends, as with any
+        new password: the reason for it may be someone else having the old
+        one. The refusal is the same whether the email or the code is wrong,
+        and guesses are throttled with login.
+        """
+        email_key = email.strip().lower()
+        # First, and checked for anyone: it says nothing about the account.
+        check_password_policy(new_password, email=email_key)
+        presented = hash_recovery_code(recovery_code)
+
+        def matches(found: User | None) -> bool:
+            stored = found.recovery_code_hash if found is not None else None
+            # Compared even when there is nothing to compare with, so the
+            # time taken does not say whether the email has an account.
+            same = hmac.compare_digest(stored or "", presented)
+            return same and stored is not None
+
+        user = self._prove(
+            email_key,
+            self._users.find_by_email(email_key),
+            matches,
+            refusal="That email and recovery code don't match an account.",
+            outcome="recover",
+        )
+        user_id = persisted_id(user)
+        self._users.set_password_hash(user, hash_password(new_password))
+        ended = self._sessions.delete_all_for(user_id)
+        if current is not None and current.id != user_id:
+            # A guest recovering their account leaves the guest behind, as
+            # at login, to be cleaned up with other idle guests.
+            self._sessions.delete(current.token_hash)
+        events.record(
+            "password_recovered", user_id=user_id, removed={"sessions": ended}
+        )
+        code = self._issue_recovery_code(user)
+        return self._start_session(user, recovery_code=code)
+
     # --- Helpers ---------------------------------------------------------------
+
+    def _issue_recovery_code(self, user: User) -> str:
+        code = new_recovery_code()
+        self._users.set_recovery_code_hash(user, hash_recovery_code(code))
+        events.record("recovery_code_issued", user_id=persisted_id(user))
+        return code
 
     def _check_password(
         self,
@@ -327,14 +424,38 @@ class AuthService:
         refusal: str,
         outcome: str | None = None,
     ) -> User:
-        """Return `user` if `password` is theirs; otherwise raise
+        """Return `user` if `password` is theirs, or refuse (see `_prove`).
+
+        `verify_password` costs the same with no user, so a refusal takes
+        as long whether or not the email has an account.
+        """
+        return self._prove(
+            email_key,
+            user,
+            lambda found: verify_password(
+                found.password_hash if found is not None else None, password
+            ),
+            refusal=refusal,
+            outcome=outcome,
+        )
+
+    def _prove(
+        self,
+        email_key: str,
+        user: User | None,
+        proven: Callable[[User | None], bool],
+        *,
+        refusal: str,
+        outcome: str | None = None,
+    ) -> User:
+        """Return `user` if `proven(user)`; otherwise raise
         InvalidCredentialsError with `refusal`, or TooManyAttemptsError while
         throttled.
 
-        The same cost whether or not there is a user, and throttled per
-        account and network and per account, keyed on the email so the
-        throttle reveals nothing about who has an account. Login and account
-        deletion share it, so guesses at either count towards both.
+        Throttled per account and network and per account, keyed on the email
+        so the throttle reveals nothing about who has an account. Login,
+        deletion and recovery all prove themselves here, so guesses at any of
+        them count towards all of them.
         """
         per_network = subject("login", email_key, self._network)
         per_account = subject("login", email_key)
@@ -347,8 +468,8 @@ class AuthService:
                 rule, key, "Too many failed attempts. Try again in {wait}."
             )
 
-        stored_hash = user.password_hash if user is not None else None
-        if not verify_password(stored_hash, password) or user is None:
+        # Evaluated whether or not there is a user, so the cost is the same.
+        if not proven(user) or user is None:
             # Keeps writes: nothing but these records (and perhaps a session
             # refresh) has been written, and they must outlive the error.
             for rule, key in rules:
@@ -374,12 +495,7 @@ class AuthService:
                 )
             raise InvalidCredentialsError(refusal)
 
-        # Hashes made under older parameters are upgraded now, the one time
-        # the password is in hand.
-        if stored_hash is not None and needs_rehash(stored_hash):
-            self._users.set_password_hash(user, hash_password(password))
-
-        # Proof of the password ends the throttling for this account.
+        # Proof ends the throttling for this account.
         for rule, key in rules:
             self._limits.clear(rule, key)
         return user
@@ -410,13 +526,17 @@ class AuthService:
             )
         return email, hash_password(password)
 
-    def _start_session(self, user: User) -> SignedIn:
+    def _start_session(
+        self, user: User, *, recovery_code: str | None = None
+    ) -> SignedIn:
         token = new_session_token()
         token_hash = hash_session_token(token)
         user_id = persisted_id(user)
         self._sessions.create(token_hash, user_id, self._now + SESSION_LIFETIME)
         self._users.touch(user_id, self._now)
-        return SignedIn(user=_current(user, token_hash), token=token)
+        return SignedIn(
+            user=_current(user, token_hash), token=token, recovery_code=recovery_code
+        )
 
 
 def _current(user: User, token_hash: str) -> CurrentUser:
@@ -425,6 +545,7 @@ def _current(user: User, token_hash: str) -> CurrentUser:
         email=user.email,
         is_guest=user.is_guest,
         token_hash=token_hash,
+        has_recovery_code=user.recovery_code_hash is not None,
     )
 
 

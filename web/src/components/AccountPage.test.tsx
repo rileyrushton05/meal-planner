@@ -6,8 +6,8 @@ import { ApiError } from "@/api/client";
 import type { Account, AccountExport } from "@/api/types";
 import { AccountPage } from "@/components/AccountPage";
 
-const ACCOUNT: Account = { email: "cook@example.com", is_guest: false };
-const GUEST: Account = { email: null, is_guest: true };
+const ACCOUNT: Account = { email: "cook@example.com", is_guest: false, has_recovery_code: true };
+const GUEST: Account = { email: null, is_guest: true, has_recovery_code: false };
 const EXPORT: AccountExport = {
   format: "meal-planner-export",
   version: 1,
@@ -22,6 +22,7 @@ afterEach(() => vi.restoreAllMocks());
 function renderPage(account: Account = ACCOUNT, overrides: Partial<Parameters<typeof AccountPage>[0]> = {}) {
   const props = {
     account,
+    onReplaceRecoveryCode: vi.fn(async (_password: string) => "NEW0-CODE-1234-5678"),
     onExport: vi.fn(async () => EXPORT),
     onDelete: vi.fn(async (_password?: string) => {}),
     ...overrides,
@@ -138,5 +139,37 @@ describe("deleting", () => {
     await user.click(screen.getByRole("button", { name: "Delete account" }));
     expect(within(dialog()).getByLabelText("Password")).toHaveValue("");
     expect(props.onDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe("the recovery code", () => {
+  it("warns an account that has none, and makes one with the password", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPage({ ...ACCOUNT, has_recovery_code: false });
+
+    const section = screen.getByRole("region", { name: "Recovery code" });
+    expect(section).toHaveTextContent("You don't have a recovery code yet");
+    await user.click(within(section).getByRole("button", { name: "Make a recovery code" }));
+    await user.type(within(dialog()).getByLabelText("Password"), "lettuce harbour spoon{Enter}");
+
+    expect(props.onReplaceRecoveryCode).toHaveBeenCalledWith("lettuce harbour spoon");
+    const saveCode = await screen.findByRole("alertdialog", { name: "Save your recovery code" });
+    expect(saveCode).toHaveTextContent("NEW0-CODE-1234-5678");
+  });
+
+  it("offers a replacement to an account that has one", () => {
+    renderPage();
+
+    const section = screen.getByRole("region", { name: "Recovery code" });
+    expect(section).not.toHaveTextContent("You don't have");
+    expect(
+      within(section).getByRole("button", { name: "Make a new recovery code" }),
+    ).toBeInTheDocument();
+  });
+
+  it("is not offered to a guest, who has no password to recover", () => {
+    renderPage(GUEST);
+
+    expect(screen.queryByRole("region", { name: "Recovery code" })).not.toBeInTheDocument();
   });
 });

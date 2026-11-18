@@ -10,6 +10,8 @@ import { mondayOf } from "../lib/dates";
 import type {
   Account,
   AccountExport,
+  RecoveryCode,
+  SignedUp,
   AppState,
   DayAssignmentWrite,
   GroceryLine,
@@ -94,6 +96,7 @@ const SESSION_ROUTES = new Set([
   "/api/auth/signup",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/recover",
 ]);
 
 async function request<T>(
@@ -241,8 +244,9 @@ export const api = {
   /** Who is signed in. Signed out, this starts a guest session first. */
   me: (): Promise<Account> => request("/api/auth/me"),
 
-  /** Create an account; a guest becomes it, keeping their meals. */
-  signUp: (email: string, password: string): Promise<Account> =>
+  /** Create an account; a guest becomes it, keeping their meals. The
+   *  response carries the account's recovery code, to show once. */
+  signUp: (email: string, password: string): Promise<SignedUp> =>
     request("/api/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, password }),
@@ -255,6 +259,25 @@ export const api = {
     }),
 
   logOut: (): Promise<void> => request("/api/auth/logout", { method: "POST" }),
+
+  /** A forgotten password replaced using the recovery code; signs in, and
+   *  carries the next recovery code (each works once). */
+  recover: (email: string, recoveryCode: string, newPassword: string): Promise<SignedUp> =>
+    request("/api/auth/recover", {
+      method: "POST",
+      body: JSON.stringify({
+        email,
+        recovery_code: recoveryCode,
+        new_password: newPassword,
+      }),
+    }),
+
+  /** A new recovery code, confirmed with the password; the old one stops. */
+  replaceRecoveryCode: (password: string): Promise<RecoveryCode> =>
+    request("/api/account/recovery-code", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
 
   /** Everything that is the caller's own, for them to keep. */
   exportAccount: (): Promise<AccountExport> => request("/api/account/export"),

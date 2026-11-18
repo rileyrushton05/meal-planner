@@ -87,6 +87,16 @@ unscoped, and someone else's meal answers 404, never 403.
   end-to-end tests use reads them from there, and every Playwright test fails
   on any violation. API responses get a stricter set from the app itself
   (`server/headers.py`): no content allowed at all, `no-store`, `nosniff`.
+- **Recovery codes, not email:** a forgotten password is reset with a
+  recovery code shown once at signup (16 characters, 80 random bits),
+  rather than an emailed link. The app never sends email, so no third
+  party ever receives users' addresses, and there is no provider to depend
+  on. Only the code's SHA-256 is stored; each code works once (recovery
+  issues the next); resetting ends every session; the refusal is the same
+  whether the email or the code is wrong, and guesses share login's
+  throttle. Codes can be replaced from the Account page with the password.
+  The trade-off: lose both the password and the code, and the account is
+  gone (an operator can still use `set-password`).
 - **Leaving:** the Account page downloads everything that is yours as
   readable JSON (meals, ingredients, every planned day; names rather than
   internal ids, and never a password hash or token), and deletes the
@@ -269,6 +279,15 @@ when a push to `main` changes `migrations/` and waits for approval through a
 GitHub environment before touching the database. It refuses to run unless
 its target is Postgres, so a missing secret cannot "succeed" against a
 throwaway SQLite file.
+
+**Migrate first, then deploy.** Merging to `main` starts the Vercel deploy
+and the migration at the same moment, and the migration waits for approval.
+Code that reads a new column fails on every request until that column
+exists, so a migration the new code depends on is applied *before* merging:
+from the branch, with the owner's URL, on the `preview` Neon branch first
+(which preview deployments also need) and then on production. Migrations
+are written additively so the code already running is unaffected. After the
+merge, the workflow finds nothing left to do.
 
 ## Deployment
 

@@ -18,6 +18,7 @@ vi.mock("@/api/client", async (importOriginal) => ({
     signUp: vi.fn(),
     logIn: vi.fn(),
     logOut: vi.fn(),
+    recover: vi.fn(),
     deleteAccount: vi.fn(),
     exportAccount: vi.fn(),
   },
@@ -31,7 +32,7 @@ beforeEach(() => {
   mocked.getState.mockImplementation(async (week: string) =>
     makeState({ week_start: week, meals: [makeMeal({ id: 1, name: "Spaghetti" })] }),
   );
-  mocked.me.mockResolvedValue({ email: null, is_guest: true });
+  mocked.me.mockResolvedValue({ email: null, is_guest: true, has_recovery_code: false });
   mocked.getGroceryList.mockResolvedValue([]);
 });
 
@@ -145,7 +146,12 @@ describe("loading", () => {
 describe("the account", () => {
   it("invites a guest to sign up, and keeps their meals when they do", async () => {
     const user = userEvent.setup();
-    mocked.signUp.mockResolvedValue({ email: "cook@example.com", is_guest: false });
+    mocked.signUp.mockResolvedValue({
+      email: "cook@example.com",
+      is_guest: false,
+      has_recovery_code: true,
+      recovery_code: "K7QM-3XRD-9PWT-HB2F",
+    });
     await renderApp("/meals");
 
     await user.click(await screen.findByRole("button", { name: "Sign up to keep your meals" }));
@@ -157,6 +163,22 @@ describe("the account", () => {
     expect(mocked.signUp).toHaveBeenCalledWith("cook@example.com", "lettuce harbour spoon");
     expect(await screen.findByText("cook@example.com")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    // The recovery code, shown once, and not dismissed until it is saved.
+    const saveCode = await screen.findByRole("alertdialog", { name: "Save your recovery code" });
+    expect(within(saveCode).getByLabelText("Recovery code")).toHaveTextContent(
+      "K7QM-3XRD-9PWT-HB2F",
+    );
+    const done = within(saveCode).getByRole("button", { name: "Done" });
+    expect(done).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    await user.click(within(saveCode).getByLabelText(/I've saved it/));
+    await user.click(done);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    // Kept out of the cache, so it is nowhere in the app once shown.
+    expect(document.body).not.toHaveTextContent("K7QM-3XRD-9PWT-HB2F");
+
     // Same account, same meals: nothing is refetched.
     expect(mocked.getState).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("article", { name: "Spaghetti" })).toBeInTheDocument();
@@ -184,7 +206,7 @@ describe("the account", () => {
   it("loads the account's own meals after logging in", async () => {
     const user = userEvent.setup();
     mocked.logIn.mockImplementation(async () => {
-      const account = { email: "cook@example.com", is_guest: false };
+      const account = { email: "cook@example.com", is_guest: false, has_recovery_code: true };
       mocked.me.mockResolvedValue(account);
       mocked.getState.mockImplementation(async (week: string) =>
         makeState({ week_start: week, meals: [makeMeal({ id: 9, name: "Their Curry" })] }),
@@ -206,9 +228,9 @@ describe("the account", () => {
 
   it("starts over as a guest after logging out", async () => {
     const user = userEvent.setup();
-    mocked.me.mockResolvedValue({ email: "cook@example.com", is_guest: false });
+    mocked.me.mockResolvedValue({ email: "cook@example.com", is_guest: false, has_recovery_code: true });
     mocked.logOut.mockImplementation(async () => {
-      mocked.me.mockResolvedValue({ email: null, is_guest: true });
+      mocked.me.mockResolvedValue({ email: null, is_guest: true, has_recovery_code: false });
     });
     await renderApp();
 
@@ -236,9 +258,9 @@ describe("the account page", () => {
 
   it("after deleting, lands home in a fresh session with nothing of the old account", async () => {
     const user = userEvent.setup();
-    mocked.me.mockResolvedValue({ email: "cook@example.com", is_guest: false });
+    mocked.me.mockResolvedValue({ email: "cook@example.com", is_guest: false, has_recovery_code: true });
     mocked.deleteAccount.mockImplementation(async () => {
-      mocked.me.mockResolvedValue({ email: null, is_guest: true });
+      mocked.me.mockResolvedValue({ email: null, is_guest: true, has_recovery_code: false });
       mocked.getState.mockImplementation(async (week: string) =>
         makeState({ week_start: week, meals: [] }),
       );
@@ -255,5 +277,57 @@ describe("the account page", () => {
     expect(
       await screen.findByRole("button", { name: "Sign up to keep your meals" }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("a forgotten password", () => {
+  it("is reset with the recovery code, signing in and showing the next code", async () => {
+    const user = userEvent.setup();
+    mocked.recover.mockImplementation(async () => {
+      const account = { email: "cook@example.com", is_guest: false, has_recovery_code: true };
+      mocked.me.mockResolvedValue(account);
+      return { ...account, recovery_code: "NEXT-CODE-2345-6789" };
+    });
+    await renderApp("/meals");
+
+    await user.click(await screen.findByRole("button", { name: "Log in" }));
+    await user.click(screen.getByRole("button", { name: "Forgot your password?" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset your password" });
+    await user.type(within(dialog).getByLabelText("Email"), "cook@example.com");
+    await user.type(within(dialog).getByLabelText("Recovery code"), "k7qm 3xrd 9pwt hb2f");
+    await user.type(within(dialog).getByLabelText("New password"), "copper kettle meadow");
+    await user.click(within(dialog).getByRole("button", { name: "Reset password" }));
+
+    expect(mocked.recover).toHaveBeenCalledWith(
+      "cook@example.com",
+      "k7qm 3xrd 9pwt hb2f",
+      "copper kettle meadow",
+    );
+    const saveCode = await screen.findByRole("alertdialog", { name: "Save your recovery code" });
+    expect(saveCode).toHaveTextContent("NEXT-CODE-2345-6789");
+    expect(saveCode).toHaveTextContent("the code you used no longer works");
+    // Possibly a different account: everything is fetched again.
+    await waitFor(() => expect(mocked.getState).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows the server's refusal and stays open", async () => {
+    const user = userEvent.setup();
+    mocked.recover.mockRejectedValue(
+      new ApiError(401, "That email and recovery code don't match an account."),
+    );
+    await renderApp("/meals");
+
+    await user.click(await screen.findByRole("button", { name: "Log in" }));
+    await user.click(screen.getByRole("button", { name: "Forgot your password?" }));
+    const dialog = screen.getByRole("dialog", { name: "Reset your password" });
+    await user.type(within(dialog).getByLabelText("Email"), "cook@example.com");
+    await user.type(within(dialog).getByLabelText("Recovery code"), "WRONG-CODE");
+    await user.type(within(dialog).getByLabelText("New password"), "copper kettle meadow");
+    await user.click(within(dialog).getByRole("button", { name: "Reset password" }));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "That email and recovery code don't match an account.",
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });
