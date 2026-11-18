@@ -93,6 +93,15 @@ export async function planDay(page: Page, day: string, meal: string) {
 }
 
 /**
+ * Signed in to this account, not a guest: there is a way to log out, and
+ * the Account link names the email on hover.
+ */
+export async function expectSignedInAs(page: Page, email: string) {
+  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Account" })).toHaveAttribute("title", email);
+}
+
+/**
  * After signing up or recovering: read the recovery code from the dialog
  * that shows it once, then say it is saved and close it, as a person must
  * before they can carry on.

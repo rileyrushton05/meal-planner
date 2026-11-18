@@ -161,7 +161,6 @@ describe("the account", () => {
     await user.click(within(dialog).getByRole("button", { name: "Create account" }));
 
     expect(mocked.signUp).toHaveBeenCalledWith("cook@example.com", "lettuce harbour spoon");
-    expect(await screen.findByText("cook@example.com")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     // The recovery code, shown once, and not dismissed until it is saved.
@@ -178,6 +177,10 @@ describe("the account", () => {
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     // Kept out of the cache, so it is nowhere in the app once shown.
     expect(document.body).not.toHaveTextContent("K7QM-3XRD-9PWT-HB2F");
+    expect(screen.getByRole("link", { name: "Account" })).toHaveAttribute(
+      "title",
+      "cook@example.com",
+    );
 
     // Same account, same meals: nothing is refetched.
     expect(mocked.getState).toHaveBeenCalledTimes(1);
@@ -223,7 +226,10 @@ describe("the account", () => {
 
     expect(await screen.findByRole("article", { name: "Their Curry" })).toBeInTheDocument();
     expect(screen.queryByRole("article", { name: "Spaghetti" })).not.toBeInTheDocument();
-    expect(await screen.findByText("cook@example.com")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Account" })).toHaveAttribute(
+      "title",
+      "cook@example.com",
+    );
   });
 
   it("starts over as a guest after logging out", async () => {

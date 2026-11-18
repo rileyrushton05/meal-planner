@@ -1,14 +1,13 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 
 import type { Theme } from "@/lib/theme";
 
 const OPTIONS = [
   { value: "light", label: "Light theme", Icon: Sun },
   { value: "dark", label: "Dark theme", Icon: Moon },
-  { value: "system", label: "Match device theme", Icon: Monitor },
 ] as const satisfies readonly { value: Theme; label: string; Icon: unknown }[];
 
-/** Three toggle buttons, the current one pressed. */
+/** Two toggle buttons, the current one pressed. */
 export function ThemeSwitcher({
   theme,
   onChange,

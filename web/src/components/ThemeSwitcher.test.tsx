@@ -1,11 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, expect, it } from "vitest";
 
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useTheme } from "@/hooks/useTheme";
 import { THEME_STORAGE_KEY } from "@/lib/theme";
-import { fakeDevice } from "@/test/device";
 
 function Harness() {
   const { theme, setTheme } = useTheme();
@@ -17,10 +16,6 @@ const isDarkNow = () => document.documentElement.classList.contains("dark");
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.classList.remove("dark");
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
 });
 
 it("starts dark, with Dark pressed", () => {
@@ -50,19 +45,10 @@ it("switches to light and remembers it", async () => {
   );
 });
 
-it("follows the device while set to match it, and stops when it is not", async () => {
-  const device = fakeDevice(false);
-  const user = userEvent.setup();
+it("offers only light and dark", () => {
   render(<Harness />);
-
-  await user.click(screen.getByRole("button", { name: "Match device theme" }));
-  expect(isDarkNow()).toBe(false);
-
-  device.switchTo(true);
-  expect(isDarkNow()).toBe(true);
-
-  await user.click(screen.getByRole("button", { name: "Light theme" }));
-  expect(device.listening()).toBe(0);
-  device.switchTo(true);
-  expect(isDarkNow()).toBe(false);
+  expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual([
+    "Light theme",
+    "Dark theme",
+  ]);
 });

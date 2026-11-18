@@ -24,12 +24,9 @@ test("dark by default; a chosen theme is there from the first paint after a relo
   await expect(html(page)).not.toHaveClass(/\bdark\b/);
 });
 
-test("matching the device follows its setting", async ({ page }) => {
+test("the device's own setting does not override the choice", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/");
-  await page.getByRole("button", { name: "Match device theme" }).click();
-  await expect(html(page)).not.toHaveClass(/\bdark\b/);
-
-  await page.emulateMedia({ colorScheme: "dark" });
   await expect(html(page)).toHaveClass(/\bdark\b/);
+  await expect(page.getByRole("button", { name: /theme$/ })).toHaveCount(2);
 });

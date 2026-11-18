@@ -7,6 +7,7 @@ import { expect, test, watchForCspViolations } from "./fixtures.ts";
 import {
   addMeal,
   dayPicker,
+  expectSignedInAs,
   goTo,
   mealRow,
   openWeek,
@@ -87,13 +88,13 @@ test("signing up keeps everything made as a guest, under a new session", async (
   await signUp.getByRole("button", { name: "Create account" }).click();
   await saveRecoveryCode(page);
 
-  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expectSignedInAs(page, email);
   await expect(mealRow(page, mine)).toBeVisible();
   expect(await sessionCookie(page)).not.toBe(guestCookie);
 
   // Still signed in, with the same meals, after a reload.
   await page.reload();
-  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expectSignedInAs(page, email);
   await expect(mealRow(page, mine)).toBeVisible();
 
   // Logging out starts a fresh guest; logging back in brings the meal back.
@@ -112,7 +113,7 @@ test("signing up keeps everything made as a guest, under a new session", async (
 
   await logIn.getByLabel("Password").fill(password);
   await logIn.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expectSignedInAs(page, email);
   await expect(mealRow(page, mine)).toBeVisible();
 });
 
@@ -129,7 +130,7 @@ test("take a copy of everything, then delete the account for good", async ({ pag
   await signUp.getByLabel("Password").fill(password);
   await signUp.getByRole("button", { name: "Create account" }).click();
   await saveRecoveryCode(page);
-  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expectSignedInAs(page, email);
 
   await page.getByRole("link", { name: "Account" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account");
@@ -197,7 +198,7 @@ test("a forgotten password is reset with the recovery code from signup", async (
 
   const next = await saveRecoveryCode(page);
   expect(next).not.toBe(code);
-  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+  await expectSignedInAs(page, email);
   await expect(mealRow(page, mine)).toBeVisible();
 
   // The code was used up: it cannot reset the password again.

@@ -12,7 +12,8 @@ import type { Credentials, RecoveryRequest } from "@/hooks/useAccount";
 
 /**
  * Who is signed in, at the foot of the sidebar: a guest is invited to sign
- * up (keeping what they made), an account shows its email and a way out.
+ * up (keeping what they made), an account gets its Account page and a way
+ * out. The email is on the Account page, and on hover over its link.
  */
 export function AccountBar({
   account,
@@ -50,6 +51,7 @@ export function AccountBar({
     <AppLink
       to="/account"
       aria-label="Account"
+      title={account.email ?? undefined}
       aria-current={onAccountPage ? "page" : undefined}
       className={cn(
         buttonVariants({ variant: "ghost", size: "sm" }),
@@ -83,12 +85,6 @@ export function AccountBar({
         </>
       ) : (
         <>
-          <p className="hidden min-w-0 text-muted-foreground lg:block">
-            Signed in as{" "}
-            <span className="block truncate font-medium text-foreground" title={account.email ?? undefined}>
-              {account.email}
-            </span>
-          </p>
           {accountLink}
           <Button
             size="sm"
