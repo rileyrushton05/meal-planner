@@ -264,50 +264,12 @@ class AuthService:
         email as typed, account or not, so it reveals nothing either.
         """
         email_key = email.strip().lower()
-        per_network = subject("login", email_key, self._network)
-        per_account = subject("login", email_key)
-        for rule, key in (
-            (LOGIN_PER_ACCOUNT_AND_NETWORK, per_network),
-            (LOGIN_PER_ACCOUNT, per_account),
-        ):
-            self._refuse_if_throttled(
-                rule, key, "Too many failed attempts. Try again in {wait}."
-            )
-
-        user = self._users.find_by_email(email_key)
-        stored_hash = user.password_hash if user is not None else None
-        if not verify_password(stored_hash, password) or user is None:
-            # Keeps writes: nothing but these records (and perhaps a session
-            # refresh) has been written, and they must outlive the error.
-            for rule, key in (
-                (LOGIN_PER_ACCOUNT_AND_NETWORK, per_network),
-                (LOGIN_PER_ACCOUNT, per_account),
-            ):
-                bucket = self._limits.record(rule, key)
-                if bucket.blocked_until is not None:
-                    events.record(
-                        "login_throttle_started",
-                        rule=rule.scope,
-                        subject=key,
-                        retry_after_seconds=_seconds(bucket.blocked_until - self._now),
-                    )
-            events.record(
-                "login_failed",
-                user_id=persisted_id(user) if user is not None else None,
-                subject=per_account,
-            )
-            raise InvalidCredentialsError(
-                "That email and password don't match an account."
-            )
-
-        # Hashes made under older parameters are upgraded now, the one time
-        # the password is in hand.
-        if stored_hash is not None and needs_rehash(stored_hash):
-            self._users.set_password_hash(user, hash_password(password))
-
-        # Proof of the password ends the throttling for this account.
-        self._limits.clear(LOGIN_PER_ACCOUNT_AND_NETWORK, per_network)
-        self._limits.clear(LOGIN_PER_ACCOUNT, per_account)
+        user = self._check_password(
+            email_key,
+            self._users.find_by_email(email_key),
+            password,
+            refusal="That email and password don't match an account.",
+        )
 
         # A new token, never the one presented: this is where session
         # fixation is stopped. A guest who logs in leaves their guest data
@@ -321,7 +283,106 @@ class AuthService:
         self._sessions.delete(current.token_hash)
         events.record("logged_out", user_id=current.id)
 
+    # --- Leaving ------------------------------------------------------------------
+
+    def delete_account(
+        self, current: CurrentUser, password: str | None
+    ) -> dict[str, int]:
+        """Delete the account and everything in it, for good, returning how
+        many rows of each kind went.
+
+        An account with a login must give its password again: a session left
+        open on a shared computer, or stolen, should not be enough to destroy
+        an account. Wrong guesses here count against the same throttle as
+        login, so this cannot be used to guess the password either. A guest
+        has no password, and nothing to lose that their session does not
+        already reach.
+        """
+        user = self._users.get(current.id)
+        if user is None:
+            raise NotSignedInError("Your session has ended. Sign in again.")
+        if user.email is not None:
+            self._check_password(
+                user.email,
+                user,
+                password or "",
+                refusal="That password isn't right.",
+                outcome="delete_account",
+            )
+        # The counts read tables under row security, which shows a user only
+        # their own rows once the transaction says whose they are.
+        act_as(self._session, current.id)
+        removed = self._users.delete_with_everything(current.id)
+        events.record("account_deleted", user_id=current.id, removed=removed)
+        return removed
+
     # --- Helpers ---------------------------------------------------------------
+
+    def _check_password(
+        self,
+        email_key: str,
+        user: User | None,
+        password: str,
+        *,
+        refusal: str,
+        outcome: str | None = None,
+    ) -> User:
+        """Return `user` if `password` is theirs; otherwise raise
+        InvalidCredentialsError with `refusal`, or TooManyAttemptsError while
+        throttled.
+
+        The same cost whether or not there is a user, and throttled per
+        account and network and per account, keyed on the email so the
+        throttle reveals nothing about who has an account. Login and account
+        deletion share it, so guesses at either count towards both.
+        """
+        per_network = subject("login", email_key, self._network)
+        per_account = subject("login", email_key)
+        rules = (
+            (LOGIN_PER_ACCOUNT_AND_NETWORK, per_network),
+            (LOGIN_PER_ACCOUNT, per_account),
+        )
+        for rule, key in rules:
+            self._refuse_if_throttled(
+                rule, key, "Too many failed attempts. Try again in {wait}."
+            )
+
+        stored_hash = user.password_hash if user is not None else None
+        if not verify_password(stored_hash, password) or user is None:
+            # Keeps writes: nothing but these records (and perhaps a session
+            # refresh) has been written, and they must outlive the error.
+            for rule, key in rules:
+                bucket = self._limits.record(rule, key)
+                if bucket.blocked_until is not None:
+                    events.record(
+                        "login_throttle_started",
+                        rule=rule.scope,
+                        subject=key,
+                        retry_after_seconds=_seconds(bucket.blocked_until - self._now),
+                    )
+            failed_for = persisted_id(user) if user is not None else None
+            if outcome is None:
+                events.record("login_failed", user_id=failed_for, subject=per_account)
+            else:
+                # Said when it was not a login, so the log does not read as
+                # someone failing to sign in.
+                events.record(
+                    "login_failed",
+                    user_id=failed_for,
+                    subject=per_account,
+                    outcome=outcome,
+                )
+            raise InvalidCredentialsError(refusal)
+
+        # Hashes made under older parameters are upgraded now, the one time
+        # the password is in hand.
+        if stored_hash is not None and needs_rehash(stored_hash):
+            self._users.set_password_hash(user, hash_password(password))
+
+        # Proof of the password ends the throttling for this account.
+        for rule, key in rules:
+            self._limits.clear(rule, key)
+        return user
 
     def _refuse_if_throttled(self, rule: Rule, key: str, message: str) -> None:
         wait = self._limits.wait_remaining(rule, key)

@@ -1,8 +1,9 @@
-import { CalendarDays, House, ShoppingBasket, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, House, ShoppingBasket, UserRound, UtensilsCrossed } from "lucide-react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect } from "react";
 
 import { AccountBar } from "@/components/AccountBar";
+import { AccountPage } from "@/components/AccountPage";
 import { AppShell, type NavPage } from "@/components/AppShell";
 import { GroceryTab } from "@/components/GroceryTab";
 import { ThisWeekPage } from "@/components/home/ThisWeekPage";
@@ -15,7 +16,7 @@ import { useAccount } from "@/hooks/useAccount";
 import { usePlanner } from "@/hooks/usePlanner";
 import { useTheme } from "@/hooks/useTheme";
 import { addDays, formatWeekRange, mondayOf, toIso, weekName } from "@/lib/dates";
-import { usePathname } from "@/lib/location";
+import { navigate, usePathname } from "@/lib/location";
 
 const APP_NAME = "Meal Planner";
 
@@ -24,6 +25,9 @@ interface Page extends NavPage {
   title: string;
   /** Whether what the page shows depends on the week, so it has a picker. */
   weekly: boolean;
+  /** In the main navigation. The account page is reached from the account
+   *  controls instead: it is not part of planning a week. */
+  nav: boolean;
 }
 
 /**
@@ -31,11 +35,13 @@ interface Page extends NavPage {
  * plan, then shopping.
  */
 const PAGES: readonly Page[] = [
-  { id: "home", path: "/", label: "This week", title: "This week", icon: House, weekly: true },
-  { id: "meals", path: "/meals", label: "Meals", title: "Meals", icon: UtensilsCrossed, weekly: false },
-  { id: "plan", path: "/plan", label: "Plan", title: "Weekly plan", icon: CalendarDays, weekly: true },
-  { id: "groceries", path: "/groceries", label: "Groceries", title: "Groceries", icon: ShoppingBasket, weekly: true },
+  { id: "home", path: "/", label: "This week", title: "This week", icon: House, weekly: true, nav: true },
+  { id: "meals", path: "/meals", label: "Meals", title: "Meals", icon: UtensilsCrossed, weekly: false, nav: true },
+  { id: "plan", path: "/plan", label: "Plan", title: "Weekly plan", icon: CalendarDays, weekly: true, nav: true },
+  { id: "groceries", path: "/groceries", label: "Groceries", title: "Groceries", icon: ShoppingBasket, weekly: true, nav: true },
+  { id: "account", path: "/account", label: "Account", title: "Account", icon: UserRound, weekly: false, nav: false },
 ];
+const NAV_PAGES = PAGES.filter((page) => page.nav);
 
 /** The page at a path; anything unknown goes home. */
 function pageAt(path: string): Page {
@@ -58,7 +64,7 @@ export default function App() {
 
   return (
     <AppShell
-      pages={PAGES}
+      pages={NAV_PAGES}
       current={page.id}
       footer={
         <>
@@ -142,6 +148,16 @@ export default function App() {
                 groceries={planner.grocery}
                 onSave={planner.savePlan}
                 onCreateMeal={planner.addMeal}
+              />
+            )}
+            {page.id === "account" && session.account && (
+              <AccountPage
+                account={session.account}
+                onExport={session.exportAccount}
+                onDelete={async (password) => {
+                  await session.deleteAccount(password);
+                  navigate("/");
+                }}
               />
             )}
             {page.id === "meals" && (

@@ -7,7 +7,7 @@ happen to exist but are nobody's business.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -187,3 +187,54 @@ class GuestStart(RequestSchema):
     date (the browser's own week, since the server cannot know its zone)."""
 
     sample_week: date | None = None
+
+
+class AccountDeletion(RequestSchema):
+    """Confirmation for deleting an account. An account with a login sends
+    its password; a guest, who has none, sends nothing."""
+
+    password: str | None = Field(default=None, max_length=1024)
+
+
+class ExportedIngredient(ResponseSchema):
+    name: str
+    qty: float
+    unit: str
+
+
+class ExportedMeal(ResponseSchema):
+    name: str
+    servings: int
+    ingredients: list[ExportedIngredient]
+
+
+class ExportedDay(ResponseSchema):
+    week_start: date
+    day: DayOfWeek
+    meal: str
+    #: None when the day uses the recipe's own servings.
+    servings: int | None
+
+
+class ExportedAccount(ResponseSchema):
+    email: str | None
+    is_guest: bool
+    created_at: datetime | None
+
+
+class AccountExport(ResponseSchema):
+    """Everything the app holds that is the caller's own, in a form a person
+    can read and another program can import: names rather than internal
+    ids, which mean nothing outside this database.
+
+    Not included, because they are not content: the password hash, session
+    tokens, and throttle records, which are keyed hashes of an email or
+    network and expire on their own.
+    """
+
+    format: str = "meal-planner-export"
+    version: int = 1
+    exported_at: datetime
+    account: ExportedAccount
+    meals: list[ExportedMeal]
+    plans: list[ExportedDay]

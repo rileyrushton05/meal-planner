@@ -264,3 +264,47 @@ def test_a_guests_sample_meals_are_written_under_row_security(
         started = client.post("/api/auth/guest", json={"sample_week": "2026-08-05"})
         assert started.status_code == 201, started.text
         assert len(client.get("/api/meals").json()) == 3
+
+
+def test_deleting_an_account_as_the_runtime_role_takes_everything_and_only_it(
+    owner: Engine, runtime_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cascade from `users` runs through tables under row security. It
+    must reach all of the account's rows (with counts read under the
+    policies), and none of Alice's or Bob's."""
+    monkeypatch.setenv("MEAL_PLANNER_DB_URL", runtime_url)
+    monkeypatch.setenv("MEAL_PLANNER_AUTO_MIGRATE", "false")
+
+    with api_client() as client:
+        meal = client.post("/api/meals/from-template/Spaghetti Bolognese").json()
+        plan = {"days": [{"day": "Monday", "meal_id": meal["id"]}]}
+        assert client.put("/api/plan/2026-08-03", json=plan).status_code == 200
+        signup = {"email": "leaving@example.com", "password": "lettuce harbour spoon"}
+        assert client.post("/api/auth/signup", json=signup).status_code == 200
+        with owner.connect() as connection:
+            me = connection.execute(
+                text("SELECT id FROM users WHERE email = 'leaving@example.com'")
+            ).scalar_one()
+
+        deleted = client.request(
+            "DELETE", "/api/account", json={"password": "lettuce harbour spoon"}
+        )
+        assert deleted.status_code == 204, deleted.text
+
+    with owner.connect() as connection:
+        mine = {
+            table: connection.execute(
+                text(f"SELECT count(*) FROM {table} WHERE user_id = :id"), {"id": me}
+            ).scalar_one()
+            for table in ("meals", "ingredients", "weekly_plans", "sessions")
+        }
+        lines = connection.execute(
+            text("SELECT count(*) FROM meal_ingredients WHERE meal_id = :m"),
+            {"m": meal["id"]},
+        ).scalar_one()
+        others = connection.execute(
+            text("SELECT count(*) FROM meals WHERE user_id IN (1, 2)")
+        ).scalar_one()
+    assert mine == {"meals": 0, "ingredients": 0, "weekly_plans": 0, "sessions": 0}
+    assert lines == 0
+    assert others == 2

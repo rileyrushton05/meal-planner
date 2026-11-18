@@ -380,6 +380,18 @@ class WeeklyPlanRepository(_Repository):
         )
         return list(self._session.exec(statement).all())
 
+    def list_planned(self) -> list[WeeklyPlan]:
+        """Every day with a meal, in every week, in calendar order: for the
+        account export. Days cleared back to nothing are left out."""
+        rows = self._session.exec(
+            select(WeeklyPlan).where(
+                WeeklyPlan.user_id == self._user_id,
+                col(WeeklyPlan.meal_id).is_not(None),
+            )
+        ).all()
+        order = {day.value: index for index, day in enumerate(DayOfWeek)}
+        return sorted(rows, key=lambda p: (p.week_start_date, order[p.day_of_week]))
+
     def set_day(
         self,
         week_start_date: date,
@@ -573,6 +585,28 @@ class UserRepository:
             and_(col(User.is_guest).is_(True), col(User.last_seen_at) < seen_before),
             dry_run=dry_run,
         )
+
+    def delete_with_everything(self, user_id: int) -> dict[str, int]:
+        """Delete an account and, through ON DELETE CASCADE, every row it
+        owns, returning how many of each kind went.
+
+        One DELETE, so it all goes or none of it does. The counts are taken
+        first, in the same transaction; on Postgres they read tables under
+        row security, so the caller must have declared the user (`act_as`).
+        """
+        removed = {
+            kind: _count_or_delete(
+                self._session, model, col(model.user_id) == user_id, dry_run=True
+            )
+            for kind, model in (
+                ("meals", Meal),
+                ("ingredients", Ingredient),
+                ("plans", WeeklyPlan),
+                ("sessions", SessionRow),
+            )
+        }
+        _count_or_delete(self._session, User, col(User.id) == user_id, dry_run=False)
+        return removed
 
     def touch(self, user_id: int, now: datetime) -> None:
         """Record a visit, which keeps a guest from being cleaned up."""

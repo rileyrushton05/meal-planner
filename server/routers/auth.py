@@ -42,7 +42,7 @@ def _set_session_cookie(response: Response, token: str) -> None:
     )
 
 
-def _clear_session_cookie(response: Response) -> None:
+def clear_session_cookie(response: Response) -> None:
     # The attributes must match, or the browser treats it as another cookie;
     # a __Host- cookie cannot even be cleared without Secure.
     response.delete_cookie(
@@ -106,7 +106,7 @@ def log_out(auth: AuthDep, current: OptionalUserDep) -> Response:
     if current is not None:
         auth.log_out(current)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    _clear_session_cookie(response)
+    clear_session_cookie(response)
     return response
 
 

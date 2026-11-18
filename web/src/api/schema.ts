@@ -152,6 +152,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/account/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Account
+         * @description Everything that is yours, as a JSON file to download: the account,
+         *     every meal with its ingredients, and every planned day.
+         */
+        get: operations["export_account_api_account_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Account
+         * @description Delete the account and everything in it, for good, and sign out.
+         *
+         *     An account with a login confirms with its password; a wrong one is a
+         *     401 invalid-credentials, throttled with login. A guest needs nothing.
+         */
+        delete: operations["delete_account_api_account_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/state": {
         parameters: {
             query?: never;
@@ -376,6 +420,47 @@ export interface components {
             is_guest: boolean;
         };
         /**
+         * AccountDeletion
+         * @description Confirmation for deleting an account. An account with a login sends
+         *     its password; a guest, who has none, sends nothing.
+         */
+        AccountDeletion: {
+            /** Password */
+            password?: string | null;
+        };
+        /**
+         * AccountExport
+         * @description Everything the app holds that is the caller's own, in a form a person
+         *     can read and another program can import: names rather than internal
+         *     ids, which mean nothing outside this database.
+         *
+         *     Not included, because they are not content: the password hash, session
+         *     tokens, and throttle records, which are keyed hashes of an email or
+         *     network and expire on their own.
+         */
+        AccountExport: {
+            /**
+             * Format
+             * @default meal-planner-export
+             */
+            format: string;
+            /**
+             * Version
+             * @default 1
+             */
+            version: number;
+            /**
+             * Exported At
+             * Format: date-time
+             */
+            exported_at: string;
+            account: components["schemas"]["ExportedAccount"];
+            /** Meals */
+            meals: components["schemas"]["ExportedMeal"][];
+            /** Plans */
+            plans: components["schemas"]["ExportedDay"][];
+        };
+        /**
          * AppState
          * @description Everything the UI needs for one week, in a single response.
          *
@@ -443,6 +528,46 @@ export interface components {
          * @enum {string}
          */
         DayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
+        /** ExportedAccount */
+        ExportedAccount: {
+            /** Email */
+            email: string | null;
+            /** Is Guest */
+            is_guest: boolean;
+            /** Created At */
+            created_at: string | null;
+        };
+        /** ExportedDay */
+        ExportedDay: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            day: components["schemas"]["DayOfWeek"];
+            /** Meal */
+            meal: string;
+            /** Servings */
+            servings: number | null;
+        };
+        /** ExportedIngredient */
+        ExportedIngredient: {
+            /** Name */
+            name: string;
+            /** Qty */
+            qty: number;
+            /** Unit */
+            unit: string;
+        };
+        /** ExportedMeal */
+        ExportedMeal: {
+            /** Name */
+            name: string;
+            /** Servings */
+            servings: number;
+            /** Ingredients */
+            ingredients: components["schemas"]["ExportedIngredient"][];
+        };
         /**
          * GroceryLine
          * @description One shopping line. qty stays numeric so clients can sort or price it.
@@ -847,6 +972,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Account"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    export_account_api_account_export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountExport"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_account_api_account_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AccountDeletion"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description Problem Details (RFC 9457) */

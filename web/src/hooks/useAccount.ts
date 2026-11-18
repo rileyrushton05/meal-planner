@@ -18,6 +18,11 @@ import type { Account } from "../api/types";
 
 export type Credentials = { email: string; password: string };
 
+export const ACCOUNT_DELETED_NOTICE =
+  "Your account and everything in it have been deleted. You're in a new guest session.";
+export const GUEST_DELETED_NOTICE =
+  "Everything from that guest session has been deleted. You're starting afresh.";
+
 export const SESSION_ENDED_NOTICE =
   "Your session ended, so you're in a new guest session. " +
   "Log in to get back to your account.";
@@ -57,6 +62,17 @@ export function useAccount() {
 
   const logOut = useMutation({ mutationFn: api.logOut, onSuccess: startOver });
 
+  // Gone for good: whatever is cached belongs to no one now. The next
+  // request finds no session and starts a guest, as on a first visit.
+  const deleteAccount = useMutation({
+    mutationFn: (password?: string) => api.deleteAccount(password),
+    onSuccess: async () => {
+      const wasGuest = account.data?.is_guest ?? true;
+      await startOver();
+      setNotice(wasGuest ? GUEST_DELETED_NOTICE : ACCOUNT_DELETED_NOTICE);
+    },
+  });
+
   return {
     account: account.data ?? null,
     notice,
@@ -67,5 +83,8 @@ export function useAccount() {
       logIn.mutateAsync(credentials).then(() => undefined),
     logOut: (): Promise<void> => logOut.mutateAsync(),
     loggingOut: logOut.isPending,
+    /** Resolves once deleted; rejects with the reason, such as a wrong password. */
+    deleteAccount: (password?: string): Promise<void> => deleteAccount.mutateAsync(password),
+    exportAccount: api.exportAccount,
   };
 }

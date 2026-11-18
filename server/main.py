@@ -23,7 +23,7 @@ from server.problems import (
     document_problem_responses,
     install_problem_handlers,
 )
-from server.routers import auth, health, meals, plans, state
+from server.routers import account, auth, health, meals, plans, state
 
 configure_logging()
 
@@ -83,6 +83,7 @@ document_problem_responses(app)
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(account.router)
 app.include_router(state.router)
 app.include_router(meals.router)
 app.include_router(plans.router)

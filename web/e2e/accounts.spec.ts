@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import type { Page } from "@playwright/test";
 
 import { expect, test, watchForCspViolations } from "./fixtures.ts";
@@ -103,4 +105,58 @@ test("signing up keeps everything made as a guest, under a new session", async (
   await logIn.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
   await expect(mealRow(page, mine)).toBeVisible();
+});
+
+test("take a copy of everything, then delete the account for good", async ({ page }) => {
+  const email = `${uniqueName("leaving").replace(" ", "-")}@example.com`;
+  const password = "lettuce harbour spoon";
+  const mine = uniqueName("Farewell Pie");
+
+  await openWeek(page, "2026-04-13");
+  await addMeal(page, mine);
+  await page.getByRole("button", { name: "Sign up to keep your meals" }).click();
+  const signUp = page.getByRole("dialog", { name: "Create an account" });
+  await signUp.getByLabel("Email").fill(email);
+  await signUp.getByLabel("Password").fill(password);
+  await signUp.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByText(`Signed in as ${email}`)).toBeVisible();
+
+  await page.getByRole("link", { name: "Account" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account");
+
+  // The download is the account's data, readable as it is.
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download my data" }).click();
+  const download = await downloading;
+  expect(download.suggestedFilename()).toMatch(/^meal-planner-export-.*\.json$/);
+  const exported = JSON.parse(await readFile(await download.path(), "utf8"));
+  expect(exported.account.email).toBe(email);
+  expect(exported.meals.map((meal: { name: string }) => meal.name)).toContain(mine);
+
+  // A wrong password deletes nothing.
+  await page.getByRole("button", { name: "Delete account" }).click();
+  const confirm = page.getByRole("alertdialog");
+  await confirm.getByLabel("Password").fill("not my password");
+  await confirm.getByRole("button", { name: "Delete for good" }).click();
+  await expect(confirm.getByRole("alert")).toHaveText("That password isn't right.");
+
+  await confirm.getByLabel("Password").fill(password);
+  await confirm.getByRole("button", { name: "Delete for good" }).click();
+
+  // Home, in a fresh guest session, with none of it left.
+  await expect(page).toHaveURL(/\/\?week=2026-04-13$/);
+  await expect(page.getByText(/everything in it have been deleted/)).toBeVisible();
+  await expect(page.getByText("You're using a guest session.")).toBeVisible();
+  await goTo(page, "Meals");
+  await expect(mealRow(page, mine)).toHaveCount(0);
+
+  // And the login is gone with it.
+  await page.getByRole("button", { name: "Log in" }).click();
+  const logIn = page.getByRole("dialog", { name: "Log in" });
+  await logIn.getByLabel("Email").fill(email);
+  await logIn.getByLabel("Password").fill(password);
+  await logIn.getByRole("button", { name: "Log in" }).click();
+  await expect(logIn.getByRole("alert")).toHaveText(
+    "That email and password don't match an account.",
+  );
 });

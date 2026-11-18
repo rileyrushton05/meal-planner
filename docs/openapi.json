@@ -302,6 +302,90 @@
         }
       }
     },
+    "/api/account/export": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Export Account",
+        "description": "Everything that is yours, as a JSON file to download: the account,\nevery meal with its ingredients, and every planned day.",
+        "operationId": "export_account_api_account_export_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountExport"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/account": {
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Delete Account",
+        "description": "Delete the account and everything in it, for good, and sign out.\n\nAn account with a login confirms with its password; a wrong one is a\n401 invalid-credentials, throttled with login. A guest needs nothing.",
+        "operationId": "delete_account_api_account_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AccountDeletion"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/state": {
       "get": {
         "tags": [
@@ -1112,6 +1196,73 @@
         "title": "Account",
         "description": "Who is signed in. No id: the client never needs it, and a numeric id\nwould tell anyone signing up roughly how many accounts exist."
       },
+      "AccountDeletion": {
+        "properties": {
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1024
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AccountDeletion",
+        "description": "Confirmation for deleting an account. An account with a login sends\nits password; a guest, who has none, sends nothing."
+      },
+      "AccountExport": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "default": "meal-planner-export"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 1
+          },
+          "exported_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Exported At"
+          },
+          "account": {
+            "$ref": "#/components/schemas/ExportedAccount"
+          },
+          "meals": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedMeal"
+            },
+            "type": "array",
+            "title": "Meals"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedDay"
+            },
+            "type": "array",
+            "title": "Plans"
+          }
+        },
+        "type": "object",
+        "required": [
+          "format",
+          "version",
+          "exported_at",
+          "account",
+          "meals",
+          "plans"
+        ],
+        "title": "AccountExport",
+        "description": "Everything the app holds that is the caller's own, in a form a person\ncan read and another program can import: names rather than internal\nids, which mean nothing outside this database.\n\nNot included, because they are not content: the password hash, session\ntokens, and throttle records, which are keyed hashes of an email or\nnetwork and expire on their own."
+      },
       "AppState": {
         "properties": {
           "week_start": {
@@ -1271,6 +1422,128 @@
         ],
         "title": "DayOfWeek",
         "description": "The seven days. Declaration order is display order, so `list(DayOfWeek)`\nis the single source of truth for \"Monday first\"."
+      },
+      "ExportedAccount": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "is_guest": {
+            "type": "boolean",
+            "title": "Is Guest"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "is_guest",
+          "created_at"
+        ],
+        "title": "ExportedAccount"
+      },
+      "ExportedDay": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "day": {
+            "$ref": "#/components/schemas/DayOfWeek"
+          },
+          "meal": {
+            "type": "string",
+            "title": "Meal"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "day",
+          "meal",
+          "servings"
+        ],
+        "title": "ExportedDay"
+      },
+      "ExportedIngredient": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "qty": {
+            "type": "number",
+            "title": "Qty"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "qty",
+          "unit"
+        ],
+        "title": "ExportedIngredient"
+      },
+      "ExportedMeal": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "servings": {
+            "type": "integer",
+            "title": "Servings"
+          },
+          "ingredients": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedIngredient"
+            },
+            "type": "array",
+            "title": "Ingredients"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "servings",
+          "ingredients"
+        ],
+        "title": "ExportedMeal"
       },
       "GroceryLine": {
         "properties": {

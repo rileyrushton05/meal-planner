@@ -18,6 +18,8 @@ vi.mock("@/api/client", async (importOriginal) => ({
     signUp: vi.fn(),
     logIn: vi.fn(),
     logOut: vi.fn(),
+    deleteAccount: vi.fn(),
+    exportAccount: vi.fn(),
   },
 }));
 
@@ -216,5 +218,42 @@ describe("the account", () => {
       await screen.findByRole("button", { name: "Sign up to keep your meals" }),
     ).toBeInTheDocument();
     expect(mocked.getState).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the account page", () => {
+  it("is reached from the account controls, not the main navigation", async () => {
+    const user = userEvent.setup();
+    await renderApp("/meals");
+
+    const nav = screen.getByRole("navigation", { name: "Pages" });
+    expect(within(nav).queryByRole("link", { name: "Account" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Account" }));
+    expect(heading()).toHaveTextContent("Account");
+    expect(screen.getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("after deleting, lands home in a fresh session with nothing of the old account", async () => {
+    const user = userEvent.setup();
+    mocked.me.mockResolvedValue({ email: "cook@example.com", is_guest: false });
+    mocked.deleteAccount.mockImplementation(async () => {
+      mocked.me.mockResolvedValue({ email: null, is_guest: true });
+      mocked.getState.mockImplementation(async (week: string) =>
+        makeState({ week_start: week, meals: [] }),
+      );
+    });
+    await renderApp("/account");
+
+    await user.click(await screen.findByRole("button", { name: "Delete account" }));
+    await user.type(screen.getByLabelText("Password"), "lettuce harbour spoon{Enter}");
+
+    expect(mocked.deleteAccount).toHaveBeenCalledWith("lettuce harbour spoon");
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(await screen.findByText(/everything in it have been deleted/)).toBeInTheDocument();
+    await waitFor(() => expect(mocked.getState).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findByRole("button", { name: "Sign up to keep your meals" }),
+    ).toBeInTheDocument();
   });
 });

@@ -9,6 +9,7 @@
 import { mondayOf } from "../lib/dates";
 import type {
   Account,
+  AccountExport,
   AppState,
   DayAssignmentWrite,
   GroceryLine,
@@ -254,4 +255,15 @@ export const api = {
     }),
 
   logOut: (): Promise<void> => request("/api/auth/logout", { method: "POST" }),
+
+  /** Everything that is the caller's own, for them to keep. */
+  exportAccount: (): Promise<AccountExport> => request("/api/account/export"),
+
+  /** Delete the account and all of it, for good. An account confirms with
+   *  its password; a guest has none to give. */
+  deleteAccount: (password?: string): Promise<void> =>
+    request("/api/account", {
+      method: "DELETE",
+      body: JSON.stringify(password === undefined ? {} : { password }),
+    }),
 };

@@ -1,8 +1,11 @@
-import { LogOut } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import { useState } from "react";
 
+import { AppLink } from "@/components/AppLink";
 import { AuthDialog, type AuthMode } from "@/components/AuthDialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { usePathname } from "@/lib/location";
+import { cn } from "@/lib/utils";
 import type { Account } from "@/api/types";
 import type { Credentials } from "@/hooks/useAccount";
 
@@ -24,6 +27,7 @@ export function AccountBar({
   loggingOut: boolean;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const onAccountPage = usePathname() === "/account";
   const [mode, setMode] = useState<AuthMode>("signup");
 
   const open = (next: AuthMode) => {
@@ -32,6 +36,23 @@ export function AccountBar({
   };
 
   if (!account) return <div className="h-7" aria-hidden />;
+
+  // Your data and deleting it. An icon in a phone's top bar, where space is
+  // short; named in the sidebar.
+  const accountLink = (
+    <AppLink
+      to="/account"
+      aria-label="Account"
+      aria-current={onAccountPage ? "page" : undefined}
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "sm" }),
+        "aria-[current=page]:bg-muted lg:justify-start",
+      )}
+    >
+      <UserRound aria-hidden />
+      <span className="hidden lg:inline">Account</span>
+    </AppLink>
+  );
 
   // A row in a phone's top bar; a stack at the foot of the sidebar. The
   // explanatory text only fits, and only helps, in the sidebar.
@@ -51,6 +72,7 @@ export function AccountBar({
           <Button size="sm" variant="ghost" onClick={() => open("login")}>
             Log in
           </Button>
+          {accountLink}
         </>
       ) : (
         <>
@@ -60,6 +82,7 @@ export function AccountBar({
               {account.email}
             </span>
           </p>
+          {accountLink}
           <Button
             size="sm"
             variant="ghost"
