@@ -1,4 +1,6 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test, watchForCspViolations } from "./fixtures.ts";
 
 import { addMeal, dayPicker, goTo, mealRow, openWeek, uniqueName } from "./helpers.ts";
 
@@ -10,6 +12,7 @@ test("each visitor gets their own guest session, invisible to anyone else", asyn
   try {
     const mine = await first.newPage();
     const theirs = await second.newPage();
+    const violations = [mine, theirs].map(watchForCspViolations);
     const name = uniqueName("Private Lasagne");
 
     await openWeek(mine, "2026-03-02");
@@ -26,6 +29,7 @@ test("each visitor gets their own guest session, invisible to anyone else", asyn
     const cookies = await first.cookies();
     const session = cookies.find((cookie) => cookie.name === "__Host-session");
     expect(session).toMatchObject({ httpOnly: true, secure: true, sameSite: "Strict" });
+    expect(violations.flat(), "Content-Security-Policy violations").toEqual([]);
   } finally {
     await first.close();
     await second.close();

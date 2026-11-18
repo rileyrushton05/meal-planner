@@ -3,7 +3,7 @@
  * before the app has even started (public/theme.js), so it never flashes.
  */
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 
 const html = (page: import("@playwright/test").Page) => page.locator("html");
 

@@ -5,7 +5,7 @@
  * depend on each other or on the order they run in.
  */
 
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 
 import {
   addMeal,

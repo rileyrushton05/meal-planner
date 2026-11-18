@@ -80,6 +80,13 @@ unscoped, and someone else's meal answers 404, never 403.
   Repositories filter by user, and the database filters again, so a query
   that forgot its filter still returns nothing of anyone else's.
   ([database-schema.md](docs/database-schema.md#row-level-security-postgres))
+- **Security headers:** the web page runs under a Content-Security-Policy
+  that allows only its own scripts, styles, fonts and API (nothing inline,
+  nothing from another host) and cannot be framed. Vercel's CDN serves the
+  page, so its headers live in `vercel.json`; the preview server the
+  end-to-end tests use reads them from there, and every Playwright test fails
+  on any violation. API responses get a stricter set from the app itself
+  (`server/headers.py`): no content allowed at all, `no-store`, `nosniff`.
 - **Tests:** every API route is checked, from the OpenAPI document, to
   answer 401 without a session, so a new route cannot ship open. The row
   security tests run connected as the app's own role, against a schema

@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db import is_local_database
 from app.migrations import upgrade_to_head
 from server.deps import get_database
+from server.headers import SecurityHeadersMiddleware
 from server.observability import RequestContextMiddleware, configure_logging
 from server.origin import reject_cross_site_writes, trusted_origins
 from server.problems import (
@@ -70,10 +71,11 @@ app.add_middleware(
 )
 
 # Starlette runs the middleware added last first, so the order on the way in
-# is: request context, then unexpected-error handling, then CORS. Every
-# response, including those CORS or the error handling writes, gets a
-# request id and a completion log line.
+# is: request context, security headers, unexpected-error handling, then
+# CORS. Every response, including those CORS or the error handling writes,
+# gets a request id, the security headers and a completion log line.
 app.add_middleware(UnexpectedErrorMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 install_problem_handlers(app)
