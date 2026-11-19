@@ -1,7 +1,7 @@
-import { Check, CopyIcon, LoaderCircle, TriangleAlert, Undo2 } from "lucide-react";
+import { Check, CopyIcon, LoaderCircle, Sparkles, TriangleAlert, Undo2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { AppState, Day, DayAssignment, Meal, WeekPlan } from "@/api/types";
+import type { AppState, Day, DayAssignment, Meal, PlanSuggestions, WeekPlan } from "@/api/types";
 import { DAYS } from "@/api/types";
 import { DayCard } from "@/components/plan/DayCard";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,22 @@ interface Props {
   onCopyPrevious: (weekStart: string) => Promise<WeekPlan | null>;
   /** Resolve with the new meal, or null if it could not be made. */
   onCreateMeal: (name: string, servings: number) => Promise<Meal | null>;
+  /** Meals for the empty days, or null if that failed. Saves nothing. */
+  onSuggest: (weekStart: string, empty: Day[], planned: number[]) => Promise<PlanSuggestions | null>;
 }
 
 /**
  * The week, a card per day. Click a day, type a few letters, Enter: the
  * meal is planned and saved. Every change can be undone.
  */
-export function WeeklyPlanTab({ state, pending, onSave, onCopyPrevious, onCreateMeal }: Props) {
+export function WeeklyPlanTab({
+  state,
+  pending,
+  onSave,
+  onCopyPrevious,
+  onCreateMeal,
+  onSuggest,
+}: Props) {
   const week = state.week_start;
   const plan = useAutoSavedPlan({ weekStart: week, plan: state.plan, save: onSave });
   const mealsById = new Map(state.meals.map((m) => [m.id, m]));
@@ -34,6 +43,31 @@ export function WeeklyPlanTab({ state, pending, onSave, onCopyPrevious, onCreate
     DAYS.map((day) => plan.draft[day].meal_id).filter((id): id is number => id !== null),
   );
   const filled = DAYS.filter((day) => plan.draft[day].meal_id !== null).length;
+  const empty = DAYS.filter((day) => plan.draft[day].meal_id === null);
+  // Something left to suggest: a meal not already on this week.
+  const canFill = empty.length > 0 && state.meals.some((m) => !plannedIds.has(m.id));
+  // Said once after filling, when there were not enough meals for every day.
+  const [fillNote, setFillNote] = useState<{ week: string; text: string } | null>(null);
+
+  const fillEmptyDays = async () => {
+    setFillNote(null);
+    const suggested = await onSuggest(week, empty, [...plannedIds]);
+    // The week may have changed while asking; these are for the old one.
+    if (!suggested || suggested.week_start !== week) return;
+    const picks = suggested.days.flatMap(({ day, meal_id }) => {
+      const meal = meal_id === null ? undefined : mealsById.get(meal_id);
+      return meal && plan.draft[day].meal_id === null ? [{ day, meal }] : [];
+    });
+    plan.pickMany(picks, `filling ${picks.length} empty ${picks.length === 1 ? "day" : "days"}`);
+    if (picks.length < empty.length) {
+      setFillNote({
+        week,
+        text:
+          `Filled ${picks.length} of ${empty.length} empty days: every other meal is ` +
+          "already on this week. Add more meals for more variety.",
+      });
+    }
+  };
   const todayIso = toIso(new Date());
 
   // A link can name a day to open on ("/plan?day=Tuesday", from the home
@@ -73,8 +107,25 @@ export function WeeklyPlanTab({ state, pending, onSave, onCopyPrevious, onCreate
             <CopyIcon aria-hidden />
             Copy last week
           </Button>
+          {canFill && (
+            <Button
+              variant="outline"
+              disabled={pending || plan.status === "saving"}
+              onClick={fillEmptyDays}
+              title="Plans the meals you haven't cooked for longest. Undo puts the days back."
+            >
+              <Sparkles aria-hidden />
+              Fill {empty.length === 1 ? "the empty day" : `${empty.length} empty days`}
+            </Button>
+          )}
         </div>
       </div>
+
+      {fillNote?.week === week && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {fillNote.text}
+        </p>
+      )}
 
       {/* Seven across once each day has room for a meal's name and its
           servings (below that a card overflows), so the week reads as a

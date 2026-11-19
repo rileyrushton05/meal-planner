@@ -121,8 +121,9 @@ ingredient. You check each line, then the meal is created in one request.
 - **About 40 templates** of common meals, ingredients filled in, added in
   one click.
 - **Weekly plan:** pick a meal and servings for each day of any week; it
-  saves as you go, with undo. Weeks are independent, and "copy last week"
-  carries one forward.
+  saves as you go, with undo. "Fill empty days" plans the meals you haven't
+  cooked for longest in one click (one Undo puts them back), and "copy last
+  week" carries a week forward.
 - **Grocery list:** everything planned for the week, totalled. Metric mass
   and volume (mg/g/kg, ml/L) convert to a common unit before merging, and
   quantities scale when a day cooks for more or fewer than the recipe. Tick
@@ -244,6 +245,7 @@ the-fridge-door/
 │   ├── security.py         #   Password hashing and session tokens
 │   ├── ratelimit.py        #   Login and signup throttling
 │   ├── planner.py          #   A week's plan → one grocery list
+│   ├── suggest.py          #   Meals for empty days: not cooked lately
 │   ├── units.py            #   Unit conversion and quantity formatting
 │   ├── catalog.py          #   Ingredient catalogue: loading, matching, syncing
 │   ├── catalog.csv         #   The catalogue itself: items, aisles, aliases

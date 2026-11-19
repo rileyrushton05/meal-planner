@@ -212,6 +212,14 @@ class WeekPlanRead(ResponseSchema):
     days: list[DayAssignment]
 
 
+class PlanSuggestions(ResponseSchema):
+    """Meals suggested for a week's empty days; saved only once the page
+    applies them. Days with nothing to suggest are left out."""
+
+    week_start: date
+    days: list[DayAssignment]
+
+
 class GroceryLine(ResponseSchema):
     """One shopping line. qty stays numeric so clients can sort or price it."""
 

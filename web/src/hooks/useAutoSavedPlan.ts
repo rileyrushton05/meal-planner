@@ -112,6 +112,16 @@ export function useAutoSavedPlan({
       apply(change.before, null);
       setChange(null);
     },
+    /** Plan several meals at once, as one change: one Undo puts back all
+     *  of them. Each day starts at its recipe's servings. */
+    pickMany: (picks: readonly { day: Day; meal: Meal }[], label: string) => {
+      if (picks.length === 0) return;
+      const next = { ...draft };
+      for (const { day, meal } of picks) {
+        next[day] = { day, meal_id: meal.id, servings: meal.servings };
+      }
+      apply(next, label);
+    },
     /** Remember the week before a change made elsewhere (a copy), for Undo. */
     remember: (before: Draft, label: string) => setChange({ before, label }),
   };

@@ -499,6 +499,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan/{week}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggest Meals
+         * @description A meal for each `empty` day: the ones not cooked recently, never one
+         *     of the `planned` meals already on this week (app/suggest.py).
+         *
+         *     Saves nothing. The page says which days are empty and what is planned,
+         *     rather than the server reading its saved week, because the page may
+         *     hold changes still on their way; it applies the suggestions as one
+         *     change, which it saves and can undo.
+         */
+        get: operations["suggest_meals_api_plan__week__suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/grocery-list/{week}": {
         parameters: {
             query?: never;
@@ -877,6 +903,20 @@ export interface components {
         PasswordConfirmation: {
             /** Password */
             password: string;
+        };
+        /**
+         * PlanSuggestions
+         * @description Meals suggested for a week's empty days; saved only once the page
+         *     applies them. Days with nothing to suggest are left out.
+         */
+        PlanSuggestions: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Days */
+            days: components["schemas"]["DayAssignment"][];
         };
         /**
          * RecipeLink
@@ -2029,6 +2069,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeekPlanRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    suggest_meals_api_plan__week__suggestions_get: {
+        parameters: {
+            query?: {
+                empty?: components["schemas"]["DayOfWeek"][];
+                planned?: number[];
+            };
+            header?: never;
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanSuggestions"];
                 };
             };
             /** @description Validation Error */

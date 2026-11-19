@@ -14,12 +14,14 @@ import type {
   RecoveryCode,
   SignedUp,
   AppState,
+  Day,
   DayAssignmentWrite,
   GroceryLine,
   ImportedRecipe,
   IngredientLine,
   Meal,
   ParsedIngredient,
+  PlanSuggestions,
   Problem,
   WeekPlan,
 } from "./types";
@@ -265,6 +267,15 @@ export const api = {
     request(`/api/meals/${mealId}/ingredients/${ingredientId}`, {
       method: "DELETE",
     }),
+
+  /** A meal for each empty day, not cooked recently. Saves nothing. */
+  suggestMeals: (week: string, empty: Day[], planned: number[]): Promise<PlanSuggestions> => {
+    const query = new URLSearchParams([
+      ...empty.map((day) => ["empty", day]),
+      ...planned.map((id) => ["planned", String(id)]),
+    ]);
+    return request(`/api/plan/${week}/suggestions?${query}`);
+  },
 
   setPlan: (week: string, days: DayAssignmentWrite[]): Promise<WeekPlan> =>
     request(`/api/plan/${week}`, {

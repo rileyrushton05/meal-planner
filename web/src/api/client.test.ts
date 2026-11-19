@@ -120,6 +120,16 @@ describe("requests", () => {
       "/api/meals/from-template/Fish%20and%20Chips",
     );
   });
+
+  it("asks for suggestions with each empty day and planned meal as its own parameter", async () => {
+    const fetchMock = mockFetch({ json: async () => ({ week_start: "2026-08-03", days: [] }) });
+
+    await api.suggestMeals("2026-08-03", ["Monday", "Friday"], [4, 9]);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/plan/2026-08-03/suggestions?empty=Monday&empty=Friday&planned=4&planned=9",
+    );
+  });
 });
 
 describe("ApiError", () => {
