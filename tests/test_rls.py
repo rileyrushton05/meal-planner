@@ -16,7 +16,7 @@ import os
 import pytest
 from api_client import api_client
 from database_safety import assert_disposable
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, column, create_engine, func, inspect, table, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 from sqlmodel import Session, select
@@ -24,6 +24,7 @@ from sqlmodel import Session, select
 from app.db import RUNTIME_ROLE, act_as, is_local_database
 from app.migrations import upgrade_to_head
 from app.models import ALL_TABLES, Ingredient, Meal, MealIngredient, WeeklyPlan
+from app.readiness import check_database_ready
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("TEST_DATABASE_URL"),
@@ -220,27 +221,70 @@ def test_rows_that_would_belong_to_or_point_at_someone_else_are_refused(
 # --- The whole app, running as the role ------------------------------------------
 
 
-def test_readiness_works_as_the_runtime_role_without_migration_table_access(
-    owner: Engine, runtime_url: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.fixture
+def runtime_client(runtime_url: str, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("MEAL_PLANNER_DB_URL", runtime_url)
     monkeypatch.setenv("MEAL_PLANNER_AUTO_MIGRATE", "false")
+    with api_client(as_guest=False) as client:
+        yield client
+
+
+def test_readiness_works_as_the_runtime_role_without_migration_table_access(
+    owner: Engine, runtime_client
+) -> None:
 
     def sequence_values():
         with owner.connect() as connection:
-            return {
-                table: tuple(
-                    connection.execute(
-                        text(f"SELECT last_value, is_called FROM {table}_id_seq")
-                    ).one()
-                )
-                for table in ("users", "meals", "ingredients", "weekly_plans")
-            }
+            values = {}
+            for name in inspect(connection).get_sequence_names():
+                sequence = table(name, column("last_value"), column("is_called"))
+                values[name] = tuple(connection.execute(select(sequence)).one())
+            return values
 
     before = sequence_values()
-    with api_client(as_guest=False) as client:
-        assert client.get("/health/ready").json() == {"status": "ok"}
+    assert runtime_client.get("/health/ready").json() == {"status": "ok"}
     assert sequence_values() == before
+
+
+@pytest.mark.parametrize("fail", [False, True], ids=["success", "failure"])
+def test_readiness_restores_connection_timeouts(owner: Engine, fail: bool) -> None:
+    # A single pooled connection proves settings do not leak to its next user.
+    engine = create_engine(owner.url, pool_size=1, max_overflow=0)
+    statement = select(
+        func.current_setting("statement_timeout"),
+        func.current_setting("lock_timeout"),
+    )
+    try:
+        with engine.connect() as connection:
+            before = connection.execute(statement).one()
+        if fail:
+            with owner.begin() as connection:
+                connection.execute(
+                    text("ALTER TABLE users RENAME COLUMN email TO old_email")
+                )
+            with pytest.raises(ProgrammingError):
+                check_database_ready(engine)
+        else:
+            check_database_ready(engine)
+        with engine.connect() as connection:
+            assert connection.execute(statement).one() == before
+    finally:
+        engine.dispose()
+
+
+def test_readiness_checks_the_rls_helper_when_another_table_uses_rls(
+    owner: Engine, runtime_client
+) -> None:
+    with owner.begin() as connection:
+        connection.execute(text("ALTER TABLE meals DISABLE ROW LEVEL SECURITY"))
+        connection.execute(
+            text(
+                "REVOKE EXECUTE ON FUNCTION current_app_user_id() "
+                f"FROM PUBLIC, {RUNTIME_ROLE}"
+            )
+        )
+    # Ingredients and plans still use the helper even with meals' policy off.
+    assert runtime_client.get("/health/ready").status_code == 503
 
 
 @pytest.mark.parametrize(
@@ -256,21 +300,16 @@ def test_readiness_works_as_the_runtime_role_without_migration_table_access(
 )
 def test_readiness_refuses_missing_runtime_permissions(
     owner: Engine,
-    runtime_url: str,
-    monkeypatch: pytest.MonkeyPatch,
+    runtime_client,
     revocation: str,
 ) -> None:
     with owner.begin() as connection:
         connection.execute(text(revocation))
-    monkeypatch.setenv("MEAL_PLANNER_DB_URL", runtime_url)
-    monkeypatch.setenv("MEAL_PLANNER_AUTO_MIGRATE", "false")
-
-    with api_client(as_guest=False) as client:
-        response = client.get("/health/ready")
-        assert response.status_code == 503
-        assert response.json()["type"] == "urn:meal-planner:problem:not-ready"
-        assert "permission" not in response.text
-        assert client.get("/health/live").status_code == 200
+    response = runtime_client.get("/health/ready")
+    assert response.status_code == 503
+    assert response.json()["type"] == "urn:meal-planner:problem:not-ready"
+    assert "permission" not in response.text
+    assert runtime_client.get("/health/live").status_code == 200
 
 
 def test_the_app_works_end_to_end_as_the_runtime_role(

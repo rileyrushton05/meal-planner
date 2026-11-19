@@ -92,8 +92,12 @@ prefix of the throttle's keyed hash.
 Tests: request correlation and logging sections.
 
 **Health checks.** `/health/live` touches nothing and says the process is up.
-`/health/ready` runs `select 1` with a bounded connect timeout and returns a
-503 problem when the database is unreachable. The keep-warm workflow pings
+`/health/ready` checks the modeled tables and columns, plus the runtime
+permissions on Postgres, and returns a 503 problem when the database is
+unavailable or incompatible. Probes use SQLAlchemy expressions, fetch no
+application rows, and never write data or advance sequences. Compatible
+additive migrations remain ready; no migration-history access is required.
+Postgres probe timeouts are transaction-local. The keep-warm workflow pings
 `/health/ready`. `/health` remains an alias of `/health/live`.
 
 ## Frontend

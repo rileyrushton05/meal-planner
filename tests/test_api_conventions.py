@@ -13,10 +13,10 @@ import uuid
 
 import pytest
 from api_client import api_client
-from sqlalchemy import text
+from sqlalchemy import func, select, text
+from sqlmodel import SQLModel
 
 from app.db import Database
-from app.models import ALL_TABLES
 from app.repositories import MealRepository
 from server.observability import configure_logging
 from server.routers import health
@@ -313,17 +313,21 @@ def test_readiness_refuses_missing_application_tables_or_columns(client, db, dam
     assert "recovery_code_hash" not in response.text
 
 
-def test_readiness_is_read_only_and_accepts_additive_schema_changes(client, db):
+def test_readiness_accepts_additive_schema_changes(client, db):
     with db.engine.begin() as connection:
         connection.execute(text("ALTER TABLE users ADD COLUMN future_column TEXT"))
 
+    assert client.get("/health/ready").json() == {"status": "ok"}
+
+
+def test_readiness_does_not_change_application_data(client, db):
     def counts():
         with db.engine.connect() as connection:
             return {
-                model.__tablename__: connection.execute(
-                    text(f"SELECT count(*) FROM {model.__tablename__}")
+                table.name: connection.execute(
+                    select(func.count()).select_from(table)
                 ).scalar_one()
-                for model in ALL_TABLES
+                for table in SQLModel.metadata.sorted_tables
             }
 
     before = counts()
