@@ -29,6 +29,8 @@ api = [
     "uvicorn[standard]==0.54.0",
     # Error tracking (server/monitoring.py); off unless SENTRY_DSN is set.
     "sentry-sdk==2.73.0",
+    # Fetching a recipe page someone linked (app/fetch.py).
+    "httpx==0.28.1",
 ]
 dev = [
     "meal-planner[api]",

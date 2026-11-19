@@ -10,6 +10,7 @@ from app.models import (
     WeeklyPlan,
     persisted_id,
 )
+from app.parsing import ParsedLine
 from app.planner import GroceryItem
 from app.templates import MealTemplate
 from server.schemas import (
@@ -17,6 +18,7 @@ from server.schemas import (
     GroceryLine,
     IngredientAmount,
     MealRead,
+    ParsedIngredient,
     TemplateIngredientRead,
     TemplateRead,
 )
@@ -64,4 +66,17 @@ def template_read(template: MealTemplate) -> TemplateRead:
             TemplateIngredientRead(name=item.name, qty=item.qty, unit=item.unit)
             for item in template.ingredients
         ],
+    )
+
+
+def parsed_ingredient(line: ParsedLine) -> ParsedIngredient:
+    return ParsedIngredient(
+        text=line.text,
+        qty=line.qty,
+        unit=line.unit,
+        name=line.name,
+        prep=line.prep,
+        catalog_item=line.catalog_item,
+        confidence=line.confidence,
+        warnings=list(line.warnings),
     )

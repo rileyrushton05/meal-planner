@@ -27,11 +27,10 @@ import { formatDate } from "@/lib/dates";
 import { formatAmount } from "@/lib/quantities";
 
 import { MealAvatar } from "./MealAvatar";
+import { SuggestionLists } from "./IngredientPreview";
 import { PasteIngredients } from "./PasteIngredients";
 import { plannedDays } from "./planned";
 
-/** Units offered as suggestions, spelled as the server stores them. */
-const COMMON_UNITS = ["g", "kg", "ml", "L", "tsp", "tbsp", "cups", "cloves", "slices", "cans"];
 
 export interface MealPanelActions {
   onUpdate: (id: number, name: string, servings: number) => void;
@@ -283,19 +282,7 @@ function Ingredients({
         />
       )}
 
-      {/* Shared by every field below that suggests. Outside the forms' grids:
-          as a grid child, even a hidden datalist picks up the column's
-          spacing and knocks the inputs out of line. */}
-      <datalist id="known-ingredients">
-        {state.ingredient_suggestions.map((s) => (
-          <option key={s.name} value={s.name} />
-        ))}
-      </datalist>
-      <datalist id="common-units">
-        {COMMON_UNITS.map((u) => (
-          <option key={u} value={u} />
-        ))}
-      </datalist>
+      <SuggestionLists suggestions={state.ingredient_suggestions} />
     </div>
   );
 }

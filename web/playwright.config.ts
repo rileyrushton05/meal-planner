@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 
 const API_PORT = 8001;
 const WEB_PORT = 4174;
+/** Serves e2e/pages/, standing in for a recipe website to import from. */
+const RECIPE_SITE_PORT = 4175;
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 // Not under test-results/, which Playwright empties when a run starts.
 const database = fileURLToPath(new URL("./.e2e/e2e.db", import.meta.url));
@@ -42,6 +44,9 @@ export default defineConfig({
         // The preview server's proxy rewrites Host, so the page's Origin has
         // to be named as trusted for writes to pass the cross-site check.
         MEAL_PLANNER_CORS_ORIGINS: `http://127.0.0.1:${WEB_PORT}`,
+        // Recipe import refuses local addresses; this one origin, the
+        // fixture site below, is exempt. Ignored on Vercel (app/importing.py).
+        MEAL_PLANNER_IMPORT_UNCHECKED_ORIGIN: `http://127.0.0.1:${RECIPE_SITE_PORT}`,
       },
       reuseExistingServer: false,
       timeout: 60_000,
@@ -52,6 +57,12 @@ export default defineConfig({
       env: { API_PROXY_TARGET: `http://127.0.0.1:${API_PORT}` },
       reuseExistingServer: false,
       timeout: 120_000,
+    },
+    {
+      command: `python3 -m http.server ${RECIPE_SITE_PORT} --bind 127.0.0.1 --directory e2e/pages`,
+      url: `http://127.0.0.1:${RECIPE_SITE_PORT}/ragu.html`,
+      reuseExistingServer: false,
+      timeout: 60_000,
     },
   ],
 });

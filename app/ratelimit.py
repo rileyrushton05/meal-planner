@@ -32,6 +32,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import math
 import os
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -98,6 +99,20 @@ class Window:
 Rule = Backoff | Window
 
 
+def wait_seconds(wait: timedelta) -> int:
+    """Whole seconds, rounded up, never 0: for a Retry-After header."""
+    return max(1, math.ceil(wait.total_seconds()))
+
+
+def describe_wait(wait: timedelta) -> str:
+    """'45 seconds', '1 minute', '15 minutes': rounded up, never 'now'."""
+    seconds = wait_seconds(wait)
+    if seconds < 60:
+        return f"{seconds} second{'s' if seconds != 1 else ''}"
+    minutes = math.ceil(seconds / 60)
+    return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+
 def wait_remaining(bucket: Bucket | None, now: datetime) -> timedelta | None:
     """How long until the subject may try again, or None if it may now."""
     if bucket is None or bucket.blocked_until is None:
@@ -132,6 +147,11 @@ GUESTS_PER_NETWORK = Window(scope="guest-network", limit=30, period=timedelta(ho
 #: signup reveals, so what an attacker would harvest.
 TAKEN_EMAILS_PER_NETWORK = Window(
     scope="taken-email-network", limit=10, period=timedelta(hours=1)
+)
+#: Recipe imports by one user. Each makes the server fetch a page someone
+#: else chose, so the server is not lent out as a crawler.
+IMPORTS_PER_USER = Window(
+    scope="recipe-import-user", limit=20, period=timedelta(hours=1)
 )
 
 
@@ -235,4 +255,5 @@ STALE_AFTER = max(
     LOGIN_PER_ACCOUNT.forget_after,
     GUESTS_PER_NETWORK.period,
     TAKEN_EMAILS_PER_NETWORK.period,
+    IMPORTS_PER_USER.period,
 )

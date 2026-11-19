@@ -91,3 +91,9 @@ class TooManyAttemptsError(MealPlannerError):
     def __init__(self, message: str, *, retry_after: timedelta) -> None:
         self.retry_after_seconds = max(1, math.ceil(retry_after.total_seconds()))
         super().__init__(message)
+
+
+class RecipeImportError(KeepsWrites, MealPlannerError):
+    """A recipe link could not be imported; the message says why. Keeps
+    writes: the attempt was counted against the import limit first, and a
+    failed import must count too, or failing ones would be free."""

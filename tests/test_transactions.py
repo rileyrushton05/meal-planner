@@ -76,6 +76,9 @@ def test_only_marked_errors_keep_writes() -> None:
     assert marked == {
         app_exceptions.InvalidCredentialsError,
         app_exceptions.EmailTakenError,
+        # Raised after counting the attempt and fetching, before any write
+        # of the caller's data (an import saves nothing).
+        app_exceptions.RecipeImportError,
     }
 
 

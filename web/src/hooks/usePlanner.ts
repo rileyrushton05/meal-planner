@@ -162,6 +162,12 @@ export function usePlanner({
     onError: report,
   });
 
+  const importing = useMutation({
+    mutationFn: (url: string) => api.importRecipe(url),
+    onMutate: clearError,
+    onError: report,
+  });
+
   const planChange = useMutation({
     mutationFn: (change: () => Promise<WeekPlan>) => change(),
     onMutate: clearError,
@@ -187,8 +193,8 @@ export function usePlanner({
 
   const actions = {
     // Resolve with the new meal, so the page can open it straight away.
-    addMeal: (name: string, servings: number) =>
-      runFor(mealChange.mutateAsync(() => api.createMeal(name, servings))),
+    addMeal: (name: string, servings: number, ingredients: IngredientLine[] = []) =>
+      runFor(mealChange.mutateAsync(() => api.createMeal(name, servings, ingredients))),
 
     addFromTemplate: (templateName: string) =>
       runFor(mealChange.mutateAsync(() => api.createMealFromTemplate(templateName))),
@@ -218,6 +224,8 @@ export function usePlanner({
 
     // Both resolve with the result, or null if it failed.
     readIngredients: (text: string) => runFor(reading.mutateAsync(text)),
+
+    importRecipe: (url: string) => runFor(importing.mutateAsync(url)),
 
     replaceIngredients: (mealId: number, ingredients: IngredientLine[]) =>
       runFor(mealChange.mutateAsync(() => api.replaceIngredients(mealId, ingredients))),
@@ -255,7 +263,11 @@ export function usePlanner({
       setDismissedError(loadError);
     },
     // Pending work per area, so one slow save does not freeze the whole app.
-    mealsPending: mealChange.isPending || mealDeletion.isPending || reading.isPending,
+    mealsPending:
+      mealChange.isPending ||
+      mealDeletion.isPending ||
+      reading.isPending ||
+      importing.isPending,
     planPending: planChange.isPending,
     grocery: grocery.data ?? null,
     ...actions,

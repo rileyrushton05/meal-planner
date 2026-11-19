@@ -27,6 +27,8 @@ export type IngredientLine = Schemas["IngredientAdd"];
 export type IngredientSuggestion = Schemas["IngredientSuggestion"];
 /** One pasted line as the server read it, for a person to check. */
 export type ParsedIngredient = Schemas["ParsedIngredient"];
+/** A recipe read from a web page, to be checked before it becomes a meal. */
+export type ImportedRecipe = Schemas["ImportedRecipe"];
 export type Meal = Schemas["MealRead"];
 export type DayAssignment = Schemas["DayAssignment"];
 export type DayAssignmentWrite = Schemas["DayAssignmentWrite"];

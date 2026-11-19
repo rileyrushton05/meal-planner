@@ -56,7 +56,15 @@ class MealRead(ResponseSchema):
     ingredients: list[IngredientAmount] = Field(default_factory=list)
 
 
-class MealCreate(RequestSchema):
+#: The most lines read or saved at once. A long recipe has 30; this bounds
+#: the work one request can ask for.
+MAX_INGREDIENT_LINES = 100
+#: The longest line read. Matches the longest ingredient name, so whatever
+#: a line reads as can be saved.
+MAX_LINE_LENGTH = 200
+
+
+class MealUpdate(RequestSchema):
     name: str = Field(min_length=1, max_length=200)
     servings: int = Field(default=1, ge=1)
 
@@ -69,8 +77,13 @@ class MealCreate(RequestSchema):
         return stripped
 
 
-class MealUpdate(MealCreate):
-    """Same fields as creation; every one is required on update."""
+class MealCreate(MealUpdate):
+    """A new meal, optionally with its ingredients: an imported recipe is
+    created whole, in one request and one transaction."""
+
+    ingredients: list[IngredientAdd] = Field(
+        default_factory=list, max_length=MAX_INGREDIENT_LINES
+    )
 
 
 class IngredientAdd(RequestSchema):
@@ -96,14 +109,6 @@ class IngredientAdd(RequestSchema):
 class IngredientUpdate(RequestSchema):
     qty: float = Field(gt=0)
     unit: str = Field(default="", max_length=50)
-
-
-#: The most lines read or saved at once. A long recipe has 30; this bounds
-#: the work one request can ask for.
-MAX_INGREDIENT_LINES = 100
-#: The longest line read. Matches the longest ingredient name, so whatever
-#: a line reads as can be saved.
-MAX_LINE_LENGTH = 200
 
 
 class IngredientList(RequestSchema):
@@ -150,6 +155,25 @@ class ParsedIngredient(ResponseSchema):
 
 
 class ParsedIngredients(ResponseSchema):
+    lines: list[ParsedIngredient]
+
+
+class RecipeLink(RequestSchema):
+    """A recipe page to import."""
+
+    url: str = Field(min_length=1, max_length=2000)
+
+
+class ImportedRecipe(ResponseSchema):
+    """A recipe read from a page, for a person to check before it becomes a
+    meal. Nothing is saved until they do."""
+
+    #: "" when the page gave none.
+    name: str
+    #: None when the page did not say.
+    servings: int | None
+    #: Where the page was found, after any redirects.
+    url: str
     lines: list[ParsedIngredient]
 
 

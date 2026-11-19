@@ -1,5 +1,6 @@
 /**
- * Entering a whole ingredient list at once: paste it, check it, save it.
+ * Entering a whole ingredient list at once: paste it, or import it from a
+ * recipe page, check it, save it.
  */
 
 import { expect, test } from "./fixtures.ts";
@@ -61,4 +62,46 @@ test("paste eight ingredient lines, check them, and save them in one request", a
   await planDay(page, "Monday", name);
   await goTo(page, "Groceries");
   await expect(page.getByText("Beef Mince", { exact: true })).toBeVisible();
+});
+
+test("import a recipe from a link, check it, and create the meal in one request", async ({
+  page,
+}) => {
+  await openWeek(page, "2026-02-09");
+  await page.getByRole("button", { name: "New meal", exact: true }).click();
+
+  // The fixture site (playwright.config.ts) stands in for a recipe website.
+  await page.getByLabel("Recipe link").fill("http://127.0.0.1:4175/ragu.html");
+  await page.getByRole("button", { name: "Import" }).click();
+
+  await expect(page.getByRole("heading", { name: "Check the recipe" })).toBeVisible();
+  const name = uniqueName("Imported Ragu");
+  await page.getByLabel("Meal name").fill(name);
+  await expect(page.getByLabel("Servings")).toHaveValue("6");
+  await expect(page.getByLabel("Ingredient on line 4")).toHaveValue("Diced Tomatoes");
+  await expect(page.getByLabel("Quantity on line 4")).toHaveValue("800");
+  // "Salt and pepper, to taste" has no amount to buy.
+  await page.getByRole("button", { name: "Remove it" }).click();
+
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() !== "GET") writes.push(new URL(request.url()).pathname);
+  });
+  await page.getByRole("button", { name: "Create meal with 6 ingredients" }).click();
+
+  await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
+  await expect(page.getByText("Serves 6 · 6 ingredients")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Garlic" })).toContainText("2 cloves");
+  expect(writes).toEqual(["/api/meals"]);
+});
+
+test("a link to an address on this network is refused, and says why", async ({ page }) => {
+  await openWeek(page, "2026-02-09");
+  await page.getByRole("button", { name: "New meal", exact: true }).click();
+
+  await page.getByLabel("Recipe link").fill("http://127.0.0.1:8001/health/live");
+  await page.getByRole("button", { name: "Import" }).click();
+
+  await expect(page.getByText("That address can't be fetched from here.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Check the recipe" })).toHaveCount(0);
 });
