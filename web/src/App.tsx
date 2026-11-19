@@ -189,6 +189,7 @@ export default function App() {
                 onSave={planner.savePlan}
                 onCopyPrevious={planner.copyPreviousWeek}
                 onCreateMeal={planner.addMeal}
+                onSuggest={planner.suggestMeals}
               />
             )}
             {page.id === "groceries" && (

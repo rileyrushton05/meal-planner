@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent, { type UserEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AppState, DayAssignment, Meal, WeekPlan } from "@/api/types";
+import type { AppState, Day, DayAssignment, Meal, PlanSuggestions, WeekPlan } from "@/api/types";
 import { WeeklyPlanTab } from "@/components/WeeklyPlanTab";
 import { makeMeal, makeState } from "@/test/factories";
 
@@ -23,6 +23,10 @@ function renderPlan(state: Partial<AppState> = {}) {
     onSave: vi.fn(echo),
     onCopyPrevious: vi.fn(async (): Promise<WeekPlan | null> => null),
     onCreateMeal: vi.fn(async (): Promise<Meal | null> => null),
+    onSuggest: vi.fn(
+      async (_week: string, _empty: Day[], _planned: number[]): Promise<PlanSuggestions | null> =>
+        null,
+    ),
   };
   return { ...render(<WeeklyPlanTab {...props} />), props };
 }
@@ -303,6 +307,102 @@ describe("undo", () => {
     await user.click(screen.getByRole("button", { name: /copy last week/i }));
 
     expect(screen.queryByRole("button", { name: /^Undo/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("filling empty days", () => {
+  const fill = () => screen.getByRole("button", { name: /^Fill / });
+
+  it("asks for meals for the empty days, sending what is already planned", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPlan({
+      plan: [{ day: "Tuesday", meal_id: 1, servings: 4 }],
+    });
+
+    expect(fill()).toHaveTextContent("Fill 6 empty days");
+    await user.click(fill());
+
+    expect(props.onSuggest).toHaveBeenCalledWith(
+      WEEK,
+      ["Monday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+      [1],
+    );
+  });
+
+  it("plans every suggestion as one change, saved at once, each at its recipe's servings", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPlan();
+    props.onSuggest.mockResolvedValue({
+      week_start: WEEK,
+      days: [
+        { day: "Monday", meal_id: 3, servings: null },
+        { day: "Tuesday", meal_id: 2, servings: null },
+        { day: "Wednesday", meal_id: 1, servings: null },
+      ],
+    });
+
+    await user.click(fill());
+
+    await waitFor(() => expect(lastSaved(props.onSave).Monday).toMatchObject({ meal_id: 3, servings: 6 }));
+    expect(lastSaved(props.onSave).Tuesday).toMatchObject({ meal_id: 2, servings: 2 });
+    expect(lastSaved(props.onSave).Wednesday).toMatchObject({ meal_id: 1, servings: 4 });
+    expect(picker("Monday")).toHaveAccessibleName(/Curry/);
+  });
+
+  it("is undone in one step", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPlan();
+    props.onSuggest.mockResolvedValue({
+      week_start: WEEK,
+      days: [
+        { day: "Monday", meal_id: 3, servings: null },
+        { day: "Tuesday", meal_id: 2, servings: null },
+      ],
+    });
+
+    await user.click(fill());
+    await user.click(await screen.findByRole("button", { name: "Undo filling 2 empty days" }));
+
+    await waitFor(() => expect(lastSaved(props.onSave).Monday.meal_id).toBeNull());
+    expect(lastSaved(props.onSave).Tuesday.meal_id).toBeNull();
+  });
+
+  it("says so when there were not enough meals for every day", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPlan({ meals: [curry] });
+    props.onSuggest.mockResolvedValue({
+      week_start: WEEK,
+      days: [{ day: "Monday", meal_id: 3, servings: null }],
+    });
+
+    await user.click(fill());
+
+    expect(await screen.findByText(/Filled 1 of 7 empty days/)).toBeInTheDocument();
+  });
+
+  it("ignores suggestions that arrive for a week no longer shown", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPlan();
+    props.onSuggest.mockResolvedValue({
+      week_start: "2026-07-27",
+      days: [{ day: "Monday", meal_id: 3, servings: null }],
+    });
+
+    await user.click(fill());
+
+    expect(props.onSave).not.toHaveBeenCalled();
+  });
+
+  it("is not offered when every day is planned, or every meal is already on the week", () => {
+    renderPlan({
+      meals: [spaghetti, tacos],
+      plan: [
+        { day: "Monday", meal_id: 1, servings: 4 },
+        { day: "Tuesday", meal_id: 2, servings: 2 },
+      ],
+    });
+
+    expect(screen.queryByRole("button", { name: /^Fill / })).toBeNull();
   });
 });
 

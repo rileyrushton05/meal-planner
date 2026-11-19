@@ -515,3 +515,75 @@ def test_planning_a_meal_that_does_not_exist_is_a_404(client):
 
     assert response.status_code == 404
     assert client.get(f"/api/plan/{MONDAY}").json()["days"] == []
+
+
+# --------------------------------------------------- suggesting meals
+
+
+def _plan(client, week: date, **days: int) -> None:
+    response = client.put(
+        f"/api/plan/{week.isoformat()}",
+        json={
+            "days": [{"day": day, "meal_id": meal_id} for day, meal_id in days.items()]
+        },
+    )
+    assert response.status_code == 200, response.text
+
+
+def _suggest(client, week: date, empty: list[str], planned: list[int] = ()):
+    params = [("empty", day) for day in empty] + [("planned", m) for m in planned]
+    response = client.get(f"/api/plan/{week.isoformat()}/suggestions", params=params)
+    assert response.status_code == 200, response.text
+    return {d["day"]: d["meal_id"] for d in response.json()["days"]}
+
+
+def test_empty_days_get_the_meals_not_cooked_recently(client):
+    soup, tacos, curry = (
+        _create_meal(client, n)["id"] for n in ("Soup", "Tacos", "Curry")
+    )
+    _plan(client, MONDAY - timedelta(weeks=1), Monday=tacos)
+    _plan(client, MONDAY - timedelta(weeks=5), Monday=soup)
+
+    # Curry never cooked, soup five weeks ago, tacos last week.
+    assert _suggest(client, MONDAY, ["Monday", "Tuesday", "Wednesday"]) == {
+        "Monday": curry,
+        "Tuesday": soup,
+        "Wednesday": tacos,
+    }
+
+
+def test_suggesting_saves_nothing_and_skips_meals_already_on_the_week(client):
+    soup, tacos = (_create_meal(client, n)["id"] for n in ("Soup", "Tacos"))
+
+    assert _suggest(client, MONDAY, ["Tuesday"], planned=[soup]) == {"Tuesday": tacos}
+    assert client.get(f"/api/plan/{MONDAY.isoformat()}").json()["days"] == []
+
+
+def test_suggestions_answer_for_the_week_containing_the_date(client):
+    _create_meal(client, "Soup")
+
+    response = client.get(
+        f"/api/plan/{WEDNESDAY.isoformat()}/suggestions", params={"empty": "Friday"}
+    )
+
+    assert response.json()["week_start"] == MONDAY.isoformat()
+
+
+def test_someone_elses_history_is_not_used(client):
+    mine = _create_meal(client, "Soup")["id"]
+    with api_client() as someone_else:
+        theirs = _create_meal(someone_else, "Tacos")["id"]
+        _plan(someone_else, MONDAY - timedelta(weeks=9), Monday=theirs)
+
+        assert _suggest(someone_else, MONDAY, ["Monday", "Tuesday"]) == {
+            "Monday": theirs
+        }
+    assert _suggest(client, MONDAY, ["Monday", "Tuesday"]) == {"Monday": mine}
+
+
+def test_a_day_that_is_not_a_weekday_is_refused_for_suggestions(client):
+    response = client.get(
+        f"/api/plan/{MONDAY.isoformat()}/suggestions", params={"empty": "Funday"}
+    )
+
+    assert response.status_code == 422

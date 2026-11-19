@@ -38,6 +38,8 @@ export type MealTemplate = Schemas["TemplateRead"];
 /** Everything needed to render one week, fetched in a single request. */
 export type AppState = Schemas["AppState"];
 export type WeekPlan = Schemas["WeekPlanRead"];
+/** Meals suggested for a week's empty days, not yet saved. */
+export type PlanSuggestions = Schemas["PlanSuggestions"];
 /** Who is signed in: a guest (no email) or an account. */
 export type Account = Schemas["Account"];
 /** An account just signed up to or recovered, with its new recovery code:

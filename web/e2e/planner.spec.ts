@@ -191,3 +191,42 @@ test("home: plan the focal day in place, then any other day in one click", async
   await expect(week.getByRole("link", { name: /^Tuesday/ })).toContainText(pie);
   await expect(page.getByRole("link", { name: /^To buy/ })).toContainText("0items");
 });
+
+test("fill the empty days with meals not cooked lately, and undo it in one step", async ({
+  page,
+}) => {
+  // A week far from the others, so earlier specs' plans are history, not
+  // this week.
+  await openWeek(page, "2026-06-01", "plan");
+  const empty = page.getByRole("button", { name: /^\w+day: no meal$/ });
+  // count() does not wait, so wait for the week to be on screen first.
+  await expect(dayPicker(page, "Sunday")).toBeVisible();
+  const before = await empty.count();
+  expect(before).toBeGreaterThan(0);
+
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "PUT" && r.url().includes("/api/plan/"),
+  );
+  await page.getByRole("button", { name: /^Fill (\d+ empty days|the empty day)$/ }).click();
+  expect((await saved).ok()).toBe(true);
+
+  // A new guest has a few sample meals, fewer than seven days: as many
+  // days are filled as there are meals, each with a different one, and the
+  // page says why the rest are still empty.
+  const note = page.getByText(/^Filled \d+ of \d+ empty days/);
+  await expect(note).toBeVisible();
+  const [, filled, of] = (await note.innerText()).match(/Filled (\d+) of (\d+)/) ?? [];
+  expect(Number(of)).toBe(before);
+  await expect(empty).toHaveCount(before - Number(filled));
+  const planned = page.getByRole("button", { name: /^\w+day: (?!no meal$)/ });
+  const meals = (await planned.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? e.textContent ?? ""))).map(
+    (label) => label.replace(/^\w+day: /, ""),
+  );
+  expect(meals).toHaveLength(Number(filled));
+  expect(new Set(meals).size).toBe(meals.length);
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: /^Undo filling/ }).click();
+  await expect(empty).toHaveCount(before);
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+});

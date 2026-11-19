@@ -31,6 +31,7 @@ import { ApiError, api } from "../api/client";
 import { queryKeys } from "../api/queryClient";
 import type {
   AppState,
+  Day,
   IngredientLine,
   IngredientSuggestion,
   Meal,
@@ -39,6 +40,7 @@ import type {
 import { parseWeek, useSearchParam } from "../lib/location";
 
 type Library = Pick<AppState, "meals" | "ingredient_suggestions" | "templates">;
+type SuggestionRequest = { weekStart: string; empty: Day[]; planned: number[] };
 
 export function usePlanner({
   loadGroceries = false,
@@ -168,6 +170,13 @@ export function usePlanner({
     onError: report,
   });
 
+  const suggesting = useMutation({
+    mutationFn: ({ weekStart, empty, planned }: SuggestionRequest) =>
+      api.suggestMeals(weekStart, empty, planned),
+    onMutate: clearError,
+    onError: report,
+  });
+
   const planChange = useMutation({
     mutationFn: (change: () => Promise<WeekPlan>) => change(),
     onMutate: clearError,
@@ -239,6 +248,11 @@ export function usePlanner({
     copyPreviousWeek: (weekStart: string) =>
       runFor(planChange.mutateAsync(() => api.copyPreviousWeek(weekStart))),
 
+    /** Meals for the empty days, or null if that failed. Saves nothing:
+     *  the plan page applies them, as a change it saves and can undo. */
+    suggestMeals: (weekStart: string, empty: Day[], planned: number[]) =>
+      runFor(suggesting.mutateAsync({ weekStart, empty, planned })),
+
   };
 
   const state: AppState | null =
@@ -268,7 +282,7 @@ export function usePlanner({
       mealDeletion.isPending ||
       reading.isPending ||
       importing.isPending,
-    planPending: planChange.isPending,
+    planPending: planChange.isPending || suggesting.isPending,
     grocery: grocery.data ?? null,
     ...actions,
   };
