@@ -8,7 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.models import DayOfWeek, persisted_id
-from app.planner import generate_weekly_grocery_list
+from app.planner import weekly_shopping
 from app.suggest import day_date, suggest_for_empty_days
 from server import serializers
 from server.deps import ServicesDep
@@ -106,6 +106,8 @@ def suggest_meals(
 
 @router.get("/grocery-list/{week}", response_model=list[GroceryLine])
 def grocery_list(week: date, services: ServicesDep) -> list[GroceryLine]:
-    """Consolidated shopping list for the week containing `week`."""
-    items = generate_weekly_grocery_list(services.plans, monday_of(week))
+    """The week's lines alone. Superseded by GET /api/groceries/{week};
+    kept so a page loaded before that existed keeps working until reloaded.
+    """
+    items = weekly_shopping(services.plans, services.groceries, monday_of(week))
     return [serializers.grocery_line(item) for item in items]

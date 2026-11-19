@@ -29,6 +29,7 @@ from server.problems import (
 from server.routers import (
     account,
     auth,
+    groceries,
     health,
     ingredients,
     meals,
@@ -107,4 +108,5 @@ app.include_router(meals.router)
 app.include_router(ingredients.router)
 app.include_router(recipes.router)
 app.include_router(plans.router)
+app.include_router(groceries.router)
 app.include_router(monitoring.router)

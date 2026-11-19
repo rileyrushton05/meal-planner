@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { AccountBar } from "@/components/AccountBar";
 import { AccountPage } from "@/components/AccountPage";
 import { AppShell, type NavPage } from "@/components/AppShell";
-import { GroceryTab } from "@/components/GroceryTab";
+import { type GroceryActions, GroceryTab } from "@/components/GroceryTab";
 import { ThisWeekPage } from "@/components/home/ThisWeekPage";
 import { MealsTab } from "@/components/meals/MealsTab";
 import { PrivacyPage } from "@/components/PrivacyPage";
@@ -150,7 +150,7 @@ export default function App() {
               <ThisWeekPage
                 state={planner.state}
                 today={toIso(new Date())}
-                groceries={planner.grocery}
+                groceries={planner.grocery?.lines ?? null}
                 onSave={planner.savePlan}
                 onCreateMeal={planner.addMeal}
               />
@@ -195,8 +195,10 @@ export default function App() {
             {page.id === "groceries" && (
               <GroceryTab
                 weekStart={planner.state.week_start}
-                lines={planner.grocery}
+                list={planner.grocery}
                 plannedDays={planner.state.plan.filter((d) => d.meal_id !== null).length}
+                pending={planner.groceryPending}
+                {...groceryActions(planner, planner.state.week_start)}
               />
             )}
           </div>
@@ -254,4 +256,22 @@ function WeekPicker({
       </div>
     </div>
   );
+}
+
+/** The grocery page's actions, each bound to the week on screen. */
+function groceryActions(
+  planner: ReturnType<typeof usePlanner>,
+  week: string,
+): GroceryActions {
+  return {
+    onCheck: (key, state) => planner.setGroceryCheck(week, key, state),
+    onEmptyBasket: () => planner.emptyBasket(week),
+    onAddExtra: (text) => planner.addExtra(week, text),
+    onRemoveExtra: (id) => planner.removeExtra(week, id),
+    onKeepExtra: (id) => planner.keepExtra(week, id),
+    onAddUsuals: () => planner.addUsuals(week),
+    onAddUsual: planner.addUsual,
+    onRemoveUsual: planner.removeUsual,
+    onAisleOrder: planner.setAisleOrder,
+  };
 }

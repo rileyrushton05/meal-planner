@@ -38,6 +38,8 @@ from app.catalog import (
 )
 from app.exceptions import (
     DuplicateNameError,
+    GroceryItemNotFoundError,
+    GroceryLimitError,
     IngredientNotOnMealError,
     InvalidDayError,
     MealNotFoundError,
@@ -46,13 +48,20 @@ from app.exceptions import (
 from app.models import (
     CatalogAlias,
     CatalogItem,
+    Category,
+    CheckState,
     DayOfWeek,
+    GroceryCheck,
+    GroceryExtra,
+    GrocerySettings,
+    GroceryUsual,
     Ingredient,
     Meal,
     MealIngredient,
     RateLimit,
     User,
     WeeklyPlan,
+    grocery_key,
     persisted_id,
 )
 from app.models import Session as SessionRow
@@ -563,6 +572,277 @@ class WeeklyPlanRepository(_Repository):
             copied += 1
         self._session.flush()
         return copied
+
+
+#: Caps on what one person can store, far above any real shop.
+MAX_EXTRAS_PER_WEEK = 100
+MAX_USUALS = 100
+
+
+class GroceryRepository(_Repository):
+    """One user's grocery list state: what is ticked off or already at
+    home, the extras on each week's list, their usuals, and their aisle
+    order. The lines themselves are derived (app/groceries.py)."""
+
+    # --- Ticks ---------------------------------------------------------------
+
+    def checks(self, week_start_date: date) -> dict[str, CheckState]:
+        """Each line key marked for the week, and how."""
+        rows = self._session.exec(
+            select(GroceryCheck).where(
+                GroceryCheck.user_id == self._user_id,
+                GroceryCheck.week_start_date == week_start_date,
+            )
+        )
+        return {row.item_key: CheckState(row.state) for row in rows}
+
+    def set_check(
+        self, week_start_date: date, item_key: str, state: CheckState | None
+    ) -> None:
+        """Mark a line, or (None) put it back to get. One statement either
+        way, so two devices ticking at once cannot collide."""
+        if state is None:
+            self._session.execute(
+                delete(GroceryCheck).where(
+                    col(GroceryCheck.user_id) == self._user_id,
+                    col(GroceryCheck.week_start_date) == week_start_date,
+                    col(GroceryCheck.item_key) == item_key,
+                )
+            )
+            return
+        self._session.execute(
+            _dialect_insert(self._session, GroceryCheck)
+            .values(
+                user_id=self._user_id,
+                week_start_date=week_start_date,
+                item_key=item_key,
+                state=state.value,
+            )
+            .on_conflict_do_update(
+                index_elements=[
+                    col(GroceryCheck.user_id),
+                    col(GroceryCheck.week_start_date),
+                    col(GroceryCheck.item_key),
+                ],
+                set_={"state": state.value, "updated_at": func.now()},
+            )
+        )
+
+    def empty_basket(self, week_start_date: date) -> int:
+        """Untick everything in the basket, keeping what is marked as
+        already at home: that is still true when the shop starts again."""
+        return _count_or_delete(
+            self._session,
+            GroceryCheck,
+            and_(
+                col(GroceryCheck.user_id) == self._user_id,
+                col(GroceryCheck.week_start_date) == week_start_date,
+                col(GroceryCheck.state) == CheckState.BASKET.value,
+            ),
+            dry_run=False,
+        )
+
+    def every_check(self) -> list[GroceryCheck]:
+        """Every week's marks, for the account export."""
+        return list(
+            self._session.exec(
+                select(GroceryCheck)
+                .where(GroceryCheck.user_id == self._user_id)
+                .order_by(col(GroceryCheck.week_start_date), col(GroceryCheck.item_key))
+            )
+        )
+
+    # --- Extras --------------------------------------------------------------
+
+    def every_extra(self) -> list[GroceryExtra]:
+        """Every week's extras, for the account export."""
+        return list(
+            self._session.exec(
+                select(GroceryExtra)
+                .where(GroceryExtra.user_id == self._user_id)
+                .order_by(col(GroceryExtra.week_start_date), col(GroceryExtra.id))
+            )
+        )
+
+    def extras(self, week_start_date: date) -> list[tuple[GroceryExtra, str | None]]:
+        """The week's extras, each with its aisle, oldest first."""
+        statement = (
+            select(GroceryExtra, CatalogItem.category)
+            .outerjoin(
+                CatalogItem,
+                col(CatalogItem.id) == col(GroceryExtra.catalog_item_id),
+            )
+            .where(
+                GroceryExtra.user_id == self._user_id,
+                GroceryExtra.week_start_date == week_start_date,
+            )
+            .order_by(col(GroceryExtra.id))
+        )
+        return [(extra, category) for extra, category in self._session.exec(statement)]
+
+    def add_extra(
+        self, week_start_date: date, name: str, qty: float | None, unit: str
+    ) -> None:
+        """Put something on the week's list. Already there (by name, any
+        case): its amount becomes this one, rather than a second line."""
+        self._refuse_past(
+            MAX_EXTRAS_PER_WEEK,
+            and_(
+                col(GroceryExtra.user_id) == self._user_id,
+                col(GroceryExtra.week_start_date) == week_start_date,
+                func.lower(GroceryExtra.name) != name.lower(),
+            ),
+            GroceryExtra,
+            f"A week's list can hold {MAX_EXTRAS_PER_WEEK} extras; remove some first.",
+        )
+        unit = canonical_unit(unit)
+        self._session.execute(
+            _dialect_insert(self._session, GroceryExtra)
+            .values(
+                user_id=self._user_id,
+                week_start_date=week_start_date,
+                name=name,
+                qty=qty,
+                unit=unit,
+                catalog_item_id=CatalogRepository.item_matching(name),
+            )
+            .on_conflict_do_update(
+                # The unique index on (user, week, lower(name)).
+                index_elements=[
+                    col(GroceryExtra.user_id),
+                    col(GroceryExtra.week_start_date),
+                    func.lower(GroceryExtra.name),
+                ],
+                set_={"qty": qty, "unit": unit, "updated_at": func.now()},
+            )
+        )
+
+    def extra(self, week_start_date: date, extra_id: int) -> GroceryExtra:
+        """One extra on the week's list."""
+        extra = self._session.exec(
+            select(GroceryExtra).where(
+                GroceryExtra.id == extra_id,
+                GroceryExtra.user_id == self._user_id,
+                GroceryExtra.week_start_date == week_start_date,
+            )
+        ).first()
+        if extra is None:
+            raise GroceryItemNotFoundError(
+                "That item is no longer on this week's list."
+            )
+        return extra
+
+    def remove_extra(self, week_start_date: date, extra_id: int) -> GroceryExtra:
+        """Take an extra off the week's list, returning what it was."""
+        extra = self.extra(week_start_date, extra_id)
+        self._session.delete(extra)
+        # Its tick goes with it, or adding it again would bring it back
+        # already ticked.
+        self.set_check(
+            week_start_date, grocery_key(extra.name, extra.unit, extra=True), None
+        )
+        self._session.flush()
+        return extra
+
+    def add_usuals(self, week_start_date: date) -> int:
+        """Put every usual on the week's list, except those already there
+        by name (whose amount is left as it is). Returns how many were added."""
+        on_list = {extra.name.lower() for extra, _ in self.extras(week_start_date)}
+        added = 0
+        for usual in self.usuals():
+            if usual.name.lower() in on_list:
+                continue
+            self.add_extra(week_start_date, usual.name, usual.qty, usual.unit)
+            added += 1
+        return added
+
+    # --- Usuals --------------------------------------------------------------
+
+    def usuals(self) -> list[GroceryUsual]:
+        """Alphabetical, as a list to scan."""
+        return list(
+            self._session.exec(
+                select(GroceryUsual)
+                .where(GroceryUsual.user_id == self._user_id)
+                .order_by(func.lower(GroceryUsual.name))
+            )
+        )
+
+    def add_usual(self, name: str, qty: float | None, unit: str) -> None:
+        """Keep something as a usual; one of that name already kept takes
+        this amount."""
+        self._refuse_past(
+            MAX_USUALS,
+            and_(
+                col(GroceryUsual.user_id) == self._user_id,
+                func.lower(GroceryUsual.name) != name.lower(),
+            ),
+            GroceryUsual,
+            f"You can keep {MAX_USUALS} usuals; remove some first.",
+        )
+        unit = canonical_unit(unit)
+        self._session.execute(
+            _dialect_insert(self._session, GroceryUsual)
+            .values(user_id=self._user_id, name=name, qty=qty, unit=unit)
+            .on_conflict_do_update(
+                # The unique index `uq_grocery_usuals_user_id_lower_name`.
+                index_elements=[
+                    col(GroceryUsual.user_id),
+                    func.lower(GroceryUsual.name),
+                ],
+                set_={"qty": qty, "unit": unit, "updated_at": func.now()},
+            )
+        )
+
+    def remove_usual(self, usual_id: int) -> None:
+        removed = _count_or_delete(
+            self._session,
+            GroceryUsual,
+            and_(
+                col(GroceryUsual.id) == usual_id,
+                col(GroceryUsual.user_id) == self._user_id,
+            ),
+            dry_run=False,
+        )
+        if not removed:
+            raise GroceryItemNotFoundError("That is no longer one of your usuals.")
+
+    def _refuse_past(
+        self, limit: int, others: ColumnElement[bool], model: type, message: str
+    ) -> None:
+        """A cap on rows a person can pile up, counting the others: adding
+        again under a name already there changes it, so is always allowed.
+        Not race-proof, and needs not be: it bounds storage, not money."""
+        if _count_or_delete(self._session, model, others, dry_run=True) >= limit:
+            raise GroceryLimitError(message)
+
+    # --- Aisle order ---------------------------------------------------------
+
+    def aisle_order(self) -> list[Category]:
+        """The person's own order, or the default (`Category` order). An
+        aisle added to the app after they chose goes at the end."""
+        settings = self._session.get(GrocerySettings, self._user_id)
+        if settings is None:
+            return list(Category)
+        known = {category.value for category in Category}
+        chosen = [
+            Category(value)
+            for value in settings.aisle_order.split(",")
+            if value in known
+        ]
+        return chosen + [category for category in Category if category not in chosen]
+
+    def set_aisle_order(self, order: list[Category]) -> None:
+        """`order` must name every aisle once; the API checks that."""
+        value = ",".join(category.value for category in order)
+        self._session.execute(
+            _dialect_insert(self._session, GrocerySettings)
+            .values(user_id=self._user_id, aisle_order=value)
+            .on_conflict_do_update(
+                index_elements=[col(GrocerySettings.user_id)],
+                set_={"aisle_order": value, "updated_at": func.now()},
+            )
+        )
 
 
 class UserRepository:

@@ -339,6 +339,106 @@ class WeeklyPlan(_Timestamps, table=True):
     servings: int | None = None
 
 
+class CheckState(StrEnum):
+    """Where a grocery line stands in this week's shop, besides still to get."""
+
+    #: Ticked off: in the basket.
+    BASKET = "basket"
+    #: Already in the cupboard: not to buy this week.
+    HAVE = "have"
+
+
+class GroceryCheck(_Timestamps, table=True):
+    """A grocery line ticked off, or marked as already at home, for one
+    week. A line with no row is still to get.
+
+    Keyed by the line's `key` (app/groceries.py) rather than an id: a
+    grocery list is derived, not stored, so its lines have nothing else to
+    be known by. The key is the ingredient's name and unit, so a tick
+    survives a meal being changed or the page being reloaded, on any device.
+    """
+
+    __tablename__: str = "grocery_checks"  # pyright: ignore[reportIncompatibleVariableOverride]
+    __table_args__ = (CheckConstraint(_in("state", CheckState), name="state_known"),)
+
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", primary_key=True)
+    week_start_date: date = Field(primary_key=True)
+    item_key: str = Field(primary_key=True)
+    state: str
+
+
+def grocery_key(name: str, unit: str, *, extra: bool) -> str:
+    """A grocery line's `GroceryCheck.item_key`: its name and unit, so a
+    tick holds while the amount changes, and is the same on every device.
+    An extra is told apart from a meal's line of the same name: it is a line
+    of its own, and its tick goes with it when it is removed."""
+    if extra:
+        return f"+{name.casefold()}"
+    return f"{name.casefold()}|{unit}"
+
+
+class GroceryExtra(_Timestamps, table=True):
+    """Something on one week's list that no planned meal needs: milk,
+    bin bags. One per name per week; adding it again changes its amount."""
+
+    __tablename__: str = "grocery_extras"  # pyright: ignore[reportIncompatibleVariableOverride]
+    __table_args__ = (
+        Index(
+            "uq_grocery_extras_user_id_week_start_date_lower_name",
+            "user_id",
+            "week_start_date",
+            text("lower(name)"),
+            unique=True,
+        ),
+        CheckConstraint("qty IS NULL OR qty > 0", name="qty_positive"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
+    week_start_date: date
+    name: str
+    #: None when no amount was given ("milk").
+    qty: float | None = None
+    unit: str = Field(default="", sa_column_kwargs={"server_default": ""})
+    #: The catalogue item it is, for its aisle; matched when it is added.
+    catalog_item_id: int | None = Field(
+        default=None, foreign_key="catalog_items.id", ondelete="SET NULL", index=True
+    )
+
+
+class GroceryUsual(_Timestamps, table=True):
+    """Something bought most weeks, kept so a week's list can have all of
+    them added in one go."""
+
+    __tablename__: str = "grocery_usuals"  # pyright: ignore[reportIncompatibleVariableOverride]
+    __table_args__ = (
+        Index(
+            "uq_grocery_usuals_user_id_lower_name",
+            "user_id",
+            text("lower(name)"),
+            unique=True,
+        ),
+        CheckConstraint("qty IS NULL OR qty > 0", name="qty_positive"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
+    name: str
+    qty: float | None = None
+    unit: str = Field(default="", sa_column_kwargs={"server_default": ""})
+
+
+class GrocerySettings(_Timestamps, table=True):
+    """How one person likes their grocery list. No row: the defaults."""
+
+    __tablename__: str = "grocery_settings"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    user_id: int = Field(foreign_key="users.id", ondelete="CASCADE", primary_key=True)
+    #: The aisles in the order their shop is laid out, comma-separated
+    #: `Category` values, every one exactly once (checked by the API).
+    aisle_order: str
+
+
 class RateLimit(_Timestamps, table=True):
     """Recent attempts at one throttled thing, such as logins to one account
     from one network. See app/ratelimit.py for the rules.
@@ -377,6 +477,10 @@ ALL_TABLES: tuple[type[SQLModel], ...] = (
     RateLimit,
     CatalogItem,
     CatalogAlias,
+    GroceryCheck,
+    GroceryExtra,
+    GroceryUsual,
+    GrocerySettings,
 )
 
 #: Shared reference data: the web app's role may read these and nothing
@@ -390,7 +494,12 @@ __all__ = [
     "CatalogAlias",
     "CatalogItem",
     "Category",
+    "CheckState",
     "DayOfWeek",
+    "GroceryCheck",
+    "GroceryExtra",
+    "GrocerySettings",
+    "GroceryUsual",
     "Ingredient",
     "Meal",
     "MealIngredient",
@@ -399,5 +508,6 @@ __all__ = [
     "Session",
     "User",
     "WeeklyPlan",
+    "grocery_key",
     "persisted_id",
 ]

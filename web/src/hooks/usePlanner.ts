@@ -6,7 +6,8 @@
  * - the library (meals, ingredient suggestions, templates), which does not vary by
  *   week;
  * - one plan per week visited;
- * - one grocery list per week, fetched by the pages that show it.
+ * - one grocery list per week, fetched by the pages that show it, with
+ *   what has been ticked off, the extras, the usuals and the aisle order.
  *
  * The first load is a single request (`/api/state`) that fills the library
  * and seeds the current week's plan, so nothing else is fetched. Changing
@@ -31,7 +32,11 @@ import { ApiError, api } from "../api/client";
 import { queryKeys } from "../api/queryClient";
 import type {
   AppState,
+  Category,
+  CheckState,
   Day,
+  GroceryList,
+  GroceryUsual,
   IngredientLine,
   IngredientSuggestion,
   Meal,
@@ -41,6 +46,11 @@ import { parseWeek, useSearchParam } from "../lib/location";
 
 type Library = Pick<AppState, "meals" | "ingredient_suggestions" | "templates">;
 type SuggestionRequest = { weekStart: string; empty: Day[]; planned: number[] };
+type CheckRequest = { weekStart: string; key: string; state: CheckState | null };
+
+/** How often a grocery list on screen is fetched again, for ticks made on
+ *  another device. Only while the page is visible (TanStack's default). */
+const GROCERY_REFRESH_MS = 20_000;
 
 export function usePlanner({
   loadGroceries = false,
@@ -87,10 +97,16 @@ export function usePlanner({
   // Held per week: returning to a week shows the list already fetched for
   // it. A change resets it (below): fetched again straight away on a page
   // that shows it, and otherwise when one next does.
+  //
+  // Unlike the rest, a list is also fetched again on its own while it is on
+  // screen: its ticks are shared by everyone on the account, so two people
+  // shopping, or a laptop left open on it, see each other's ticks.
   const grocery = useQuery({
     queryKey: queryKeys.grocery(week),
-    queryFn: () => api.getGroceryList(week),
+    queryFn: () => api.getGroceries(week),
     enabled: loadGroceries && library.isSuccess,
+    refetchOnWindowFocus: "always",
+    refetchInterval: GROCERY_REFRESH_MS,
   });
 
   const report = (err: unknown) => setActionError(describe(err));
@@ -177,6 +193,63 @@ export function usePlanner({
     onError: report,
   });
 
+  /** A list the server sent back, filed under the week it says it is. */
+  const storeGroceries = (list: GroceryList) =>
+    queryClient.setQueryData(queryKeys.grocery(list.week_start), list);
+
+  /** The same change to every week's cached list: usuals and the aisle
+   *  order are the person's, not one week's. */
+  const patchEveryList = (patch: (list: GroceryList) => GroceryList) =>
+    queryClient.setQueriesData<GroceryList>({ queryKey: queryKeys.groceries }, (list) =>
+      list ? patch(list) : list,
+    );
+
+  const groceryChange = useMutation({
+    mutationFn: (change: () => Promise<GroceryList>) => change(),
+    onMutate: clearError,
+    onSuccess: storeGroceries,
+    onError: report,
+  });
+
+  const usualsChange = useMutation({
+    mutationFn: (change: () => Promise<GroceryUsual[]>) => change(),
+    onMutate: clearError,
+    onSuccess: (usuals) => patchEveryList((list) => ({ ...list, usuals })),
+    onError: report,
+  });
+
+  // Saved behind the tick, which `setGroceryCheck` has already shown. The
+  // server answers with nothing, so once the last tick in flight has landed
+  // the list is fetched again: that puts right a tick that failed, and a
+  // refresh that crossed with one, and shows ticks from other devices.
+  const checking = useMutation({
+    mutationKey: ["grocery-check"],
+    mutationFn: ({ weekStart, key, state }: CheckRequest) =>
+      api.setGroceryCheck(weekStart, key, state),
+    onMutate: clearError,
+    onError: report,
+    onSettled: (_data, _error, { weekStart }) => {
+      if (queryClient.isMutating({ mutationKey: ["grocery-check"] }) === 1) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.grocery(weekStart) });
+      }
+    },
+  });
+
+  const ordering = useMutation({
+    mutationFn: (order: Category[]) => api.setAisleOrder(order),
+    onMutate: (order) => {
+      clearError();
+      const before = queryClient.getQueriesData<GroceryList>({ queryKey: queryKeys.groceries });
+      patchEveryList((list) => ({ ...list, aisle_order: order }));
+      return { before };
+    },
+    onSuccess: (order) => patchEveryList((list) => ({ ...list, aisle_order: order })),
+    onError: (err, _order, context) => {
+      for (const [key, list] of context?.before ?? []) queryClient.setQueryData(key, list);
+      report(err);
+    },
+  });
+
   const planChange = useMutation({
     mutationFn: (change: () => Promise<WeekPlan>) => change(),
     onMutate: clearError,
@@ -253,6 +326,46 @@ export function usePlanner({
     suggestMeals: (weekStart: string, empty: Day[], planned: number[]) =>
       runFor(suggesting.mutateAsync({ weekStart, empty, planned })),
 
+    // The grocery list. Each takes the week it is for, as `savePlan` does.
+    // Shown before anything is sent, and synchronously: inside the click,
+    // so the checkbox never flicks back while the list catches up, and a
+    // tick in the shop never waits for the network.
+    setGroceryCheck: (weekStart: string, key: string, state: CheckState | null) => {
+      queryClient.setQueryData<GroceryList>(queryKeys.grocery(weekStart), (list) =>
+        list
+          ? {
+              ...list,
+              lines: list.lines.map((line) => (line.key === key ? { ...line, state } : line)),
+            }
+          : list,
+      );
+      return run(checking.mutateAsync({ weekStart, key, state }));
+    },
+
+    emptyBasket: (weekStart: string) =>
+      run(groceryChange.mutateAsync(() => api.emptyBasket(weekStart))),
+
+    /** Resolves true once added, so the field can be cleared; false keeps
+     *  what was typed, to fix. */
+    addExtra: (weekStart: string, text: string) =>
+      runFor(groceryChange.mutateAsync(() => api.addExtra(weekStart, text))).then(Boolean),
+
+    removeExtra: (weekStart: string, extraId: number) =>
+      run(groceryChange.mutateAsync(() => api.removeExtra(weekStart, extraId))),
+
+    keepExtra: (weekStart: string, extraId: number) =>
+      run(groceryChange.mutateAsync(() => api.keepExtra(weekStart, extraId))),
+
+    addUsuals: (weekStart: string) =>
+      run(groceryChange.mutateAsync(() => api.addUsuals(weekStart))),
+
+    addUsual: (text: string) =>
+      runFor(usualsChange.mutateAsync(() => api.addUsual(text))).then(Boolean),
+
+    removeUsual: (id: number) => run(usualsChange.mutateAsync(() => api.removeUsual(id))),
+
+    setAisleOrder: (order: Category[]) => run(ordering.mutateAsync(order)),
+
   };
 
   const state: AppState | null =
@@ -283,6 +396,8 @@ export function usePlanner({
       reading.isPending ||
       importing.isPending,
     planPending: planChange.isPending || suggesting.isPending,
+    // Ticks are left out: each shows at once, so there is nothing to wait for.
+    groceryPending: groceryChange.isPending || usualsChange.isPending || ordering.isPending,
     grocery: grocery.data ?? null,
     ...actions,
   };

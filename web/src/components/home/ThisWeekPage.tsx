@@ -73,7 +73,8 @@ export function ThisWeekPage({ state, today, groceries, onSave, onCreateMeal }: 
           plannedDays={planned}
           servings={servings}
           mealCount={plannedIds.size}
-          itemsToBuy={groceries?.length ?? null}
+          // Still to get: not yet in the basket, and not already at home.
+          itemsToBuy={groceries ? groceries.filter((line) => line.state === null).length : null}
         />
       </div>
 

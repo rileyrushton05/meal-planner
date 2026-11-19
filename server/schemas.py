@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import Category, DayOfWeek
+from app.models import Category, CheckState, DayOfWeek
 from app.parsing import Confidence
 
 
@@ -224,13 +224,65 @@ class GroceryLine(ResponseSchema):
     """One shopping line. qty stays numeric so clients can sort or price it;
     counted things arrive already rounded up to whole ones."""
 
+    #: What a tick is saved against (PUT .../checks); stable while the
+    #: amount changes.
+    key: str
     name: str
-    qty: float
+    #: Null only for an extra added with no amount ("milk").
+    qty: float | None
+    unit: str
+    #: The amount as shown: "1.5 kg", "2 cloves"; "" when there is none.
+    display: str
+    #: The aisle, from the catalogue; null for an item it does not know.
+    #: Lines arrive in the person's aisle order, unknown last.
+    category: Category | None
+    #: In the basket, or already at home; null while still to get.
+    state: CheckState | None
+    #: Set for something added by hand rather than by a planned meal.
+    extra_id: int | None
+
+
+class GroceryUsualRead(ResponseSchema):
+    id: int
+    name: str
+    qty: float | None
     unit: str
     display: str
-    #: The aisle, from the catalogue; null for an ingredient it does not know.
-    #: Lines arrive in aisle order (the order of `Category`), unknown last.
-    category: Category | None
+
+
+class GroceryList(ResponseSchema):
+    """A week's shopping, and what the page needs to change it."""
+
+    week_start: date
+    lines: list[GroceryLine]
+    usuals: list[GroceryUsualRead]
+    #: Every aisle once, in the order this person's shop is laid out.
+    aisle_order: list[Category]
+
+
+class GroceryCheckWrite(RequestSchema):
+    """Tick a line off (basket), mark it as at home (have), or put it back
+    to get (null)."""
+
+    key: str = Field(min_length=1, max_length=MAX_LINE_LENGTH + 20)
+    state: CheckState | None
+
+
+class GroceryItemText(RequestSchema):
+    """Something to buy as a person types it: "2 L milk", "bin bags"."""
+
+    text: str = Field(min_length=1, max_length=MAX_LINE_LENGTH)
+
+
+class AisleOrder(RequestSchema):
+    aisle_order: list[Category]
+
+    @field_validator("aisle_order")
+    @classmethod
+    def _every_aisle_once(cls, value: list[Category]) -> list[Category]:
+        if sorted(value) != sorted(Category):
+            raise ValueError("List every aisle exactly once.")
+        return value
 
 
 class TemplateIngredientRead(ResponseSchema):
@@ -352,6 +404,32 @@ class ExportedAccount(ResponseSchema):
     created_at: datetime | None
 
 
+class ExportedGroceryItem(ResponseSchema):
+    name: str
+    #: None when no amount was given ("milk").
+    qty: float | None
+    unit: str
+
+
+class ExportedExtra(ExportedGroceryItem):
+    week_start: date
+
+
+class ExportedTick(ResponseSchema):
+    week_start: date
+    #: The line's name and unit as the app keys it ("pasta|g"); a leading
+    #: "+" marks one of that week's extras.
+    item: str
+    state: CheckState
+
+
+class ExportedGroceries(ResponseSchema):
+    usuals: list[ExportedGroceryItem]
+    extras: list[ExportedExtra]
+    ticks: list[ExportedTick]
+    aisle_order: list[Category]
+
+
 class AccountExport(ResponseSchema):
     """Everything the app holds that is the caller's own, in a form a person
     can read and another program can import: names rather than internal
@@ -368,3 +446,5 @@ class AccountExport(ResponseSchema):
     account: ExportedAccount
     meals: list[ExportedMeal]
     plans: list[ExportedDay]
+    #: Added in place, without a new version: older readers ignore it.
+    groceries: ExportedGroceries

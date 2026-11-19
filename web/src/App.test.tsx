@@ -13,7 +13,7 @@ vi.mock("@/api/client", async (importOriginal) => ({
   api: {
     getState: vi.fn(),
     getPlan: vi.fn(),
-    getGroceryList: vi.fn(),
+    getGroceries: vi.fn(),
     me: vi.fn(),
     signUp: vi.fn(),
     logIn: vi.fn(),
@@ -33,7 +33,12 @@ beforeEach(() => {
     makeState({ week_start: week, meals: [makeMeal({ id: 1, name: "Spaghetti" })] }),
   );
   mocked.me.mockResolvedValue({ email: null, is_guest: true, has_recovery_code: false });
-  mocked.getGroceryList.mockResolvedValue([]);
+  mocked.getGroceries.mockImplementation(async (week: string) => ({
+    week_start: week,
+    lines: [],
+    usuals: [],
+    aisle_order: ["produce", "meat", "dairy", "bakery", "pantry", "frozen"],
+  }));
 });
 
 async function renderApp(path = "/") {
@@ -88,13 +93,13 @@ describe("pages", () => {
     const user = userEvent.setup();
     await renderApp("/meals");
     await user.click(screen.getByRole("link", { name: "Plan" }));
-    expect(mocked.getGroceryList).not.toHaveBeenCalled();
+    expect(mocked.getGroceries).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("link", { name: "Groceries" }));
-    await waitFor(() => expect(mocked.getGroceryList).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mocked.getGroceries).toHaveBeenCalledTimes(1));
     // Home's count is the same list, already in memory.
     await user.click(screen.getByRole("link", { name: "This week" }));
-    expect(mocked.getGroceryList).toHaveBeenCalledTimes(1);
+    expect(mocked.getGroceries).toHaveBeenCalledTimes(1);
   });
 
   it("opens the page in the link", async () => {
