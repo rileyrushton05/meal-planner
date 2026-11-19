@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from app.models import (
+    Category,
     DayOfWeek,
     Ingredient,
     Meal,
@@ -54,7 +55,11 @@ def day_assignment(plan: WeeklyPlan) -> DayAssignment:
 
 def grocery_line(item: GroceryItem) -> GroceryLine:
     return GroceryLine(
-        name=item.name, qty=item.qty, unit=item.unit, display=item.display_qty
+        name=item.name,
+        qty=item.qty,
+        unit=item.unit,
+        display=item.display_qty,
+        category=Category(item.category) if item.category else None,
     )
 
 

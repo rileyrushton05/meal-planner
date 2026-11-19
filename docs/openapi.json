@@ -1690,6 +1690,19 @@
         "title": "AppState",
         "description": "Everything the UI needs for one week, in a single response.\n\nThe point of this endpoint is latency: the Streamlit version issued a\nseparate query per section on every interaction, which is unnoticeable\nagainst a local file and painful across a network. One request, one\nround trip."
       },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "produce",
+          "meat",
+          "dairy",
+          "bakery",
+          "pantry",
+          "frozen"
+        ],
+        "title": "Category",
+        "description": "Where an item is in a supermarket, so a grocery list can follow the\naisles. Declaration order is shopping order."
+      },
       "Confidence": {
         "type": "string",
         "enum": [
@@ -1951,6 +1964,16 @@
           "display": {
             "type": "string",
             "title": "Display"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1958,10 +1981,11 @@
           "name",
           "qty",
           "unit",
-          "display"
+          "display",
+          "category"
         ],
         "title": "GroceryLine",
-        "description": "One shopping line. qty stays numeric so clients can sort or price it."
+        "description": "One shopping line. qty stays numeric so clients can sort or price it;\ncounted things arrive already rounded up to whole ones."
       },
       "GuestStart": {
         "properties": {

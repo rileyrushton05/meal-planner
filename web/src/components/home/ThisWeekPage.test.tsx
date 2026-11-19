@@ -217,8 +217,8 @@ describe("the numbers", () => {
     renderHome({
       plan: [{ day: "Monday", meal_id: 1, servings: 4 }],
       groceries: [
-        { name: "Beef mince", qty: 500, unit: "g", display: "500 g" },
-        { name: "Tortillas", qty: 8, unit: "", display: "8" },
+        { name: "Beef mince", qty: 500, unit: "g", display: "500 g", category: null },
+        { name: "Tortillas", qty: 8, unit: "", display: "8", category: null },
       ],
     });
     expect(stat(/^To buy/)).toHaveTextContent("2items");

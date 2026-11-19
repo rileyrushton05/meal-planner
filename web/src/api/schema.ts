@@ -645,6 +645,13 @@ export interface components {
             templates: components["schemas"]["TemplateRead"][];
         };
         /**
+         * Category
+         * @description Where an item is in a supermarket, so a grocery list can follow the
+         *     aisles. Declaration order is shopping order.
+         * @enum {string}
+         */
+        Category: "produce" | "meat" | "dairy" | "bakery" | "pantry" | "frozen";
+        /**
          * Confidence
          * @enum {string}
          */
@@ -735,7 +742,8 @@ export interface components {
         };
         /**
          * GroceryLine
-         * @description One shopping line. qty stays numeric so clients can sort or price it.
+         * @description One shopping line. qty stays numeric so clients can sort or price it;
+         *     counted things arrive already rounded up to whole ones.
          */
         GroceryLine: {
             /** Name */
@@ -746,6 +754,7 @@ export interface components {
             unit: string;
             /** Display */
             display: string;
+            category: components["schemas"]["Category"] | null;
         };
         /**
          * GuestStart
@@ -2210,5 +2219,6 @@ type ReadonlyArray<T> = [
 ] extends [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
+export const categoryValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Category"]> = ["produce", "meat", "dairy", "bakery", "pantry", "frozen"];
 export const confidenceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Confidence"]> = ["high", "medium", "low"];
 export const dayOfWeekValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DayOfWeek"]> = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

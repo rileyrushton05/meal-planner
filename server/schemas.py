@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import DayOfWeek
+from app.models import Category, DayOfWeek
 from app.parsing import Confidence
 
 
@@ -221,12 +221,16 @@ class PlanSuggestions(ResponseSchema):
 
 
 class GroceryLine(ResponseSchema):
-    """One shopping line. qty stays numeric so clients can sort or price it."""
+    """One shopping line. qty stays numeric so clients can sort or price it;
+    counted things arrive already rounded up to whole ones."""
 
     name: str
     qty: float
     unit: str
     display: str
+    #: The aisle, from the catalogue; null for an ingredient it does not know.
+    #: Lines arrive in aisle order (the order of `Category`), unknown last.
+    category: Category | None
 
 
 class TemplateIngredientRead(ResponseSchema):

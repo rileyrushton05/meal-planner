@@ -5,6 +5,7 @@ import type { GroceryLine } from "@/api/types";
 import { AppLink } from "@/components/AppLink";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useBasket } from "@/hooks/useBasket";
+import { byAisle, listAsText } from "@/lib/aisles";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -18,9 +19,9 @@ interface Props {
 const keyOf = (line: GroceryLine) => `${line.name}|${line.unit}`;
 
 /**
- * The week's shopping, made for the shop: tick an item and it drops into
- * the basket below, so the next thing to find is always at the top, and
- * "how much is left" is one number.
+ * The week's shopping, made for the shop: grouped by aisle, so the list is
+ * walked once; tick an item and it drops into the basket below, so the next
+ * thing to find is always at the top, and "how much is left" is one number.
  */
 export function GroceryTab({ weekStart, lines, plannedDays }: Props) {
   const basket = useBasket(weekStart);
@@ -58,8 +59,12 @@ export function GroceryTab({ weekStart, lines, plannedDays }: Props) {
     );
   }
 
-  const toGet = lines.filter((line) => !basket.keys.has(keyOf(line)));
-  const inBasket = lines.filter((line) => basket.keys.has(keyOf(line)));
+  // In aisle order, so the next item down the list is the next one along
+  // the shop, and focus moves the way the eye does.
+  const ordered = byAisle(lines).flatMap((aisle) => aisle.lines);
+  const toGet = ordered.filter((line) => !basket.keys.has(keyOf(line)));
+  const inBasket = ordered.filter((line) => basket.keys.has(keyOf(line)));
+  const aisles = byAisle(toGet);
   const done = inBasket.length;
 
   const toggle = (line: GroceryLine) => {
@@ -72,14 +77,11 @@ export function GroceryTab({ weekStart, lines, plannedDays }: Props) {
     basket.toggle(key);
   };
 
-  const asText = (of: readonly GroceryLine[]) =>
-    of.map((line) => `- ${line.name}: ${line.display}`).join("\n");
-
   // What is left is what someone else at the shop needs; before anything is
   // ticked, that is the whole list.
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(asText(toGet));
+      await navigator.clipboard.writeText(listAsText(toGet));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -89,7 +91,7 @@ export function GroceryTab({ weekStart, lines, plannedDays }: Props) {
   };
 
   const download = () => {
-    const url = URL.createObjectURL(new Blob([asText(lines)], { type: "text/plain" }));
+    const url = URL.createObjectURL(new Blob([listAsText(ordered)], { type: "text/plain" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = `grocery-list-${weekStart}.txt`;
@@ -179,7 +181,25 @@ export function GroceryTab({ weekStart, lines, plannedDays }: Props) {
               {toGet.length}
             </span>
           </h2>
-          {toGet.length ? (
+          {aisles.length > 1 ? (
+            <div className="mt-2 divide-y overflow-hidden rounded-xl border bg-card">
+              {aisles.map((aisle) => {
+                const headingId = `aisle-${aisle.category ?? "other"}`;
+                return (
+                  <div key={headingId} role="group" aria-labelledby={headingId}>
+                    <h3
+                      id={headingId}
+                      className="border-b bg-muted/40 px-4 py-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+                    >
+                      {aisle.label}
+                    </h3>
+                    <ul className="divide-y">{aisle.lines.map((line) => row(line, false))}</ul>
+                  </div>
+                );
+              })}
+            </div>
+          ) : toGet.length ? (
+            // One aisle (or none the catalogue knows): a heading would say nothing.
             <ul className="mt-2 divide-y overflow-hidden rounded-xl border bg-card">
               {toGet.map((line) => row(line, false))}
             </ul>

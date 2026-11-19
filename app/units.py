@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 #: Metric mass and volume only. tsp/tbsp/cup vary by region (an Australian
 #: cup is 250 ml, a US cup ~237 ml), so converting them would produce a
 #: silently wrong number; leaving them alone merely fails to merge.
@@ -79,6 +81,45 @@ _SINGULAR = {
     "tubs": "tub",
     "cartons": "carton",
 }
+
+
+#: Units bought whole: a plain count ("2 onions") and the things that come
+#: one at a time. Half a lettuce, from a recipe for four planned for two, is
+#: still one lettuce at the shop. Measures (cups, pinches, handfuls) and
+#: metric amounts are left as they are.
+_BOUGHT_WHOLE = frozenset(
+    {
+        "",
+        "cloves",
+        "slices",
+        "rashers",
+        "stalks",
+        "sticks",
+        "sprigs",
+        "bunches",
+        "cans",
+        "jars",
+        "packets",
+        "bottles",
+        "punnets",
+        "bags",
+        "tubs",
+        "cartons",
+    }
+)
+
+
+def to_buy(qty: float, unit: str) -> float:
+    """How much to buy of an amount needed: counted things round up to a
+    whole one ("0.5" lettuce -> 1, "1.5" onions -> 2); anything else is
+    unchanged.
+
+    The small allowance keeps a sum that floating point left a hair over a
+    whole number (3 x 0.1 x 10) from becoming one more than was needed.
+    """
+    if unit.strip().lower() not in _BOUGHT_WHOLE:
+        return qty
+    return float(max(1, math.ceil(qty - 1e-9)))
 
 
 def format_amount(qty: float, unit: str) -> str:

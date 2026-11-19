@@ -124,13 +124,15 @@ ingredient. You check each line, then the meal is created in one request.
   saves as you go, with undo. "Fill empty days" plans the meals you haven't
   cooked for longest in one click (one Undo puts them back), and "copy last
   week" carries a week forward.
-- **Grocery list:** everything planned for the week, totalled. Metric mass
-  and volume (mg/g/kg, ml/L) convert to a common unit before merging, and
-  quantities scale when a day cooks for more or fewer than the recipe. Tick
-  things off as they go in the basket and copy what's left, or download the
-  whole list.
+- **Grocery list:** everything planned for the week, totalled and grouped
+  by aisle in the order a shop is walked. Metric mass and volume (mg/g/kg,
+  ml/L) convert to a common unit before merging, quantities scale when a day
+  cooks for more or fewer than the recipe, and counted things round up to
+  whole ones once totalled (half a lettuce on two nights is one lettuce).
+  Tick things off as they go in the basket and copy what's left, or download
+  the whole list.
 - **An ingredient catalogue** links ingredients to about 80 common grocery
-  items by name or alias, ready for grouping the list by aisle.
+  items by name or alias, which is how the list knows each one's aisle.
 - **Your data is yours:** download all of it as JSON, or delete the account
   and everything in it, from the Account page.
 - **Phone and desktop, light and dark.**
@@ -213,7 +215,7 @@ Four changes, in order of how much they bought:
 3. **One transaction per request.** Each repository used to open its own
    session, so a request touching three of them paid three BEGIN/COMMIT
    pairs: 1.5 s of the original 3.4 s was transaction overhead alone.
-4. **One query, not N.** The grocery list is a single four-table join rather
+4. **One query, not N.** The grocery list is a single five-table join rather
    than a query per meal and per ingredient.
 
 The frontend loads a week in one request and works from memory afterwards, so

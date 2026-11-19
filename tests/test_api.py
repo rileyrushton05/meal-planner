@@ -414,6 +414,31 @@ def test_grocery_list_scales_and_merges(client):
     assert lines[0]["display"] == "200 g"
 
 
+def test_grocery_list_says_the_aisle_and_buys_counted_things_whole(client):
+    # The API loads the catalogue as it starts, so Lettuce is known.
+    meal = _create_meal(client, "Caesar Salad", servings=4)
+    client.post(
+        f"/api/meals/{meal['id']}/ingredients",
+        json={"name": "Lettuce", "qty": 1, "unit": ""},
+    )
+    client.put(
+        f"/api/plan/{MONDAY.isoformat()}",
+        json={"days": [{"day": "Monday", "meal_id": meal["id"], "servings": 2}]},
+    )
+
+    lines = client.get(f"/api/grocery-list/{MONDAY.isoformat()}").json()
+
+    assert lines == [
+        {
+            "name": "Lettuce",
+            "qty": 1,
+            "unit": "",
+            "display": "1",
+            "category": "produce",
+        }
+    ]
+
+
 # ------------------------------------------------------------------ state
 
 

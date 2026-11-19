@@ -500,15 +500,16 @@ class WeeklyPlanRepository(_Repository):
 
     def ingredient_rows_for_week(
         self, week_start_date: date
-    ) -> list[tuple[str, float, str, int | None, int]]:
-        """Every planned ingredient for a week: name, qty, unit, then the
-        planned and recipe serving counts.
+    ) -> list[tuple[str, float, str, int | None, int, str | None]]:
+        """Every planned ingredient for a week: name, qty, unit, the planned
+        and recipe serving counts, and the aisle (the catalogue item's
+        category; None for an ingredient the catalogue does not know).
 
         One join rather than a query per meal and per ingredient, which cost
         48 statements for a full week - free on SQLite, ~2.4s over a network.
 
         SQLAlchemy's own select, because SQLModel's typed overloads stop at
-        four columns and this needs five.
+        four columns and this needs six.
         """
         statement = (
             sa_select(
@@ -517,11 +518,15 @@ class WeeklyPlanRepository(_Repository):
                 col(MealIngredient.unit),
                 col(WeeklyPlan.servings),
                 col(Meal.servings),
+                col(CatalogItem.category),
             )
             .select_from(WeeklyPlan)
             .join(Meal, col(Meal.id) == col(WeeklyPlan.meal_id))
             .join(MealIngredient, col(MealIngredient.meal_id) == col(Meal.id))
             .join(Ingredient, col(Ingredient.id) == col(MealIngredient.ingredient_id))
+            .outerjoin(
+                CatalogItem, col(CatalogItem.id) == col(Ingredient.catalog_item_id)
+            )
             .where(
                 col(WeeklyPlan.user_id) == self._user_id,
                 col(WeeklyPlan.week_start_date) == week_start_date,
