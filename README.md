@@ -57,9 +57,13 @@ planned.
   device brings it back.
 - **This week** opens on tonight's meal and what it needs, tomorrow's, and
   how much of the week is planned.
-- **Meals** with a serving size and ingredients, with autocomplete over
-  ingredients already used. Names match ignoring case, so "Eggs" and "eggs"
-  stay one item rather than splitting the shopping list.
+- **Meals** with a serving size and ingredients. **Paste a recipe's whole
+  ingredient list** and each line is read for you ("1 x 400 g can chopped
+  tomatoes" is 400 g of Diced Tomatoes, "2-3 garlic cloves" is 3 cloves),
+  shown to check and correct, then saved in one request. Or add them one at
+  a time, with autocomplete that fills in the usual unit. Names match
+  ignoring case and units are stored one way ("clove", "Cloves"), so "Eggs"
+  and "eggs" stay one item rather than splitting the shopping list.
 - **About 40 templates** of common meals, ingredients filled in, added in
   one click.
 - **Weekly plan:** pick a meal and servings for each day of any week; it
@@ -148,7 +152,7 @@ Four changes, in order of how much they bought:
 1. **Colocation.** Functions run in `syd1`, next to the `ap-southeast-2`
    database and the person using it. Previously the request crossed the
    Pacific twice. A round trip fell from 325 ms to 41 ms.
-2. **Fetch only what changed.** Meals, templates and ingredient names do not
+2. **Fetch only what changed.** Meals, templates and ingredient suggestions do not
    vary by week, so changing week asks for the plan alone. Weeks already
    visited are served from memory and issue no request at all.
 3. **One transaction per request.** Each repository used to open its own
@@ -190,6 +194,7 @@ the-fridge-door/
 │   ├── catalog.py          #   Ingredient catalogue: loading, matching, syncing
 │   ├── catalog.csv         #   The catalogue itself: items, aisles, aliases
 │   ├── parsing.py          #   Reading a typed line: "1 x 400 g can tomatoes"
+│   ├── suggestions.py      #   Ingredient autocomplete, with the usual unit
 │   ├── templates.py        #   Starter meals
 │   ├── samples.py          #   What a new guest starts with
 │   ├── readiness.py        #   The database checks behind /health/ready

@@ -12,6 +12,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import DayOfWeek
+from app.parsing import Confidence
 
 
 class RequestSchema(BaseModel):
@@ -97,6 +98,68 @@ class IngredientUpdate(RequestSchema):
     unit: str = Field(default="", max_length=50)
 
 
+#: The most lines read or saved at once. A long recipe has 30; this bounds
+#: the work one request can ask for.
+MAX_INGREDIENT_LINES = 100
+#: The longest line read. Matches the longest ingredient name, so whatever
+#: a line reads as can be saved.
+MAX_LINE_LENGTH = 200
+
+
+class IngredientList(RequestSchema):
+    """A meal's whole ingredient list, replacing the one it has."""
+
+    ingredients: list[IngredientAdd] = Field(max_length=MAX_INGREDIENT_LINES)
+
+
+class IngredientText(RequestSchema):
+    """Ingredient lines as a person typed or pasted them, one per line."""
+
+    text: str = Field(max_length=MAX_INGREDIENT_LINES * (MAX_LINE_LENGTH + 2))
+
+    @field_validator("text")
+    @classmethod
+    def _bounded(cls, value: str) -> str:
+        lines = value.splitlines()
+        if sum(1 for line in lines if line.strip()) > MAX_INGREDIENT_LINES:
+            raise ValueError(f"Paste up to {MAX_INGREDIENT_LINES} lines at a time.")
+        for number, line in enumerate(lines, start=1):
+            if len(line.strip()) > MAX_LINE_LENGTH:
+                raise ValueError(
+                    f"Line {number} is longer than {MAX_LINE_LENGTH} characters."
+                )
+        return value
+
+
+class ParsedIngredient(ResponseSchema):
+    """One line as read, for a person to check before it is saved."""
+
+    #: The line as given, spacing tidied.
+    text: str
+    #: None when no amount could be read.
+    qty: float | None
+    unit: str
+    #: The catalogue item's name when matched; otherwise the line's words.
+    name: str
+    #: How it is prepared or described ("finely diced"). Not saved.
+    prep: str
+    catalog_item: str | None
+    confidence: Confidence
+    #: Why the confidence is not high, as sentences to show.
+    warnings: list[str]
+
+
+class ParsedIngredients(ResponseSchema):
+    lines: list[ParsedIngredient]
+
+
+class IngredientSuggestion(ResponseSchema):
+    """A name the ingredient field offers, and the unit to fill in with it."""
+
+    name: str
+    unit: str
+
+
 class _DayFields(BaseModel):
     """One day of a week. A null meal_id clears the day."""
 
@@ -157,7 +220,9 @@ class AppState(ResponseSchema):
 
     week_start: date
     meals: list[MealRead]
-    ingredient_names: list[str]
+    #: For the ingredient field: the user's own ingredients, then catalogue
+    #: items they have not used yet.
+    ingredient_suggestions: list[IngredientSuggestion]
     plan: list[DayAssignment]
     templates: list[TemplateRead]
 

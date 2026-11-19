@@ -46,6 +46,11 @@ unscoped, and someone else's meal answers 404, never 403.
   Guest sessions and "email already taken" answers are capped per network
   per hour. Emails and IP addresses are stored only as keyed hashes, and
   the address comes from the platform's header, never one a client can set.
+- **Bounded work:** reading pasted ingredients takes at most 100 lines of
+  200 characters, and the parser runs in time linear in the line (a test
+  feeds it adversarial 10,000-character lines), so no request can make it
+  work hard. It is rules, not a language model: nothing to prompt-inject,
+  and no paid API for a caller to run up.
 - **Every route needs a session:** a test walks the OpenAPI document and
   checks that every data route (all of `/api/` but signing in and out)
   answers 401 without one, so a new route cannot ship open. The one

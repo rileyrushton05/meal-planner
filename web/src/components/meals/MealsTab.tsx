@@ -79,6 +79,8 @@ export function MealsTab({ state, pending, ...props }: Props) {
             onAddIngredient={props.onAddIngredient}
             onUpdateIngredient={props.onUpdateIngredient}
             onRemoveIngredient={props.onRemoveIngredient}
+            onReadIngredients={props.onReadIngredients}
+            onReplaceIngredients={props.onReplaceIngredients}
           />
         ) : (
           <div className="rounded-xl border border-dashed p-10 text-center">

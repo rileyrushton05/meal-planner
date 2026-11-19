@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { makeMeal } from "@/test/factories";
 
-import { formatAmount, formatQty, scaledIngredients } from "./quantities";
+import { formatAmount, formatQty, sameUnit, scaledIngredients } from "./quantities";
 
 describe("formatQty", () => {
   it.each([
@@ -18,6 +18,30 @@ describe("formatQty", () => {
   it("leaves no stray space after a count", () => {
     expect(formatAmount(2, "")).toBe("2");
     expect(formatAmount(250, "g")).toBe("250 g");
+  });
+
+  it.each([
+    [1, "cloves", "1 clove"],
+    [2, "cloves", "2 cloves"],
+    [1, "pinches", "1 pinch"],
+    [0.5, "cups", "0.5 cups"],
+    [1.001, "cans", "1 can"],
+    [1, "kg", "1 kg"],
+  ])("writes %s %s as %s", (qty, unit, text) => {
+    expect(formatAmount(qty, unit)).toBe(text);
+  });
+});
+
+describe("sameUnit", () => {
+  it("ignores case, spacing and plural", () => {
+    expect(sameUnit("clove", "Cloves")).toBe(true);
+    expect(sameUnit(" g", "g")).toBe(true);
+    expect(sameUnit("", "")).toBe(true);
+  });
+
+  it("keeps different units apart, even of one kind", () => {
+    expect(sameUnit("g", "kg")).toBe(false);
+    expect(sameUnit("", "g")).toBe(false);
   });
 });
 

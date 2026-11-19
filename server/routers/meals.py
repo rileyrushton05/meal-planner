@@ -10,6 +10,7 @@ from server import serializers
 from server.deps import Services, ServicesDep
 from server.schemas import (
     IngredientAdd,
+    IngredientList,
     IngredientUpdate,
     MealCreate,
     MealRead,
@@ -105,6 +106,19 @@ def add_ingredient(
 ) -> MealRead:
     """Attach an ingredient, creating it if the name is new."""
     services.meals.add_ingredient(meal_id, payload.name, payload.qty, payload.unit)
+    return _meal_response(services, meal_id)
+
+
+@router.put("/{meal_id}/ingredients", response_model=MealRead)
+def replace_ingredients(
+    meal_id: int, payload: IngredientList, services: ServicesDep
+) -> MealRead:
+    """Replace a meal's whole ingredient list in one transaction: a pasted
+    list is saved in one request, and either all of it is or none of it.
+    The same ingredient twice in one unit adds up; in two units is 409."""
+    services.meals.replace_ingredients(
+        meal_id, ((item.name, item.qty, item.unit) for item in payload.ingredients)
+    )
     return _meal_response(services, meal_id)
 
 

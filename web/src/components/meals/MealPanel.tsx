@@ -1,7 +1,14 @@
-import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ClipboardList, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
-import type { AppState, IngredientAmount, Meal } from "@/api/types";
+import type {
+  AppState,
+  IngredientAmount,
+  IngredientLine,
+  IngredientSuggestion,
+  Meal,
+  ParsedIngredient,
+} from "@/api/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,12 +24,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDate } from "@/lib/dates";
+import { formatAmount } from "@/lib/quantities";
 
 import { MealAvatar } from "./MealAvatar";
+import { PasteIngredients } from "./PasteIngredients";
 import { plannedDays } from "./planned";
 
-/** Units the grocery list knows how to add up, offered as suggestions. */
-const COMMON_UNITS = ["g", "kg", "ml", "l", "tsp", "tbsp", "cloves"];
+/** Units offered as suggestions, spelled as the server stores them. */
+const COMMON_UNITS = ["g", "kg", "ml", "L", "tsp", "tbsp", "cups", "cloves", "slices", "cans"];
 
 export interface MealPanelActions {
   onUpdate: (id: number, name: string, servings: number) => void;
@@ -30,6 +39,10 @@ export interface MealPanelActions {
   onAddIngredient: (mealId: number, name: string, qty: number, unit: string) => void;
   onUpdateIngredient: (mealId: number, ingredientId: number, qty: number, unit: string) => void;
   onRemoveIngredient: (mealId: number, ingredientId: number) => void;
+  /** Resolve with the lines as read, or null if reading failed. */
+  onReadIngredients: (text: string) => Promise<ParsedIngredient[] | null>;
+  /** Resolve with the saved meal, or null if saving failed. */
+  onReplaceIngredients: (mealId: number, ingredients: IngredientLine[]) => Promise<Meal | null>;
 }
 
 /**
@@ -211,19 +224,30 @@ function Ingredients({
   onAddIngredient,
   onUpdateIngredient,
   onRemoveIngredient,
+  onReadIngredients,
+  onReplaceIngredients,
 }: MealPanelActions & { meal: Meal; state: AppState; pending: boolean }) {
   const count = meal.ingredients.length;
+  const [pasting, setPasting] = useState(false);
 
   return (
     <div className="p-4 sm:p-5">
-      <h3 className="mb-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-        Ingredients{count > 0 && <span className="ml-1.5 tabular-nums">{count}</span>}
-      </h3>
+      <div className="mb-2 flex min-h-8 items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+          Ingredients{count > 0 && <span className="ml-1.5 tabular-nums">{count}</span>}
+        </h3>
+        {!pasting && (
+          <Button variant="ghost" size="sm" onClick={() => setPasting(true)}>
+            <ClipboardList aria-hidden />
+            Paste a list
+          </Button>
+        )}
+      </div>
 
-      {count === 0 ? (
+      {pasting ? null : count === 0 ? (
         <p className="mb-3 text-sm text-muted-foreground">
-          Nothing yet. Each ingredient you add here goes on the grocery list whenever this
-          meal is planned.
+          Nothing yet. Add them one at a time below, or paste the list from a recipe. Each
+          one goes on the grocery list whenever this meal is planned.
         </p>
       ) : (
         <ul className="mb-3 divide-y">
@@ -240,13 +264,38 @@ function Ingredients({
         </ul>
       )}
 
-      <AddIngredient
-        known={state.ingredient_names}
-        pending={pending}
-        // An empty meal has one obvious next step, so be ready for it.
-        autoFocus={count === 0}
-        onAdd={(name, qty, unit) => onAddIngredient(meal.id, name, qty, unit)}
-      />
+      {pasting ? (
+        <PasteIngredients
+          meal={meal}
+          pending={pending}
+          known="known-ingredients"
+          onRead={onReadIngredients}
+          onSave={(ingredients) => onReplaceIngredients(meal.id, ingredients)}
+          onClose={() => setPasting(false)}
+        />
+      ) : (
+        <AddIngredient
+          suggestions={state.ingredient_suggestions}
+          pending={pending}
+          // An empty meal has one obvious next step, so be ready for it.
+          autoFocus={count === 0}
+          onAdd={(name, qty, unit) => onAddIngredient(meal.id, name, qty, unit)}
+        />
+      )}
+
+      {/* Shared by every field below that suggests. Outside the forms' grids:
+          as a grid child, even a hidden datalist picks up the column's
+          spacing and knocks the inputs out of line. */}
+      <datalist id="known-ingredients">
+        {state.ingredient_suggestions.map((s) => (
+          <option key={s.name} value={s.name} />
+        ))}
+      </datalist>
+      <datalist id="common-units">
+        {COMMON_UNITS.map((u) => (
+          <option key={u} value={u} />
+        ))}
+      </datalist>
     </div>
   );
 }
@@ -330,7 +379,7 @@ function IngredientRow({
       >
         <span className="truncate font-medium">{ingredient.name}</span>
         <span className="shrink-0 text-muted-foreground tabular-nums">
-          {ingredient.qty} {ingredient.unit}
+          {formatAmount(ingredient.qty, ingredient.unit)}
         </span>
       </button>
       <Button
@@ -349,14 +398,17 @@ function IngredientRow({
 /**
  * The next ingredient: name, amount, Enter. Afterwards the cursor goes back
  * to the name, so a whole recipe can be typed without touching the mouse.
+ *
+ * Picking a known name fills in the unit it is usually measured in (garlic
+ * in cloves, mince in g), until the person types a unit of their own.
  */
 function AddIngredient({
-  known,
+  suggestions,
   pending,
   autoFocus,
   onAdd,
 }: {
-  known: readonly string[];
+  suggestions: readonly IngredientSuggestion[];
   pending: boolean;
   autoFocus: boolean;
   onAdd: (name: string, qty: number, unit: string) => void;
@@ -364,9 +416,13 @@ function AddIngredient({
   const [name, setName] = useState("");
   const [qty, setQty] = useState("");
   const [unit, setUnit] = useState("");
+  const [unitTyped, setUnitTyped] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
   const quantity = Number(qty);
   const valid = name.trim().length > 0 && quantity > 0;
+  const usual = (value: string) =>
+    suggestions.find((s) => s.name.toLowerCase() === value.trim().toLowerCase());
+  const known = usual(name);
 
   return (
     <form
@@ -377,6 +433,7 @@ function AddIngredient({
         setName("");
         setQty("");
         setUnit("");
+        setUnitTyped(false);
         nameField.current?.focus();
       }}
       className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 rounded-lg border border-dashed p-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_auto]"
@@ -393,7 +450,10 @@ function AddIngredient({
           list="known-ingredients"
           value={name}
           autoFocus={autoFocus}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (!unitTyped) setUnit(usual(e.target.value)?.unit ?? "");
+          }}
           placeholder="e.g. Pasta"
         />
       </div>
@@ -418,28 +478,19 @@ function AddIngredient({
           id="ingredient-unit"
           list="common-units"
           value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          placeholder="g, ml"
+          onChange={(e) => {
+            setUnit(e.target.value);
+            setUnitTyped(true);
+          }}
+          // A known item counted rather than measured: say so, or the empty
+          // field looks like something was missed.
+          placeholder={known && !known.unit && !unitTyped ? "none" : "g, ml"}
         />
       </div>
       <Button type="submit" disabled={pending || !valid} aria-label="Add ingredient">
         <Plus aria-hidden />
         <span className="hidden sm:inline">Add</span>
       </Button>
-
-      {/* Outside the field columns: as a sibling there, even a hidden
-          datalist picks up the column's spacing and knocks the input out of
-          line with its neighbours. */}
-      <datalist id="known-ingredients">
-        {known.map((n) => (
-          <option key={n} value={n} />
-        ))}
-      </datalist>
-      <datalist id="common-units">
-        {COMMON_UNITS.map((u) => (
-          <option key={u} value={u} />
-        ))}
-      </datalist>
     </form>
   );
 }

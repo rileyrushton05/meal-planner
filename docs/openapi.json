@@ -909,6 +909,67 @@
             }
           }
         }
+      },
+      "put": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Replace Ingredients",
+        "description": "Replace a meal's whole ingredient list in one transaction: a pasted\nlist is saved in one request, and either all of it is or none of it.\nThe same ingredient twice in one unit adds up; in two units is 409.",
+        "operationId": "replace_ingredients_api_meals__meal_id__ingredients_put",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Meal Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngredientList"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/meals/{meal_id}/ingredients/{ingredient_id}": {
@@ -1016,6 +1077,58 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/MealRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ingredients/parse": {
+      "post": {
+        "tags": [
+          "ingredients"
+        ],
+        "summary": "Parse Ingredients",
+        "description": "Read pasted lines as amounts, units and names, for a preview. Saves\nnothing: the client sends the checked list to\n`PUT /api/meals/{id}/ingredients`.\n\nNeeds a session like every data route, though it reads no data, so the\nparser is not open to anyone on the internet. The body's size and line\ncount are bounded (IngredientText), so the work is too.",
+        "operationId": "parse_ingredients_api_ingredients_parse_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IngredientText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParsedIngredients"
                 }
               }
             }
@@ -1410,12 +1523,12 @@
             "type": "array",
             "title": "Meals"
           },
-          "ingredient_names": {
+          "ingredient_suggestions": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/IngredientSuggestion"
             },
             "type": "array",
-            "title": "Ingredient Names"
+            "title": "Ingredient Suggestions"
           },
           "plan": {
             "items": {
@@ -1436,12 +1549,21 @@
         "required": [
           "week_start",
           "meals",
-          "ingredient_names",
+          "ingredient_suggestions",
           "plan",
           "templates"
         ],
         "title": "AppState",
         "description": "Everything the UI needs for one week, in a single response.\n\nThe point of this endpoint is latency: the Streamlit version issued a\nseparate query per section on every interaction, which is unnoticeable\nagainst a local file and painful across a network. One request, one\nround trip."
+      },
+      "Confidence": {
+        "type": "string",
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "title": "Confidence"
       },
       "Credentials": {
         "properties": {
@@ -1784,6 +1906,60 @@
         "title": "IngredientAmount",
         "description": "One ingredient attached to a meal, with how much of it."
       },
+      "IngredientList": {
+        "properties": {
+          "ingredients": {
+            "items": {
+              "$ref": "#/components/schemas/IngredientAdd"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Ingredients"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ingredients"
+        ],
+        "title": "IngredientList",
+        "description": "A meal's whole ingredient list, replacing the one it has."
+      },
+      "IngredientSuggestion": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "unit"
+        ],
+        "title": "IngredientSuggestion",
+        "description": "A name the ingredient field offers, and the unit to fill in with it."
+      },
+      "IngredientText": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 20200,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "IngredientText",
+        "description": "Ingredient lines as a person typed or pasted them, one per line."
+      },
       "IngredientUpdate": {
         "properties": {
           "qty": {
@@ -1881,6 +2057,87 @@
         ],
         "title": "MealUpdate",
         "description": "Same fields as creation; every one is required on update."
+      },
+      "ParsedIngredient": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "prep": {
+            "type": "string",
+            "title": "Prep"
+          },
+          "catalog_item": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Item"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "qty",
+          "unit",
+          "name",
+          "prep",
+          "catalog_item",
+          "confidence",
+          "warnings"
+        ],
+        "title": "ParsedIngredient",
+        "description": "One line as read, for a person to check before it is saved."
+      },
+      "ParsedIngredients": {
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ParsedIngredient"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lines"
+        ],
+        "title": "ParsedIngredients"
       },
       "PasswordConfirmation": {
         "properties": {

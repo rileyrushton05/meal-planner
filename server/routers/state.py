@@ -6,11 +6,12 @@ from datetime import date
 
 from fastapi import APIRouter
 
+from app.suggestions import ingredient_suggestions
 from app.templates import MEAL_TEMPLATES
 from server import serializers
 from server.deps import ServicesDep
 from server.routers.plans import monday_of
-from server.schemas import AppState
+from server.schemas import AppState, IngredientSuggestion
 
 router = APIRouter(prefix="/api", tags=["state"])
 
@@ -31,12 +32,17 @@ def get_state(services: ServicesDep, week: date | None = None) -> AppState:
         for meal, ingredients in services.meals.list_all_with_ingredients()
     ]
 
+    suggestions = ingredient_suggestions(
+        (ingredient.name for ingredient in services.ingredients.list_all()),
+        ((line.name, line.unit) for meal in meals for line in meal.ingredients),
+    )
+
     return AppState(
         week_start=week_start,
         meals=meals,
-        ingredient_names=sorted(
-            {ingredient.name for ingredient in services.ingredients.list_all()}
-        ),
+        ingredient_suggestions=[
+            IngredientSuggestion(name=s.name, unit=s.unit) for s in suggestions
+        ],
         plan=[
             serializers.day_assignment(plan)
             for plan in services.plans.get_week(week_start)
