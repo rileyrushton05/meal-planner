@@ -113,12 +113,14 @@ export function NewMealPanel({
           </div>
         </div>
 
+        {/* grid-cols-1 rather than an implicit column, which grows to its
+            longest line and pushed a phone-width panel off screen. */}
         {templates.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             No templates match “{query.trim()}”.
           </p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {templates.map((template) => {
               const added = existing.has(template.name.toLowerCase());
               return (

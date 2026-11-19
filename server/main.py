@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import is_local_database
+from app.jobs import sync_catalog
 from app.migrations import upgrade_to_head
 from server.deps import get_database
 from server.headers import SecurityHeadersMiddleware
@@ -48,10 +50,14 @@ def _auto_migrate_enabled(url: str) -> bool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Bring the schema up to date once, before serving any request."""
-    url = get_database().url
-    if _auto_migrate_enabled(url):
-        upgrade_to_head(url)
+    """Bring the schema and the catalogue up to date once, before serving
+    any request. Only where migrations run automatically (a database on
+    this machine); deployments load the catalogue with the sync job."""
+    database = get_database()
+    if _auto_migrate_enabled(database.url):
+        upgrade_to_head(database.url)
+        with database.transaction() as session:
+            sync_catalog(session, now=datetime.now(UTC), dry_run=False)
     yield
 
 

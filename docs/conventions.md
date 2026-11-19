@@ -163,6 +163,13 @@ Tests: `web/src/hooks/usePlanner.test.ts`, `web/src/hooks/useAccount.test.tsx`,
   the target first, and resolve the URL like migrations do, so a database
   not on this machine must be named in the shell. Jobs take the time as an
   argument and support `--dry-run`.
+- Shared reference data (the ingredient catalogue) lives in the repository
+  as a reviewable CSV, loaded by an idempotent sync job running as the
+  owner, never typed into a migration. Its tables have no row security and
+  the runtime role may only `SELECT` them; they are listed in
+  `REFERENCE_TABLES`, which readiness and `tests/test_rls.py` use. Matching
+  against it is literal (case and spacing ignored): a spelling worth
+  matching is added as an alias, never guessed.
 - Get-or-create is `INSERT ... ON CONFLICT DO NOTHING` then a lookup, never
   "look, then insert": two requests creating the same row at once both
   succeed instead of one hitting the unique index, which in Postgres also

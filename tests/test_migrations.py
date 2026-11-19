@@ -265,3 +265,41 @@ def test_downgrade_refuses_once_two_accounts_own_data(database):
 
     with pytest.raises(RuntimeError, match="2 accounts own data"):
         downgrade_to(url, BEFORE)
+
+
+# --- Every migration, from empty ---------------------------------------------------
+
+
+def _index_names(engine: Engine) -> set[str]:
+    """Read from the catalogue tables directly: SQLAlchemy's reflection skips
+    expression indexes on SQLite, which are exactly the ones at risk."""
+    sql = (
+        "SELECT name FROM sqlite_master WHERE type = 'index'"
+        if engine.dialect.name == "sqlite"
+        else "SELECT indexname FROM pg_indexes WHERE schemaname = 'public'"
+    )
+    return {name for (name,) in _rows(engine, sql)}
+
+
+def test_every_index_the_models_declare_survives_the_migrations(database):
+    """SQLite alters a table by rebuilding it, and the rebuild silently
+    drops expression indexes, such as the case-insensitive unique names. Two
+    migrations lost one that way before this test existed."""
+    from sqlmodel import SQLModel
+
+    import app.models  # noqa: F401  (registers every table)
+
+    url, engine = database
+    declared = {
+        index.name
+        for table in SQLModel.metadata.sorted_tables
+        for index in table.indexes
+    }
+
+    upgrade_to(url, "head")
+    assert declared - _index_names(engine) == set()
+
+    # And through the newest migration's downgrade and back.
+    downgrade_to(url, "-1")
+    upgrade_to(url, "head")
+    assert declared - _index_names(engine) == set()

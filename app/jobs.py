@@ -1,6 +1,7 @@
 """Scheduled maintenance, run by GitHub Actions (.github/workflows/jobs.yml).
 
     python -m app.jobs purge-guests [--dry-run]
+    python -m app.jobs sync-catalog [--dry-run] [--show-unmatched]
 
 One entry point for every scheduled job, so each is run, logged and
 targeted the same way; the price refresh (Phase 4) joins it here. Jobs
@@ -24,10 +25,16 @@ from sqlmodel import Session
 
 from app import events
 from app.auth import SESSION_LIFETIME
+from app.catalog import load_catalog, plan_sync
 from app.db import Database
 from app.migrations import resolve_migration_url
 from app.ratelimit import STALE_AFTER
-from app.repositories import RateLimitRepository, SessionRepository, UserRepository
+from app.repositories import (
+    CatalogRepository,
+    RateLimitRepository,
+    SessionRepository,
+    UserRepository,
+)
 
 #: A guest not seen for this long is deleted with everything they made.
 #: Matches the session lifetime: by then their cookie no longer works, so
@@ -58,15 +65,57 @@ def purge_guests(session: Session, *, now: datetime, dry_run: bool) -> Purged:
     )
 
 
-Job = Callable[..., Purged]
-JOBS: dict[str, Job] = {"purge-guests": purge_guests}
+@dataclass(frozen=True, slots=True)
+class CatalogSynced:
+    added: int
+    updated: int
+    removed: int
+    linked: int
+    unlinked: int
+    unmatched: int
+    #: The names behind `unmatched`. Users' own words, so never logged or
+    #: printed by default: Actions logs of a public repository are public.
+    unmatched_names: tuple[str, ...] = ()
+
+
+def sync_catalog(session: Session, *, now: datetime, dry_run: bool) -> CatalogSynced:
+    """Load app/catalog.csv: add, update and remove items to match it,
+    rebuild the aliases, and relink every ingredient. Running it twice
+    changes nothing the second time."""
+    catalog = CatalogRepository(session)
+    plan = plan_sync(load_catalog(), catalog.items(), catalog.every_ingredient())
+    if not dry_run:
+        catalog.apply(plan)
+    return CatalogSynced(
+        added=len(plan.add),
+        updated=len(plan.update),
+        removed=len(plan.remove),
+        linked=sum(1 for key in plan.relink.values() if key is not None),
+        unlinked=sum(1 for key in plan.relink.values() if key is None),
+        unmatched=len(plan.unmatched),
+        unmatched_names=tuple(sorted(set(plan.unmatched), key=str.casefold)),
+    )
+
+
+Job = Callable[..., Purged | CatalogSynced]
+JOBS: dict[str, Job] = {"purge-guests": purge_guests, "sync-catalog": sync_catalog}
+#: How each job reports: (done, dry run, the event field for its counts).
+_REPORTS = {
+    "purge-guests": ("Removed", "Would remove", "removed"),
+    "sync-catalog": ("Synced", "Would sync", "changed"),
+}
 
 
 def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.jobs")
     parser.add_argument("job", choices=sorted(JOBS))
     parser.add_argument(
-        "--dry-run", action="store_true", help="count what would go; delete nothing"
+        "--dry-run", action="store_true", help="count what would change; change nothing"
+    )
+    parser.add_argument(
+        "--show-unmatched",
+        action="store_true",
+        help="sync-catalog: list ingredient names no item matched (local use only)",
     )
     args = parser.parse_args(argv)
 
@@ -79,11 +128,18 @@ def main(argv: list[str] | None = None, *, now: datetime | None = None) -> int:
     with Database(url).transaction() as session:
         result = JOBS[args.job](session, now=moment, dry_run=args.dry_run)
 
-    verb = "Would remove" if args.dry_run else "Removed"
-    counts = asdict(result)
+    done, would, field = _REPORTS[args.job]
+    counts = {kind: n for kind, n in asdict(result).items() if isinstance(n, int)}
     summary = ", ".join(f"{n} {kind.replace('_', ' ')}" for kind, n in counts.items())
-    print(f"{verb}: {summary}")
-    events.record(args.job.replace("-", "_"), removed=counts, dry_run=args.dry_run)
+    print(f"{would if args.dry_run else done}: {summary}")
+    if args.show_unmatched and isinstance(result, CatalogSynced):
+        for name in result.unmatched_names:
+            print(f"  not in the catalogue: {name}")
+    event = args.job.replace("-", "_")
+    if field == "removed":
+        events.record(event, removed=counts, dry_run=args.dry_run)
+    else:
+        events.record(event, changed=counts, dry_run=args.dry_run)
     return 0
 
 

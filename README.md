@@ -35,7 +35,7 @@ What the app keeps, in plain terms (also in the app, at `/privacy`):
 - **Start straight away** — a first visit opens as a guest with three sample meals planned on four days of the current week, so the grocery list has something to show. Signing up keeps everything; logging in on another device brings it back.
 - **Meals** — create meals with a serving size, edit or delete them (deleting asks for confirmation, since it also removes ingredients and unassigns planned days).
 - **Ingredients** — attach quantities and units, with autocomplete over ingredients already used. Names match case-insensitively, so "Eggs" and "eggs" stay one item rather than splitting the shopping list.
-- **Quick-add templates** — ~18 common meals with typical ingredients already filled in.
+- **Quick-add templates** — about 40 common meals with typical ingredients already filled in, all written in the ingredient catalogue's names.
 - **Weekly plan** — assign a meal and serving count to each day of any week. Weeks are independent, so planning ahead never overwrites the current one, and "copy previous week" carries assignments forward.
 - **Grocery list** — totals everything planned for a week. Metric mass and volume (mg/g/kg, ml/L) convert to a common unit before merging, and quantities scale when a day's servings differ from the recipe. Copy it or download it as `.txt`.
 
@@ -181,6 +181,8 @@ the-fridge-door/
 │   ├── planner.py        #   GroceryItem + weekly aggregation
 │   ├── units.py          #   Unit conversion and quantity formatting
 │   ├── templates.py      #   Starter meals
+│   ├── catalog.py        #   Ingredient catalogue: loading, matching, syncing
+│   ├── catalog.csv       #   The catalogue itself: items, aisles, aliases
 │   ├── migrations.py     #   Applies Alembic migrations from Python
 │   └── exceptions.py     #   Domain errors carrying user-facing messages
 ├── server/               # FastAPI application
