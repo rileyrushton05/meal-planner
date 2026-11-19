@@ -1,13 +1,15 @@
-import { CalendarDays, House, ShoppingBasket, UserRound, UtensilsCrossed } from "lucide-react";
+import { CalendarDays, House, ShieldCheck, ShoppingBasket, UserRound, UtensilsCrossed } from "lucide-react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useEffect } from "react";
 
 import { AccountBar } from "@/components/AccountBar";
 import { AccountPage } from "@/components/AccountPage";
+import { AppLink } from "@/components/AppLink";
 import { AppShell, type NavPage } from "@/components/AppShell";
 import { GroceryTab } from "@/components/GroceryTab";
 import { ThisWeekPage } from "@/components/home/ThisWeekPage";
 import { MealsTab } from "@/components/meals/MealsTab";
+import { PrivacyPage } from "@/components/PrivacyPage";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { WeeklyPlanTab } from "@/components/WeeklyPlanTab";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,7 @@ const PAGES: readonly Page[] = [
   { id: "plan", path: "/plan", label: "Plan", title: "Weekly plan", icon: CalendarDays, weekly: true, nav: true },
   { id: "groceries", path: "/groceries", label: "Groceries", title: "Groceries", icon: ShoppingBasket, weekly: true, nav: true },
   { id: "account", path: "/account", label: "Account", title: "Account", icon: UserRound, weekly: false, nav: false },
+  { id: "privacy", path: "/privacy", label: "Privacy", title: "Privacy", icon: ShieldCheck, weekly: false, nav: false },
 ];
 const NAV_PAGES = PAGES.filter((page) => page.nav);
 
@@ -80,6 +83,14 @@ export default function App() {
             <span className="hidden text-xs text-muted-foreground lg:inline">Theme</span>
             <ThemeSwitcher theme={theme.theme} onChange={theme.setTheme} />
           </div>
+          {/* On a phone, the Account page links here instead: the top bar has no room. */}
+          <AppLink
+            to="/privacy"
+            aria-current={page.id === "privacy" ? "page" : undefined}
+            className="hidden text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline aria-[current=page]:text-foreground lg:block"
+          >
+            Privacy
+          </AppLink>
         </>
       }
     >
@@ -133,7 +144,10 @@ export default function App() {
         {/* Only the first load has nothing to show. Later loads keep the
             current week on screen and dim it, so changing week does not blank
             the page. */}
-        {!planner.state ? (
+        {/* Needs nothing from the API, so it shows even when that is down. */}
+        {page.id === "privacy" ? (
+          <PrivacyPage />
+        ) : !planner.state ? (
           <p role="status" className="py-10 text-sm text-muted-foreground">
             Loading…
           </p>

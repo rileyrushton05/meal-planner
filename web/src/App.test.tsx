@@ -249,6 +249,33 @@ describe("the account", () => {
   });
 });
 
+describe("the privacy page", () => {
+  it("is linked from the sidebar and the account page, and named in the tab", async () => {
+    const user = userEvent.setup();
+    await renderApp("/account");
+
+    await user.click(screen.getByRole("link", { name: "How The Fridge Door handles your data" }));
+    expect(heading()).toHaveTextContent("Privacy");
+    expect(document.title).toBe("Privacy · The Fridge Door");
+    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("aria-current", "page");
+
+    const nav = screen.getByRole("navigation", { name: "Pages" });
+    expect(within(nav).queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
+  });
+
+  it("shows even when the app's data cannot load", async () => {
+    mocked.getState.mockRejectedValue(new Error("Database unavailable."));
+    window.history.replaceState(null, "", "/privacy");
+    render(
+      <QueryClientProvider client={createQueryClient({ retry: false })}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByRole("region", { name: "What's stored" })).toBeInTheDocument();
+  });
+});
+
 describe("the account page", () => {
   it("is reached from the account controls, not the main navigation", async () => {
     const user = userEvent.setup();

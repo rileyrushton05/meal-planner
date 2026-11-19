@@ -2,6 +2,7 @@ import { Download, KeyRound, LoaderCircle, Trash2, TriangleAlert, UserRound } fr
 import { type FormEvent, type ReactNode, useState } from "react";
 
 import type { Account, AccountExport } from "@/api/types";
+import { AppLink } from "@/components/AppLink";
 import { RecoveryCodeDialog } from "@/components/RecoveryCodeDialog";
 import {
   AlertDialog,
@@ -59,6 +60,11 @@ export function AccountPage({ account, onReplaceRecoveryCode, onExport, onDelete
       )}
       <ExportSection onExport={onExport} />
       <DeleteSection account={account} onDelete={onDelete} />
+      <p className="text-sm text-muted-foreground">
+        <AppLink to="/privacy" className="underline underline-offset-4 hover:text-foreground">
+          How The Fridge Door handles your data
+        </AppLink>
+      </p>
     </div>
   );
 }

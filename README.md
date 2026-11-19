@@ -10,6 +10,26 @@ over a FastAPI backend, backed by Postgres.
 [**meal-planner-liard-ten.vercel.app**](https://meal-planner-liard-ten.vercel.app/)
 — frontend and API deployed together on Vercel, with the database on Neon.
 
+## Privacy
+
+What the app keeps, in plain terms (also in the app, at `/privacy`):
+
+- **An account** is an email, used only as a login name and never sent
+  anything, plus a password and a recovery code stored only as one-way
+  hashes (argon2id and SHA-256). Then the meals, ingredients and planned
+  days you add.
+- **A session** is a cookie; the database holds only its hash, and it ends
+  after 30 days. **A guest** has no email or password at all, and a guest
+  unused for 30 days is deleted with everything in it by a nightly job.
+- **Logs** never record email addresses, passwords, tokens or IP addresses.
+  Login throttling counts keyed hashes of the email and network, never the
+  values, and forgets them after a day. **Error reports** (Sentry, EU) carry
+  what broke, never who.
+- **Where:** Vercel and Neon in Sydney; Sentry in the EU. No ads, analytics
+  or third-party scripts.
+- **Leaving:** the Account page downloads everything as JSON and deletes the
+  account, and everything it owns, at once, signing out every device.
+
 ## Features
 
 - **Start straight away** — a first visit opens as a guest with three sample meals planned on four days of the current week, so the grocery list has something to show. Signing up keeps everything; logging in on another device brings it back.
