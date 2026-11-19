@@ -11,8 +11,13 @@ import { buttonVariants } from "@/components/ui/button";
  */
 export function PrivacyPage() {
   return (
-    <div className="max-w-2xl space-y-6">
-      <section aria-labelledby="in-short" className="flex gap-4 rounded-xl border bg-card p-5">
+    // One column, at a comfortable reading width, until there is room for
+    // two: what is stored on the left, everything else on the right.
+    <div className="grid max-w-2xl grid-cols-1 gap-6 xl:max-w-none xl:grid-cols-2 xl:items-start">
+      <section
+        aria-labelledby="in-short"
+        className="flex gap-4 rounded-xl border bg-card p-5 xl:col-span-2"
+      >
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary-subtle text-primary-subtle-foreground">
           <ShieldCheck aria-hidden className="size-5" />
         </span>
@@ -52,43 +57,45 @@ export function PrivacyPage() {
         />
       </Section>
 
-      <Section id="logs" title="Logs and error reports">
-        <p>
-          The app's logs never record email addresses, passwords, session tokens or IP addresses.
-          To slow down password guessing, repeated failed logins are counted against a scrambled
-          form of your email and network, never the values themselves, and the count is deleted
-          after a day.
-        </p>
-        <p>
-          When something breaks, an error report goes to Sentry with what went wrong, never who it
-          happened to: no email, cookies, IP address or anything you typed.
-        </p>
-      </Section>
+      <div className="grid gap-6">
+        <Section id="logs" title="Logs and error reports">
+          <p>
+            The app's logs never record email addresses, passwords, session tokens or IP addresses.
+            To slow down password guessing, repeated failed logins are counted against a scrambled
+            form of your email and network, never the values themselves, and the count is deleted
+            after a day.
+          </p>
+          <p>
+            When something breaks, an error report goes to Sentry with what went wrong, never who it
+            happened to: no email, cookies, IP address or anything you typed.
+          </p>
+        </Section>
 
-      <Section id="where" title="Where it's kept">
-        <Facts
-          items={[
-            ["The app and your data", "Vercel and Neon, both in Sydney."],
-            ["Error reports", "Sentry, in the EU."],
-          ]}
-        />
-        <p>
-          Vercel also keeps short-lived request logs of its own as part of running the site, and
-          Neon keeps a short restore history of the database in case it needs recovering.
-        </p>
-      </Section>
+        <Section id="where" title="Where it's kept">
+          <Facts
+            items={[
+              ["The app and your data", "Vercel and Neon, both in Sydney."],
+              ["Error reports", "Sentry, in the EU."],
+            ]}
+          />
+          <p>
+            Vercel also keeps short-lived request logs of its own as part of running the site, and
+            Neon keeps a short restore history of the database in case it needs recovering.
+          </p>
+        </Section>
 
-      <Section id="leaving" title="Taking it with you, or deleting it">
-        <p>
-          On the Account page you can download everything you've made as a file, and delete your
-          account. Deleting removes your account and everything in it straight away, and signs out
-          every device. Guests can delete their session the same way.
-        </p>
-        <AppLink to="/account" className={buttonVariants({ variant: "outline" })}>
-          Go to your account
-          <ArrowRight aria-hidden />
-        </AppLink>
-      </Section>
+        <Section id="leaving" title="Taking it with you, or deleting it">
+          <p>
+            On the Account page you can download everything you've made as a file, and delete your
+            account. Deleting removes your account and everything in it straight away, and signs out
+            every device. Guests can delete their session the same way.
+          </p>
+          <AppLink to="/account" className={buttonVariants({ variant: "outline" })}>
+            Go to your account
+            <ArrowRight aria-hidden />
+          </AppLink>
+        </Section>
+      </div>
     </div>
   );
 }

@@ -38,8 +38,13 @@ interface Props {
 export function AccountPage({ account, onReplaceRecoveryCode, onExport, onDelete }: Props) {
   const hasLogin = !account.is_guest && account.email !== null;
   return (
-    <div className="max-w-2xl space-y-6">
-      <section aria-labelledby="who" className="flex items-center gap-4 rounded-xl border bg-card p-5">
+    // One column, at a comfortable reading width, until there is room for
+    // two. Deleting stays last, across the bottom when it is on its own.
+    <div className="grid max-w-2xl grid-cols-1 gap-6 xl:max-w-none xl:grid-cols-2">
+      <section
+        aria-labelledby="who"
+        className="flex items-center gap-4 rounded-xl border bg-card p-5 xl:col-span-2"
+      >
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-primary-subtle text-primary-subtle-foreground">
           <UserRound aria-hidden className="size-5" />
         </span>
@@ -59,8 +64,12 @@ export function AccountPage({ account, onReplaceRecoveryCode, onExport, onDelete
         <RecoverySection hasCode={account.has_recovery_code} onReplace={onReplaceRecoveryCode} />
       )}
       <ExportSection onExport={onExport} />
-      <DeleteSection account={account} onDelete={onDelete} />
-      <p className="text-sm text-muted-foreground">
+      <DeleteSection
+        account={account}
+        onDelete={onDelete}
+        className={hasLogin ? "xl:col-span-2" : undefined}
+      />
+      <p className="text-sm text-muted-foreground xl:col-span-2">
         <AppLink to="/privacy" className="underline underline-offset-4 hover:text-foreground">
           How The Fridge Door handles your data
         </AppLink>
@@ -173,13 +182,17 @@ function RecoverySection({
   );
 }
 
-function DeleteSection({ account, onDelete }: Pick<Props, "account" | "onDelete">) {
+function DeleteSection({
+  account,
+  onDelete,
+  className,
+}: Pick<Props, "account" | "onDelete"> & { className?: string }) {
   const needsPassword = !account.is_guest && account.email !== null;
 
   return (
     <section
       aria-labelledby="delete-account"
-      className="space-y-3 rounded-xl border border-destructive/40 bg-card p-5"
+      className={cn("space-y-3 rounded-xl border border-destructive/40 bg-card p-5", className)}
     >
       <h2 id="delete-account" className="text-base font-semibold">
         {needsPassword ? "Delete your account" : "Delete everything"}
