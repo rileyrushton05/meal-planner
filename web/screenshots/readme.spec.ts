@@ -9,7 +9,7 @@
 
 import { fileURLToPath } from "node:url";
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 const OUT = fileURLToPath(new URL("../../docs/images/", import.meta.url));
 
@@ -84,12 +84,36 @@ async function setTheme(page: Page, theme: "light" | "dark") {
   await page.evaluate((theme) => localStorage.setItem("theme", theme), theme);
 }
 
-async function shoot(page: Page, name: string) {
+async function shoot(page: Page, name: string, only?: Locator) {
   // Let fonts load and transitions finish, so nothing is caught mid-fade.
   await page.evaluate(() => document.fonts.ready);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(300);
-  await page.screenshot({ path: `${OUT}${name}.png`, animations: "disabled" });
+  const options = { path: `${OUT}${name}.png`, animations: "disabled" } as const;
+  await (only ? only.screenshot(options) : page.screenshot(options));
+}
+
+/**
+ * The recipe-import preview, read from the end-to-end tests' fixture site
+ * (playwright.config.ts) by the real server. The fixture is served from
+ * 127.0.0.1, an odd thing to show in a README, so the page it came from is
+ * shown as recipes.example, a domain reserved for examples. Nothing else
+ * in the response is touched.
+ */
+async function importARecipe(page: Page, week: string) {
+  await page.route("**/api/recipes/import", async (route) => {
+    const response = await route.fetch();
+    const recipe = await response.json();
+    await route.fulfill({
+      response,
+      json: { ...recipe, url: "https://recipes.example/weeknight-beef-ragu/" },
+    });
+  });
+  await page.goto(`/meals?week=${week}&meal=new`);
+  await page.getByLabel("Recipe link").fill("http://127.0.0.1:4175/ragu.html");
+  await page.getByRole("button", { name: "Import" }).click();
+  await expect(page.getByRole("heading", { name: "Check the recipe" })).toBeVisible();
+  await page.unroute("**/api/recipes/import");
 }
 
 test("README screenshots", async ({ page }) => {
@@ -102,6 +126,9 @@ test("README screenshots", async ({ page }) => {
     await page.goto(`/?week=${week}`);
     await expect(page.getByText("Tonight", { exact: false }).first()).toBeVisible();
     await shoot(page, `this-week-${theme}`);
+
+    await importARecipe(page, week);
+    await shoot(page, `import-${theme}`, page.getByRole("region", { name: "New meal" }));
 
     if (theme === "light") continue;
 

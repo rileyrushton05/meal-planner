@@ -43,7 +43,7 @@ Naan,bakery,count,90,naan bread|garlic naan
 Tortillas,bakery,count,40,tortilla|wraps|wrap|flour tortillas
 Rice,pantry,mass,,white rice|jasmine rice|basmati rice|long grain rice
 Arborio Rice,pantry,mass,,risotto rice
-Pasta,pantry,mass,,spaghetti|penne|fusilli|dried pasta
+Pasta,pantry,mass,,spaghetti|penne|fusilli|dried pasta|pappardelle|fettuccine|linguine|rigatoni|tagliatelle|macaroni|farfalle|orecchiette|ditalini|orzo|spaghettini|bucatini
 Lasagne Sheets,pantry,mass,,lasagna sheets|lasagne|lasagna
 Rice Noodles,pantry,mass,,rice noodle|rice stick noodles|pad thai noodles
 Egg Noodles,pantry,mass,,egg noodle
@@ -53,6 +53,7 @@ Croutons,pantry,mass,,crouton
 Taco Shells,pantry,count,12,taco shell|hard taco shells
 Corn Chips,pantry,mass,,tortilla chips|corn chip
 Tomato Passata,pantry,mass,,passata
+Tomato Paste,pantry,mass,,tomato puree|tomato purée|tomato concentrate
 Diced Tomatoes,pantry,mass,,tinned tomatoes|canned tomatoes|chopped tomatoes|crushed tomatoes|tinned tomato|canned tomato|chopped tomato|crushed tomato|diced tomato
 Kidney Beans,pantry,mass,,red kidney beans
 Tuna,pantry,mass,,tinned tuna|canned tuna|tuna in springwater
