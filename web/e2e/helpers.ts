@@ -92,13 +92,35 @@ export async function planDay(page: Page, day: string, meal: string) {
   await expect(search).toHaveCount(0);
 }
 
+/** The row at the foot of the sidebar that says who you are, and opens the
+ * account menu. */
+function whoAmI(page: Page) {
+  return page.getByRole("button", { name: /signed in$/i });
+}
+
+/** Choose an item from the account menu. */
+async function fromAccountMenu(page: Page, item: "Account" | "Privacy" | "Log in" | "Log out") {
+  await whoAmI(page).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: item }).click();
+}
+
+export const openAccountPage = (page: Page) => fromAccountMenu(page, "Account");
+export const logOut = (page: Page) => fromAccountMenu(page, "Log out");
+
+/** A guest: invited to keep their meals, and named as not signed in. */
+export async function expectGuest(page: Page) {
+  await expect(page.getByRole("region", { name: "Keep your meals" })).toBeVisible();
+  await expect(whoAmI(page)).toHaveAccessibleName("Guest Not signed in");
+}
+
 /**
- * Signed in to this account, not a guest: there is a way to log out, and
- * the Account link names the email on hover.
+ * Signed in to this account, not a guest: no invitation to sign up, and
+ * the row that says so names the email on hover.
  */
 export async function expectSignedInAs(page: Page, email: string) {
-  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Account" })).toHaveAttribute("title", email);
+  await expect(whoAmI(page)).toHaveAccessibleName("Account Signed in");
+  await expect(whoAmI(page)).toHaveAttribute("title", email);
+  await expect(page.getByRole("region", { name: "Keep your meals" })).toHaveCount(0);
 }
 
 /**

@@ -4,13 +4,12 @@ import { useEffect } from "react";
 
 import { AccountBar } from "@/components/AccountBar";
 import { AccountPage } from "@/components/AccountPage";
-import { AppLink } from "@/components/AppLink";
 import { AppShell, type NavPage } from "@/components/AppShell";
 import { GroceryTab } from "@/components/GroceryTab";
 import { ThisWeekPage } from "@/components/home/ThisWeekPage";
 import { MealsTab } from "@/components/meals/MealsTab";
 import { PrivacyPage } from "@/components/PrivacyPage";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { WeeklyPlanTab } from "@/components/WeeklyPlanTab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,40 +69,30 @@ export default function App() {
       pages={NAV_PAGES}
       current={page.id}
       footer={
-        <>
-          <AccountBar
-            account={session.account}
-            onSignUp={session.signUp}
-            onLogIn={session.logIn}
-            onRecover={session.recover}
-            onLogOut={session.logOut}
-            loggingOut={session.loggingOut}
-          />
-          {/* On a phone, the Account page links here instead: the top bar has no room. */}
-          <AppLink
-            to="/privacy"
-            aria-current={page.id === "privacy" ? "page" : undefined}
-            className="hidden text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline aria-[current=page]:text-foreground lg:block"
-          >
-            Privacy
-          </AppLink>
-          {/* Last, so on a desktop the theme sits in the bottom-left corner. */}
-          <div className="flex items-center justify-between gap-3">
-            <span className="hidden text-xs text-muted-foreground lg:inline">Theme</span>
-            <ThemeSwitcher theme={theme.theme} onChange={theme.setTheme} />
-          </div>
-        </>
+        <AccountBar
+          account={session.account}
+          onSignUp={session.signUp}
+          onLogIn={session.logIn}
+          onRecover={session.recover}
+          onLogOut={session.logOut}
+          loggingOut={session.loggingOut}
+        />
       }
     >
-      <header className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b px-4 py-3 sm:px-6 lg:px-8">
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+      {/* The title and the theme on one line; the week picker between them
+          when there is room, and on a line of its own on a phone. */}
+      <header className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-3 border-b px-4 py-3 sm:px-6 lg:px-8">
+        <h1 className="mr-auto text-xl font-semibold tracking-tight">{title}</h1>
         {page.weekly && (
-          <WeekPicker
-            week={planner.week}
-            onChange={planner.setWeek}
-            disabled={planner.loading}
-          />
+          <div className="order-last basis-full md:order-none md:basis-auto">
+            <WeekPicker
+              week={planner.week}
+              onChange={planner.setWeek}
+              disabled={planner.loading}
+            />
+          </div>
         )}
+        <ThemeToggle theme={theme.theme} onChange={theme.setTheme} />
       </header>
 
       {/* Aligned with the title above, not centred, and as wide as the
