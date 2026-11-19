@@ -23,7 +23,6 @@ data/
 .env
 .env.*
 !.env.example
-.streamlit/secrets.toml
 
 # Editor/OS
 .DS_Store

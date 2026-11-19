@@ -10,7 +10,7 @@ export default mergeConfig(
       globals: true,
       setupFiles: ["./src/test/setup.ts"],
       // Playwright's specs run in a real browser, not here.
-      exclude: [...configDefaults.exclude, "e2e/**"],
+      exclude: [...configDefaults.exclude, "e2e/**", "screenshots/**"],
       css: false,
       coverage: {
         provider: "v8",
