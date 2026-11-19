@@ -51,6 +51,19 @@ unscoped, and someone else's meal answers 404, never 403.
   feeds it adversarial 10,000-character lines), so no request can make it
   work hard. It is rules, not a language model: nothing to prompt-inject,
   and no paid API for a caller to run up.
+- **Recipe import fetches a page someone else chose**, so it is held to
+  rules against server-side request forgery (`app/fetch.py`): http and
+  https only, no credentials in the URL; every address the name resolves
+  to must be public (not private, loopback, link-local, carrier-grade NAT,
+  reserved or multicast, IPv4-mapped IPv6 included); the connection goes
+  to the address that was checked, with the name sent as Host and as the
+  TLS server name, so a second DNS answer cannot swap in an internal one
+  (DNS rebinding) while the certificate is still verified; each of up to
+  five redirects is checked again; 5 seconds in all, 2 MB at most, HTML
+  only. Each user may import 20 recipes an hour, failures included. The
+  page is read for its schema.org JSON-LD by a scan that is linear in its
+  length: `html.parser` took minutes on two megabytes of `<`, and a test
+  now holds every hostile shape found to under a second.
 - **Every route needs a session:** a test walks the OpenAPI document and
   checks that every data route (all of `/api/` but signing in and out)
   answers 401 without one, so a new route cannot ship open. The one

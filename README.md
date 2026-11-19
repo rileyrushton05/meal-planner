@@ -60,7 +60,10 @@ planned.
 - **Meals** with a serving size and ingredients. **Paste a recipe's whole
   ingredient list** and each line is read for you ("1 x 400 g can chopped
   tomatoes" is 400 g of Diced Tomatoes, "2-3 garlic cloves" is 3 cloves),
-  shown to check and correct, then saved in one request. Or add them one at
+  shown to check and correct, then saved in one request. **Or import a
+  recipe from its link:** the page's recipe data gives the name, servings
+  and ingredients, checked the same way before the meal is created. Or add
+  them one at
   a time, with autocomplete that fills in the usual unit. Names match
   ignoring case and units are stored one way ("clove", "Cloves"), so "Eggs"
   and "eggs" stay one item rather than splitting the shopping list.
@@ -195,6 +198,9 @@ the-fridge-door/
 │   ├── catalog.csv         #   The catalogue itself: items, aisles, aliases
 │   ├── parsing.py          #   Reading a typed line: "1 x 400 g can tomatoes"
 │   ├── suggestions.py      #   Ingredient autocomplete, with the usual unit
+│   ├── fetch.py            #   Fetching a linked page, safely (SSRF guards)
+│   ├── recipes.py          #   Finding the schema.org Recipe in a page
+│   ├── importing.py        #   Recipe import: limit, fetch, read, parse
 │   ├── templates.py        #   Starter meals
 │   ├── samples.py          #   What a new guest starts with
 │   ├── readiness.py        #   The database checks behind /health/ready

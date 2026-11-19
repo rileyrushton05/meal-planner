@@ -17,6 +17,10 @@ configuration and the client uses relative paths.
     emails and addresses with it.
   - `SENTRY_DSN` (optional): turns on error tracking. Without it nothing is
     reported.
+  - Never `MEAL_PLANNER_IMPORT_UNCHECKED_ORIGIN`. It exempts one origin
+    from recipe import's public-address check, for the end-to-end tests'
+    local fixture site, and is ignored whenever `VERCEL` is set; it does
+    not belong in any Vercel environment regardless.
 - **Region:** `syd1`, set in `vercel.json`. Functions default to `iad1`
   (Virginia); running them next to the database is worth more than any
   application-level optimisation here (see

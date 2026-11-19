@@ -591,7 +591,7 @@
           "meals"
         ],
         "summary": "Create Meal",
-        "description": "Create a meal. Duplicate names are rejected with 409.",
+        "description": "Create a meal, with its ingredients if any are given (an imported\nrecipe), all in one transaction. Duplicate names are rejected with 409.",
         "operationId": "create_meal_api_meals_post",
         "requestBody": {
           "content": {
@@ -1129,6 +1129,58 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ParsedIngredients"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recipes/import": {
+      "post": {
+        "tags": [
+          "recipes"
+        ],
+        "summary": "Import Recipe",
+        "description": "Read the recipe on a web page, for a preview. Saves nothing: the\nchecked recipe is created with `POST /api/meals`.\n\nThe server fetches the page, so the URL is held to app/fetch.py's\nrules (public addresses only, checked after every redirect; 5 seconds;\n2 MB; HTML), and each user may import 20 an hour. A page that cannot be\nread is 422 recipe-import, with a sentence saying why.",
+        "operationId": "import_recipe_api_recipes_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipeLink"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportedRecipe"
                 }
               }
             }
@@ -1849,6 +1901,45 @@
         "title": "GuestStart",
         "description": "Optional: ask for sample meals, planned in the week containing this\ndate (the browser's own week, since the server cannot know its zone)."
       },
+      "ImportedRecipe": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "servings": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servings"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ParsedIngredient"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "servings",
+          "url",
+          "lines"
+        ],
+        "title": "ImportedRecipe",
+        "description": "A recipe read from a page, for a person to check before it becomes a\nmeal. Nothing is saved until they do."
+      },
       "IngredientAdd": {
         "properties": {
           "name": {
@@ -1994,6 +2085,14 @@
             "minimum": 1.0,
             "title": "Servings",
             "default": 1
+          },
+          "ingredients": {
+            "items": {
+              "$ref": "#/components/schemas/IngredientAdd"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Ingredients"
           }
         },
         "additionalProperties": false,
@@ -2001,7 +2100,8 @@
         "required": [
           "name"
         ],
-        "title": "MealCreate"
+        "title": "MealCreate",
+        "description": "A new meal, optionally with its ingredients: an imported recipe is\ncreated whole, in one request and one transaction."
       },
       "MealRead": {
         "properties": {
@@ -2055,8 +2155,7 @@
         "required": [
           "name"
         ],
-        "title": "MealUpdate",
-        "description": "Same fields as creation; every one is required on update."
+        "title": "MealUpdate"
       },
       "ParsedIngredient": {
         "properties": {
@@ -2154,6 +2253,23 @@
           "password"
         ],
         "title": "PasswordConfirmation"
+      },
+      "RecipeLink": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "RecipeLink",
+        "description": "A recipe page to import."
       },
       "Recovery": {
         "properties": {

@@ -16,6 +16,7 @@ import type {
   AppState,
   DayAssignmentWrite,
   GroceryLine,
+  ImportedRecipe,
   IngredientLine,
   Meal,
   ParsedIngredient,
@@ -188,10 +189,25 @@ export const api = {
    *  changing week fetches this rather than the whole of getState. */
   getPlan: (week: string): Promise<WeekPlan> => request(`/api/plan/${week}`),
 
-  createMeal: (name: string, servings: number): Promise<Meal> =>
+  /** A new meal, with its ingredients if given: an imported recipe is
+   *  created whole, in one request. */
+  createMeal: (
+    name: string,
+    servings: number,
+    ingredients: IngredientLine[] = [],
+  ): Promise<Meal> =>
     request("/api/meals", {
       method: "POST",
-      body: JSON.stringify({ name, servings }),
+      body: JSON.stringify(
+        ingredients.length ? { name, servings, ingredients } : { name, servings },
+      ),
+    }),
+
+  /** Read the recipe on a web page, for a preview. Saves nothing. */
+  importRecipe: (url: string): Promise<ImportedRecipe> =>
+    request("/api/recipes/import", {
+      method: "POST",
+      body: JSON.stringify({ url }),
     }),
 
   createMealFromTemplate: (templateName: string): Promise<Meal> =>

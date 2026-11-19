@@ -292,7 +292,8 @@ export interface paths {
         put?: never;
         /**
          * Create Meal
-         * @description Create a meal. Duplicate names are rejected with 409.
+         * @description Create a meal, with its ingredients if any are given (an imported
+         *     recipe), all in one transaction. Duplicate names are rejected with 409.
          */
         post: operations["create_meal_api_meals_post"];
         delete?: never;
@@ -419,6 +420,32 @@ export interface paths {
          *     count are bounded (IngredientText), so the work is too.
          */
         post: operations["parse_ingredients_api_ingredients_parse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/recipes/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Recipe
+         * @description Read the recipe on a web page, for a preview. Saves nothing: the
+         *     checked recipe is created with `POST /api/meals`.
+         *
+         *     The server fetches the page, so the URL is held to app/fetch.py's
+         *     rules (public addresses only, checked after every redirect; 5 seconds;
+         *     2 MB; HTML), and each user may import 20 an hour. A page that cannot be
+         *     read is 422 recipe-import, with a sentence saying why.
+         */
+        post: operations["import_recipe_api_recipes_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -703,6 +730,21 @@ export interface components {
             /** Sample Week */
             sample_week?: string | null;
         };
+        /**
+         * ImportedRecipe
+         * @description A recipe read from a page, for a person to check before it becomes a
+         *     meal. Nothing is saved until they do.
+         */
+        ImportedRecipe: {
+            /** Name */
+            name: string;
+            /** Servings */
+            servings: number | null;
+            /** Url */
+            url: string;
+            /** Lines */
+            lines: components["schemas"]["ParsedIngredient"][];
+        };
         /** IngredientAdd */
         IngredientAdd: {
             /** Name */
@@ -765,7 +807,11 @@ export interface components {
              */
             unit: string;
         };
-        /** MealCreate */
+        /**
+         * MealCreate
+         * @description A new meal, optionally with its ingredients: an imported recipe is
+         *     created whole, in one request and one transaction.
+         */
         MealCreate: {
             /** Name */
             name: string;
@@ -774,6 +820,8 @@ export interface components {
              * @default 1
              */
             servings: number;
+            /** Ingredients */
+            ingredients?: components["schemas"]["IngredientAdd"][];
         };
         /**
          * MealRead
@@ -789,10 +837,7 @@ export interface components {
             /** Ingredients */
             ingredients: components["schemas"]["IngredientAmount"][];
         };
-        /**
-         * MealUpdate
-         * @description Same fields as creation; every one is required on update.
-         */
+        /** MealUpdate */
         MealUpdate: {
             /** Name */
             name: string;
@@ -832,6 +877,14 @@ export interface components {
         PasswordConfirmation: {
             /** Password */
             password: string;
+        };
+        /**
+         * RecipeLink
+         * @description A recipe page to import.
+         */
+        RecipeLink: {
+            /** Url */
+            url: string;
         };
         /**
          * Recovery
@@ -1810,6 +1863,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ParsedIngredients"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    import_recipe_api_recipes_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecipeLink"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportedRecipe"];
                 };
             };
             /** @description Validation Error */

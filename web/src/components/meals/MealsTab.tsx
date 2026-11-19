@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 
-import type { AppState, Meal } from "@/api/types";
+import type { AppState, ImportedRecipe, IngredientLine, Meal } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { useSearchParam } from "@/lib/location";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,13 @@ interface Props extends Omit<MealPanelActions, "onUpdate" | "onDelete"> {
   state: AppState;
   pending: boolean;
   /** Resolve with the new meal (or null if it failed), so it can be opened. */
-  onAddMeal: (name: string, servings: number) => Promise<Meal | null>;
+  onAddMeal: (
+    name: string,
+    servings: number,
+    ingredients?: IngredientLine[],
+  ) => Promise<Meal | null>;
+  /** Resolve with the recipe read from the page, or null if it could not be. */
+  onImportRecipe: (url: string) => Promise<ImportedRecipe | null>;
   onAddFromTemplate: (name: string) => Promise<Meal | null>;
   onUpdateMeal: MealPanelActions["onUpdate"];
   onDeleteMeal: MealPanelActions["onDelete"];
@@ -65,6 +71,12 @@ export function MealsTab({ state, pending, ...props }: Props) {
             onBack={state.meals.length > 0 ? backToList : undefined}
             onCreate={async (name, servings) => open(await props.onAddMeal(name, servings))}
             onCreateFromTemplate={async (name) => open(await props.onAddFromTemplate(name))}
+            onImport={props.onImportRecipe}
+            onCreateImported={async (name, servings, ingredients) => {
+              const meal = await props.onAddMeal(name, servings, ingredients);
+              open(meal);
+              return meal;
+            }}
           />
         ) : view === "meal" && selected ? (
           <MealPanel

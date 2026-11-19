@@ -34,7 +34,6 @@ The rules, and why:
 from __future__ import annotations
 
 import hmac
-import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -60,8 +59,10 @@ from app.ratelimit import (
     TAKEN_EMAILS_PER_NETWORK,
     RateLimiter,
     Rule,
+    describe_wait,
     network_of,
     subject,
+    wait_seconds,
 )
 from app.repositories import SessionRepository, UserRepository
 from app.samples import add_samples
@@ -479,7 +480,9 @@ class AuthService:
                         "login_throttle_started",
                         rule=rule.scope,
                         subject=key,
-                        retry_after_seconds=_seconds(bucket.blocked_until - self._now),
+                        retry_after_seconds=wait_seconds(
+                            bucket.blocked_until - self._now
+                        ),
                     )
             failed_for = persisted_id(user) if user is not None else None
             if outcome is None:
@@ -508,10 +511,10 @@ class AuthService:
             "throttled",
             rule=rule.scope,
             subject=key,
-            retry_after_seconds=_seconds(wait),
+            retry_after_seconds=wait_seconds(wait),
         )
         raise TooManyAttemptsError(
-            message.format(wait=_describe(wait)), retry_after=wait
+            message.format(wait=describe_wait(wait)), retry_after=wait
         )
 
     def _new_credentials(self, email: str, password: str) -> tuple[str, str]:
@@ -547,19 +550,6 @@ def _current(user: User, token_hash: str) -> CurrentUser:
         token_hash=token_hash,
         has_recovery_code=user.recovery_code_hash is not None,
     )
-
-
-def _seconds(wait: timedelta) -> int:
-    return max(1, math.ceil(wait.total_seconds()))
-
-
-def _describe(wait: timedelta) -> str:
-    """'45 seconds', '1 minute', '15 minutes': rounded up, never 'now'."""
-    seconds = _seconds(wait)
-    if seconds < 60:
-        return f"{seconds} second{'s' if seconds != 1 else ''}"
-    minutes = math.ceil(seconds / 60)
-    return f"{minutes} minute{'s' if minutes != 1 else ''}"
 
 
 def _as_utc(moment: datetime) -> datetime:

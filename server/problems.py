@@ -35,6 +35,7 @@ from app.exceptions import (
     MealPlannerError,
     NoLoginError,
     NotSignedInError,
+    RecipeImportError,
     TooManyAttemptsError,
     UnitMismatchError,
     WeakPasswordError,
@@ -113,6 +114,7 @@ _DOMAIN_ERRORS: dict[type[MealPlannerError], tuple[int, str]] = {
     AlreadySignedUpError: (409, "already-signed-up"),
     NoLoginError: (409, "no-login"),
     TooManyAttemptsError: (429, "too-many-attempts"),
+    RecipeImportError: (422, "recipe-import"),
 }
 
 #: Shown for any validation failure. Field-level reasons are in

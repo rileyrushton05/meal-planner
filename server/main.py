@@ -34,6 +34,7 @@ from server.routers import (
     meals,
     monitoring,
     plans,
+    recipes,
     state,
 )
 
@@ -104,5 +105,6 @@ app.include_router(account.router)
 app.include_router(state.router)
 app.include_router(meals.router)
 app.include_router(ingredients.router)
+app.include_router(recipes.router)
 app.include_router(plans.router)
 app.include_router(monitoring.router)

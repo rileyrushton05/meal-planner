@@ -2,7 +2,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AppState, IngredientLine, Meal, ParsedIngredient } from "@/api/types";
+import type {
+  AppState,
+  ImportedRecipe,
+  IngredientLine,
+  Meal,
+  ParsedIngredient,
+} from "@/api/types";
 import { MealsTab } from "@/components/meals/MealsTab";
 import { makeMeal, makeState, makeTemplate } from "@/test/factories";
 
@@ -11,7 +17,11 @@ function renderTab(state: AppState = makeState(), path = "/meals") {
   const props = {
     state,
     pending: false,
-    onAddMeal: vi.fn(async (): Promise<Meal | null> => null),
+    onAddMeal: vi.fn(
+      async (_name: string, _servings: number, _lines?: IngredientLine[]): Promise<Meal | null> =>
+        null,
+    ),
+    onImportRecipe: vi.fn(async (_url: string): Promise<ImportedRecipe | null> => null),
     onAddFromTemplate: vi.fn(async (): Promise<Meal | null> => null),
     onUpdateMeal: vi.fn(),
     onDeleteMeal: vi.fn(),
@@ -635,5 +645,97 @@ describe("pasting a list", () => {
     expect(screen.queryByLabelText("Paste the ingredient list")).toBeNull();
     expect(screen.getByLabelText("Ingredient")).toBeInTheDocument();
     expect(props.onReadIngredients).not.toHaveBeenCalled();
+  });
+});
+
+describe("importing a recipe from a link", () => {
+  const recipe: ImportedRecipe = {
+    name: "Weeknight Beef Ragu",
+    servings: 6,
+    url: "https://fixture.example/ragu/",
+    lines: [
+      parsed({ text: "500 g beef mince", qty: 500, unit: "g", name: "Beef Mince" }),
+      parsed({ text: "2 garlic cloves", qty: 2, unit: "cloves", name: "Garlic" }),
+      parsed({ text: "Salt, to taste", qty: null, name: "Salt", confidence: "low" }),
+    ],
+  };
+
+  async function importIt(found: ImportedRecipe | null = recipe, meals = [spaghetti]) {
+    const user = userEvent.setup();
+    const rendered = renderTab(makeState({ meals }), "/meals?meal=new");
+    rendered.props.onImportRecipe.mockResolvedValue(found);
+    await user.type(screen.getByLabelText("Recipe link"), found?.url ?? "https://x.example/");
+    await user.click(screen.getByRole("button", { name: "Import" }));
+    return { user, ...rendered };
+  }
+
+  it("reads the page and shows the recipe to check, and nothing else", async () => {
+    const { props } = await importIt();
+
+    expect(props.onImportRecipe).toHaveBeenCalledWith("https://fixture.example/ragu/");
+    expect(await screen.findByRole("heading", { name: "Check the recipe" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Meal name")).toHaveValue("Weeknight Beef Ragu");
+    expect(screen.getByLabelText("Servings")).toHaveValue(6);
+    expect(screen.getByLabelText("Ingredient on line 2")).toHaveValue("Garlic");
+    expect(screen.getByRole("link", { name: /fixture\.example/ })).toHaveAttribute(
+      "href",
+      "https://fixture.example/ragu/",
+    );
+    // The name form and templates step aside while the recipe is checked.
+    expect(screen.queryByRole("button", { name: "Create meal" })).toBeNull();
+    expect(screen.queryByLabelText("Search templates")).toBeNull();
+  });
+
+  it("creates the meal with its checked ingredients in one go, and opens it", async () => {
+    const { user, props } = await importIt();
+    const created = makeMeal({ id: 9, name: "Ragu" });
+    props.onAddMeal.mockResolvedValue(created);
+
+    await user.click(await screen.findByRole("button", { name: "Remove it" }));
+    await user.clear(screen.getByLabelText("Meal name"));
+    await user.type(screen.getByLabelText("Meal name"), "Ragu");
+    await user.click(screen.getByRole("button", { name: "Create meal with 2 ingredients" }));
+
+    expect(props.onAddMeal).toHaveBeenCalledWith("Ragu", 6, [
+      { name: "Beef Mince", qty: 500, unit: "g" },
+      { name: "Garlic", qty: 2, unit: "cloves" },
+    ]);
+    await waitFor(() => expect(selection()).toBe("9"));
+  });
+
+  it("will not create a meal under a name already taken", async () => {
+    const { user } = await importIt({ ...recipe, name: "spaghetti" });
+
+    await user.click(await screen.findByRole("button", { name: "Remove it" }));
+
+    expect(screen.getByText(/You already have a meal called Spaghetti/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Create meal with/ })).toBeDisabled();
+  });
+
+  it("asks for a name and the servings when the page gives neither", async () => {
+    const { user } = await importIt({ ...recipe, name: "", servings: null });
+
+    await user.click(await screen.findByRole("button", { name: "Remove it" }));
+
+    expect(screen.getByText("The page gave no name; give it one.")).toBeInTheDocument();
+    expect(screen.getByText(/didn't say how many it serves/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Servings")).toHaveValue(4);
+    expect(screen.getByRole("button", { name: /^Create meal with/ })).toBeDisabled();
+  });
+
+  it("stays on the link if the page could not be read", async () => {
+    await importIt(null);
+
+    expect(screen.getByLabelText("Recipe link")).toHaveValue("https://x.example/");
+    expect(screen.queryByRole("heading", { name: "Check the recipe" })).toBeNull();
+  });
+
+  it("goes back to the whole page to use another link", async () => {
+    const { user } = await importIt();
+
+    await user.click(await screen.findByRole("button", { name: "Use a different link" }));
+
+    expect(screen.getByLabelText("Recipe link")).toBeInTheDocument();
+    expect(screen.getByLabelText("Search templates")).toBeInTheDocument();
   });
 });

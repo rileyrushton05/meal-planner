@@ -54,12 +54,17 @@ def get_meal(meal_id: int, services: ServicesDep) -> MealRead:
 def create_meal(
     payload: MealCreate, services: ServicesDep, response: Response
 ) -> MealRead:
-    """Create a meal. Duplicate names are rejected with 409."""
-    meal = serializers.meal_read(
-        services.meals.add(payload.name, servings=payload.servings), []
-    )
-    response.headers["Location"] = _location(meal)
-    return meal
+    """Create a meal, with its ingredients if any are given (an imported
+    recipe), all in one transaction. Duplicate names are rejected with 409."""
+    meal = services.meals.add(payload.name, servings=payload.servings)
+    if payload.ingredients:
+        services.meals.replace_ingredients(
+            persisted_id(meal),
+            ((item.name, item.qty, item.unit) for item in payload.ingredients),
+        )
+    created = _meal_response(services, persisted_id(meal))
+    response.headers["Location"] = _location(created)
+    return created
 
 
 @router.post(

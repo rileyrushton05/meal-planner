@@ -5,8 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.parsing import parse_lines
+from server import serializers
 from server.deps import CurrentUserDep
-from server.schemas import IngredientText, ParsedIngredient, ParsedIngredients
+from server.schemas import IngredientText, ParsedIngredients
 
 router = APIRouter(prefix="/api/ingredients", tags=["ingredients"])
 
@@ -25,16 +26,6 @@ def parse_ingredients(
     """
     return ParsedIngredients(
         lines=[
-            ParsedIngredient(
-                text=line.text,
-                qty=line.qty,
-                unit=line.unit,
-                name=line.name,
-                prep=line.prep,
-                catalog_item=line.catalog_item,
-                confidence=line.confidence,
-                warnings=list(line.warnings),
-            )
-            for line in parse_lines(payload.text)
+            serializers.parsed_ingredient(line) for line in parse_lines(payload.text)
         ]
     )
