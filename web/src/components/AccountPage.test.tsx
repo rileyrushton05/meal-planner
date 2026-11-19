@@ -64,7 +64,7 @@ describe("downloading your data", () => {
     expect(props.onExport).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     const link = click.mock.contexts[0] as HTMLAnchorElement;
-    expect(link.download).toMatch(/^meal-planner-export-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(link.download).toMatch(/^the-fridge-door-export-\d{4}-\d{2}-\d{2}\.json$/);
     expect(JSON.parse(await created[0].text())).toEqual(EXPORT);
   });
 

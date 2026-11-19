@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Meal Planner API",
+    title="The Fridge Door API",
     version="1.0.0",
     summary="Plan a week of meals and get a consolidated grocery list.",
     lifespan=lifespan,

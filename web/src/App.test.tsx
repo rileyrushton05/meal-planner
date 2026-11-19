@@ -59,7 +59,7 @@ describe("pages", () => {
 
     expect(heading()).toHaveTextContent("This week");
     expect(currentLink()).toHaveTextContent("This week");
-    expect(document.title).toBe("This week · Meal Planner");
+    expect(document.title).toBe("This week · The Fridge Door");
   });
 
   it("names home for the week it shows", async () => {
@@ -68,7 +68,7 @@ describe("pages", () => {
 
     await user.click(screen.getByRole("button", { name: "Next week" }));
     expect(heading()).toHaveTextContent("Next week");
-    expect(document.title).toBe("Next week · Meal Planner");
+    expect(document.title).toBe("Next week · The Fridge Door");
     // Other pages keep their own names in any week.
     await user.click(screen.getByRole("link", { name: "Plan" }));
     expect(heading()).toHaveTextContent("Weekly plan");

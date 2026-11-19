@@ -67,7 +67,7 @@ def export_account(
             if day.meal_id in names
         ],
     )
-    filename = f"meal-planner-export-{now.date().isoformat()}.json"
+    filename = f"the-fridge-door-export-{now.date().isoformat()}.json"
     return JSONResponse(
         export.model_dump(mode="json"),
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},

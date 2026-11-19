@@ -77,7 +77,7 @@ function ExportSection({ onExport }: Pick<Props, "onExport">) {
       );
       const link = document.createElement("a");
       link.href = url;
-      link.download = `meal-planner-export-${toIso(new Date())}.json`;
+      link.download = `the-fridge-door-export-${toIso(new Date())}.json`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (err) {

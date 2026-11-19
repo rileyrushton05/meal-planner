@@ -198,7 +198,7 @@ def test_the_export_downloads_as_a_file(guest) -> None:
 
     assert response.status_code == 200
     disposition = response.headers["content-disposition"]
-    assert disposition.startswith('attachment; filename="meal-planner-export-')
+    assert disposition.startswith('attachment; filename="the-fridge-door-export-')
     assert disposition.endswith('.json"')
     assert response.json()["account"] == {
         "email": None,

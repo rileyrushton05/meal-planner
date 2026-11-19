@@ -139,7 +139,7 @@ test("take a copy of everything, then delete the account for good", async ({ pag
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download my data" }).click();
   const download = await downloading;
-  expect(download.suggestedFilename()).toMatch(/^meal-planner-export-.*\.json$/);
+  expect(download.suggestedFilename()).toMatch(/^the-fridge-door-export-.*\.json$/);
   const exported = JSON.parse(await readFile(await download.path(), "utf8"));
   expect(exported.account.email).toBe(email);
   expect(exported.meals.map((meal: { name: string }) => meal.name)).toContain(mine);

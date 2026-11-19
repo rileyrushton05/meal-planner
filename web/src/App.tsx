@@ -18,7 +18,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { addDays, formatWeekRange, mondayOf, toIso, weekName } from "@/lib/dates";
 import { navigate, usePathname } from "@/lib/location";
 
-const APP_NAME = "Meal Planner";
+const APP_NAME = "The Fridge Door";
 
 interface Page extends NavPage {
   /** The heading at the top of the page, and the browser tab's title. */

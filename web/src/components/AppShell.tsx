@@ -1,5 +1,4 @@
 import type { LucideIcon } from "lucide-react";
-import { UtensilsCrossed } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { AppLink } from "@/components/AppLink";
@@ -69,11 +68,14 @@ function Brand() {
       to="/"
       className="flex shrink-0 items-center gap-2.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring lg:px-1"
     >
-      <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
-        <UtensilsCrossed className="size-4" aria-hidden />
-      </span>
-      <span className="hidden text-[15px] font-semibold tracking-tight sm:inline">
-        Meal Planner
+      {/* The favicon itself, so the tab and the app always show the same logo. */}
+      <img src="/favicon.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
+      {/* Hidden on a phone to save room, but still the link's name there. */}
+      <span className="sr-only leading-none sm:not-sr-only sm:grid sm:gap-0.5">
+        <span className="text-[9px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
+          The
+        </span>
+        <span className="text-[15px] font-semibold tracking-tight">Fridge Door</span>
       </span>
     </AppLink>
   );

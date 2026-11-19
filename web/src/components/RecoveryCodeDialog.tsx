@@ -54,13 +54,13 @@ export function RecoveryCodeDialog({
   const download = () => {
     if (!code) return;
     const text =
-      `Meal Planner recovery code\n\n${code}\n\n` +
+      `The Fridge Door recovery code\n\n${code}\n\n` +
       "If you forget your password, use this code to set a new one.\n" +
       "It works once; you will be given a new one when you use it.\n";
     const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `meal-planner-recovery-code-${toIso(new Date())}.txt`;
+    link.download = `the-fridge-door-recovery-code-${toIso(new Date())}.txt`;
     link.click();
     URL.revokeObjectURL(url);
   };

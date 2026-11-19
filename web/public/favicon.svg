@@ -1,10 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#10b981"/>
-  <!-- lucide "utensils-crossed" (ISC licence), centred at 16px -->
-  <g transform="translate(4 4)" fill="none" stroke="#022c22" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-    <path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/>
-    <path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/>
-    <path d="m2.1 21.8 6.4-6.3"/>
-    <path d="m19 5-7 7"/>
+  <!-- The Fridge Door: a dinner fork and table knife, crossed, white on green.
+       The sidebar shows this same file, so the tab and the app always match. -->
+  <rect width="32" height="32" rx="8" fill="#059669"/>
+  <g fill="#ffffff">
+    <!-- Fork: four tines, a palm narrowing to the neck, a tapered handle. -->
+    <g transform="rotate(-40 16 16) translate(16 16) scale(0.832 1.04) translate(-16 -16)">
+      <rect x="13.4" y="3.9" width="0.9" height="5.8" rx="0.45"/>
+      <rect x="14.83" y="3.9" width="0.9" height="5.8" rx="0.45"/>
+      <rect x="16.27" y="3.9" width="0.9" height="5.8" rx="0.45"/>
+      <rect x="17.7" y="3.9" width="0.9" height="5.8" rx="0.45"/>
+      <path d="M13.4 8.7H18.6V9.7C18.6 11.6 17.3 12.6 16.75 13.3H15.25C14.7 12.6 13.4 11.6 13.4 9.7Z"/>
+      <path d="M15.25 13.1C15.25 15.2 15.2 16.6 14.95 19.1C14.7 21.8 14.5 24.4 14.5 26.4A1.5 1.5 0 0 0 17.5 26.4C17.5 24.4 17.3 21.8 17.05 19.1C16.8 16.6 16.75 15.2 16.75 13.1Z"/>
+    </g>
+    <!-- Knife: a rounded blade, a narrow bolster, a shaped handle. -->
+    <g transform="rotate(40 16 16) translate(16 16) scale(0.832 1.04) translate(-16 -16)">
+      <path d="M15.1 15.2V5.6C15.1 4.4 15.8 3.8 16.5 3.9C17.7 4.1 18.3 6.1 18.2 9.1C18.1 11.6 17.75 13.5 17.4 15.2Z"/>
+      <rect x="15.45" y="15" width="1.7" height="1.4" rx="0.5"/>
+      <path d="M15.05 16.1C14.9 19 14.6 23 14.6 26.3A1.6 1.6 0 0 0 17.8 26.3C17.8 23 17.5 19 17.4 16.1Z"/>
+    </g>
   </g>
 </svg>

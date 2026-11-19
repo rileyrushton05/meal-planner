@@ -1,8 +1,8 @@
-# Meal Planner
+# The Fridge Door
 
 [![Tests](https://github.com/rileyrushton05/meal-planner/actions/workflows/tests.yml/badge.svg)](https://github.com/rileyrushton05/meal-planner/actions/workflows/tests.yml)
 
-Plan a week of meals and get a consolidated grocery list. A React frontend
+A meal planner: plan a week of meals and get a consolidated grocery list. A React frontend
 over a FastAPI backend, backed by Postgres.
 
 ## Live demo
