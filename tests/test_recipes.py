@@ -187,7 +187,10 @@ def test_a_hostile_page_the_largest_fetched_is_read_quickly(hostile) -> None:
     start = time.perf_counter()
     find_recipe(hostile)
 
-    assert time.perf_counter() - start < 1.0
+    # Linear reading takes well under a second here; the quadratic reading
+    # this guards against took minutes. Generous, because CI's Postgres job
+    # runs Python several times slower: 1 s failed there at 1.1 s.
+    assert time.perf_counter() - start < 10.0
 
 
 def test_the_type_attribute_is_read_loosely() -> None:
