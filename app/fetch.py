@@ -36,6 +36,9 @@ MAX_BYTES = 2_000_000
 TIMEOUT_SECONDS = 5.0
 MAX_REDIRECTS = 5
 _REDIRECTS = {301, 302, 303, 307, 308}
+#: What a site answers when it will not serve a program: unauthorised,
+#: "payment required" (used by some bot walls), forbidden, too many requests.
+_REFUSING = {401, 402, 403, 429}
 _HTML = {"text/html", "application/xhtml+xml"}
 #: Says what is asking, as a polite client does. No contact details: the
 #: request is made for whoever pasted the link.
@@ -172,6 +175,15 @@ def _origin(url: httpx.URL) -> str:
 
 
 def _read(response: httpx.Response, deadline: float, clock: Callable[[], float]) -> str:
+    if response.status_code in _REFUSING:
+        # Big recipe sites turn away programs that say what they are, and
+        # this one does not pretend to be a browser to get past that.
+        raise FetchRefused(
+            "That site doesn't let apps read its recipes. Copy the ingredients "
+            "from the page and paste them into a meal instead."
+        )
+    if response.status_code == 404:
+        raise FetchRefused("There's no page at that link. Check it and try again.")
     if response.status_code >= 400:
         raise FetchRefused(f"The site answered with an error ({response.status_code}).")
     if response.status_code != 200:

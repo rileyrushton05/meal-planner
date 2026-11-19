@@ -203,10 +203,60 @@ _DESCRIPTORS = frozenset(
         "frozen",
         "dried",
         "organic",
+        "whole",
         "free",
         "range",
     ]
 )
+
+#: Words that start preparation written after the name with no comma, as
+#: some recipe sites write it: "carrots peeled and finely chopped". Only
+#: after the first word, so "crushed tomatoes" keeps its name; and never
+#: "dried", "smoked" or "ground", which are often part of one ("sun dried
+#: tomatoes").
+_PREP_WORDS = frozenset(
+    [
+        "chopped",
+        "diced",
+        "sliced",
+        "minced",
+        "crushed",
+        "grated",
+        "peeled",
+        "trimmed",
+        "picked",
+        "deseeded",
+        "seeded",
+        "halved",
+        "quartered",
+        "torn",
+        "shredded",
+        "drained",
+        "rinsed",
+        "softened",
+        "melted",
+        "beaten",
+        "cubed",
+        "cut",
+        "finely",
+        "roughly",
+        "thinly",
+        "coarsely",
+        "washed",
+        "cored",
+        "zested",
+        "squeezed",
+        "toasted",
+        "crumbled",
+        "mashed",
+        "pitted",
+        "stoned",
+        "julienned",
+    ]
+)
+
+#: Units that are already metric: of two measures of one amount, keep this.
+_METRIC = frozenset({"mg", "g", "kg", "ml", "L"})
 
 #: Phrases that are preparation or serving, wherever they appear.
 _SERVING = re.compile(
@@ -242,6 +292,10 @@ _RANGE = re.compile(r"\s*(?:-|to\b|or\b)\s*", re.IGNORECASE)
 _DOZEN = re.compile(r"\s*dozen\b", re.IGNORECASE)
 _TIMES = re.compile(r"\s*x\s*", re.IGNORECASE)
 _BRACKETS = re.compile(r"\s*\(([^()]*)\)")
+_SLASH = re.compile(r"\s*/\s*")
+_NOTHING_IN_BRACKETS = re.compile(r"\(\s*\)")
+#: Notes that say nothing about the ingredient: "Note 3", "$1.20".
+_EMPTY_NOTE = re.compile(r"\(?\s*note\s*\d+\s*\)?|\$\s*\d+(?:\.\d+)?", re.IGNORECASE)
 _WORD = re.compile(r"\s*([a-z]+)\.?(?![a-z])", re.IGNORECASE)
 _FLUID_OUNCE = re.compile(r"\s*fl\.?\s*oz\.?(?![a-z])", re.IGNORECASE)
 _OF = re.compile(r"\s*of\b", re.IGNORECASE)
@@ -277,7 +331,11 @@ def parse_line(text: str, catalogue: Mapping[str, str] | None = None) -> ParsedL
 
     name, brackets = _without_brackets(amount.rest)
     prep += brackets
-    name = _without_of(name).strip(" .;-")
+    # Footnote marks: "vegetable broth*", "ditalini**".
+    name = " ".join(_without_of(name).replace("*", " ").split()).strip(" .;-")
+    name, after = _split_trailing_prep(name)
+    if after:
+        prep.insert(0, after)
 
     unit = amount.unit
     item, dropped = None, ""
@@ -317,7 +375,7 @@ def parse_line(text: str, catalogue: Mapping[str, str] | None = None) -> ParsedL
         qty=qty,
         unit=unit,
         name=item or _capitalised(name),
-        prep=", ".join(part for part in prep if part),
+        prep=", ".join(part for part in map(_tidy_note, prep) if part),
         catalog_item=item,
         confidence=confidence,
         warnings=tuple(warnings),
@@ -405,11 +463,18 @@ def _set_aside_prep(line: str) -> tuple[str, list[str]]:
             prep.append(line[i + 1 :].strip())
             line = line[:i]
             break
-    serving = _SERVING.search(line)
-    if serving:
-        prep.insert(0, line[serving.start() :].strip())
-        line = line[: serving.start()]
+    # Only outside brackets: "(optional)" is a note, read with the others,
+    # and cutting inside it would leave a "(" in the name.
+    for serving in _SERVING.finditer(line):
+        if _depth_at(line, serving.start()) == 0:
+            prep.insert(0, line[serving.start() :].strip())
+            line = line[: serving.start()]
+            break
     return line.strip(), prep
+
+
+def _depth_at(text: str, index: int) -> int:
+    return max(0, text.count("(", 0, index) - text.count(")", 0, index))
 
 
 def _take_qty(text: str) -> tuple[Fraction | None, str]:
@@ -452,6 +517,16 @@ def _measure(text: str) -> tuple[Fraction, str] | None:
     return (qty, unit) if unit and not rest.strip() else None
 
 
+def _measure_first(text: str) -> tuple[Fraction, str, str] | None:
+    """An amount with a unit at the start of `text` ("500g ..."), and the
+    rest."""
+    qty, rest = _take_qty(text)
+    if qty is None:
+        return None
+    unit, rest = _take_unit(rest)
+    return (qty, unit, rest) if unit else None
+
+
 def _drop_container(text: str) -> tuple[str, str]:
     unit, rest = _take_unit(text)
     if unit in _CONTAINERS:
@@ -491,6 +566,9 @@ def _read_amount(line: str) -> _Amount:
         size = _measure(bracket.group(1))
         if size:
             rest = rest[bracket.end() :]
+    elif (inner := _measure_first(rest)) and _drop_container(inner[2])[0]:
+        # "1 15oz. can", "2 400 g tins": a count of containers of a size.
+        size, rest = (inner[0], inner[1]), inner[2]
     if size:
         amount.qty, amount.unit = qty * size[0], size[1]
         amount.container, rest = _drop_container(rest)
@@ -499,6 +577,14 @@ def _read_amount(line: str) -> _Amount:
 
     amount.qty = qty
     amount.unit, rest = _take_unit(rest)
+    # "1 lb / 500g", "400 g / 14 oz": one amount measured twice. The metric
+    # one is kept, as the grocery list adds metric amounts up.
+    slash = _SLASH.match(rest) if amount.unit else None
+    other = _measure_first(rest[slash.end() :]) if slash else None
+    if other:
+        if amount.unit not in _METRIC and other[1] in _METRIC:
+            amount.qty, amount.unit = other[0], other[1]
+        rest = other[2]
     if amount.unit and amount.unit not in _CONTAINERS:
         amount.container, rest = _drop_container(rest)
     amount.rest = _without_alternative(rest, amount)
@@ -526,9 +612,55 @@ def _read_amount_at_end(line: str) -> _Amount | None:
 
 
 def _without_brackets(text: str) -> tuple[str, list[str]]:
-    """The name without bracketed notes, and the notes: "onion (diced)"."""
-    notes = [match.group(1).strip() for match in _BRACKETS.finditer(text)]
-    return " ".join(_BRACKETS.sub(" ", text).split()), [n for n in notes if n]
+    """The name without bracketed notes, and the notes: "onion (diced)".
+
+    Brackets nest ("(, diced (white or brown))" is one note), and one never
+    closed runs to the end. Notes are tidied of the stray comma some sites
+    start them with, and of footnote references and prices.
+    """
+    name: list[str] = []
+    notes: list[str] = []
+    note: list[str] = []
+    depth = 0
+    for char in text:
+        if char == "(":
+            depth += 1
+            if depth == 1:
+                note = []
+                continue
+        elif char == ")" and depth:
+            depth -= 1
+            if depth == 0:
+                notes.append("".join(note))
+                continue
+        (note if depth else name).append(char)
+    if depth:
+        notes.append("".join(note))
+    tidy = [_tidy_note(n) for n in notes]
+    return " ".join("".join(name).split()), [n for n in tidy if n]
+
+
+def _tidy_note(note: str) -> str:
+    note = _EMPTY_NOTE.sub(" ", note)
+    note = " ".join(_NOTHING_IN_BRACKETS.sub(" ", note).split())
+    # "(or tomato passata)" written inside a second pair of brackets.
+    while note.startswith("(") and note.endswith(")"):
+        note = note[1:-1].strip()
+    return note.strip(" ,;")
+
+
+def _split_trailing_prep(name: str) -> tuple[str, str]:
+    """ "carrots peeled and finely chopped" -> ("carrots", "peeled and ...")."""
+    words = name.split(" ")
+    # Something must be left that is a thing, not only how it is:
+    # "freshly grated parmesan" is not split after "freshly".
+    named = False
+    for index, word in enumerate(words):
+        lower = word.lower()
+        if named and lower in _PREP_WORDS:
+            return " ".join(words[:index]), " ".join(words[index:])
+        named = named or (lower not in _DESCRIPTORS and lower not in _PREP_WORDS)
+    return name, ""
 
 
 def _match(
@@ -542,9 +674,14 @@ def _match(
         if candidate in names:
             return names[candidate], ""
     words = key.split()
-    kept = [word for word in words if word not in _DESCRIPTORS]
-    if kept and len(kept) < len(words) and " ".join(kept) in names:
-        return names[" ".join(kept)], " ".join(w for w in words if w in _DESCRIPTORS)
+    kept = " ".join(word for word in words if word not in _DESCRIPTORS)
+    dropped = " ".join(w for w in words if w in _DESCRIPTORS)
+    if kept and dropped:
+        # After a can, the canned thing first: "can crushed tomato" is not
+        # a fresh tomato.
+        for candidate in [f"canned {kept}", kept] if canned else [kept]:
+            if candidate in names:
+                return names[candidate], dropped
     return None, ""
 
 
