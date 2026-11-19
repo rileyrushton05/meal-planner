@@ -340,4 +340,6 @@ def test_a_hostile_line_is_still_read_quickly(line) -> None:
     start = time.perf_counter()
     parse_line(line)
 
-    assert time.perf_counter() - start < 0.25
+    # Milliseconds when linear; a backtracking pattern takes seconds or
+    # more. Generous, as CI runs Python several times slower than a laptop.
+    assert time.perf_counter() - start < 2.0
