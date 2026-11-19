@@ -12,6 +12,7 @@ from app.ratelimit import (
     LOGIN_PER_ACCOUNT,
     LOGIN_PER_ACCOUNT_AND_NETWORK,
     Backoff,
+    Bucket,
     Window,
     network_of,
     subject,
@@ -63,6 +64,34 @@ def test_failures_are_forgotten_a_day_after_the_streak_began() -> None:
     bucket = RULE.record(bucket, tomorrow)
     assert bucket.hits == 1
     assert bucket.window_started_at == tomorrow
+
+
+@pytest.mark.parametrize("rule", [LOGIN_PER_ACCOUNT_AND_NETWORK, LOGIN_PER_ACCOUNT])
+def test_a_day_of_spaced_failures_keeps_the_wait_capped(rule: Backoff) -> None:
+    now = T0
+    bucket = None
+    for _ in range(75):
+        bucket = rule.record(bucket, now)
+        wait = wait_remaining(bucket, now)
+        assert wait is None or wait <= rule.max_wait
+        now += (wait or timedelta(0)) + timedelta(seconds=1)
+
+    assert bucket.hits == 75
+    assert now < T0 + rule.forget_after
+    assert bucket.blocked_until == now - timedelta(seconds=1)
+    reset = rule.record(bucket, T0 + rule.forget_after)
+    assert reset.hits == 1
+    assert reset.blocked_until is None
+
+
+@pytest.mark.parametrize("rule", [LOGIN_PER_ACCOUNT_AND_NETWORK, LOGIN_PER_ACCOUNT])
+def test_a_large_stored_failure_count_still_uses_the_maximum_wait(
+    rule: Backoff,
+) -> None:
+    bucket = Bucket(hits=1000, window_started_at=T0)
+    updated = rule.record(bucket, T0)
+    assert updated.hits == bucket.hits + 1
+    assert wait_remaining(updated, T0) == rule.max_wait
 
 
 def test_the_account_ceiling_is_higher_than_the_per_network_limit() -> None:

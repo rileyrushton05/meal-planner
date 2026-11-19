@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from api_client import api_client
@@ -20,7 +21,10 @@ from app.ratelimit import (
     LOGIN_PER_ACCOUNT_AND_NETWORK,
     RATE_LIMIT_KEY_ENV_VAR,
     TAKEN_EMAILS_PER_NETWORK,
+    network_of,
+    subject,
 )
+from app.repositories import RateLimitRepository
 from server.deps import SESSION_COOKIE
 from server.observability import configure_logging
 
@@ -136,6 +140,53 @@ def test_an_email_with_no_account_is_throttled_identically(anonymous):
     for _ in range(PER_NETWORK):
         assert _login(anonymous, WRONG, email="nobody@example.com").status_code == 401
     assert _login(anonymous, email="nobody@example.com").status_code == 429
+
+
+@pytest.mark.parametrize("rule", [LOGIN_PER_ACCOUNT_AND_NETWORK, LOGIN_PER_ACCOUNT])
+def test_a_long_failure_streak_is_recorded_and_still_blocks_login(
+    account, anonymous, db, rule
+):
+    now = datetime.now(UTC)
+    parts = ("login", EMAIL)
+    if rule == LOGIN_PER_ACCOUNT_AND_NETWORK:
+        parts += (network_of("testclient"),)
+    key = subject(*parts)
+    previous_hits = rule.free + 40
+    with db.transaction() as session:
+        limits = RateLimitRepository(session)
+        limits.get(rule.scope, key, for_update=True)
+        limits.save(
+            rule.scope,
+            key,
+            hits=previous_hits,
+            window_started_at=now - timedelta(hours=10),
+            blocked_until=now - timedelta(seconds=1),
+        )
+
+    assert _login(anonymous, WRONG).status_code == 401
+    with db.transaction() as session:
+        stored = RateLimitRepository(session).get(rule.scope, key)
+        assert stored is not None
+        assert stored.hits == previous_hits + 1
+
+    response = _login(anonymous)
+    assert response.status_code == 429
+    assert _type(response) == "too-many-attempts"
+    assert 1 <= int(response.headers["retry-after"]) <= 900
+
+    # Once the wait ends, the correct password must still work and clear
+    # the entire streak, including a count left by an older deployment.
+    with db.transaction() as session:
+        RateLimitRepository(session).save(
+            rule.scope,
+            key,
+            hits=previous_hits + 1,
+            window_started_at=now - timedelta(hours=10),
+            blocked_until=now - timedelta(seconds=1),
+        )
+    assert _login(anonymous).status_code == 200
+    with db.transaction() as session:
+        assert RateLimitRepository(session).get(rule.scope, key) is None
 
 
 def test_a_made_up_forwarding_header_does_not_buy_a_fresh_count(account, anonymous):

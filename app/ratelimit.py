@@ -68,7 +68,14 @@ class Backoff:
         hits = bucket.hits + 1
         if hits < self.free:
             return replace(bucket, hits=hits, blocked_until=None)
-        wait = min(self.first_wait * 2 ** (hits - self.free), self.max_wait)
+        # Once doubling would exceed the cap, do not calculate the larger
+        # timedelta at all: a long failure streak can overflow it before
+        # min() has a chance to apply the cap.
+        doublings = hits - self.free
+        if doublings >= (self.max_wait // self.first_wait).bit_length():
+            wait = self.max_wait
+        else:
+            wait = self.first_wait * 2**doublings
         return replace(bucket, hits=hits, blocked_until=now + wait)
 
 
