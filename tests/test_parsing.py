@@ -7,9 +7,17 @@ is added here first, failing, and then fixed.
 
 from __future__ import annotations
 
+import time
+
 import pytest
 
-from app.parsing import Confidence, parse_line, parse_lines
+from app.parsing import (
+    NOT_KNOWN,
+    Confidence,
+    canonical_unit,
+    parse_line,
+    parse_lines,
+)
 
 # (line, qty, unit, name). A name that is a catalogue item is spelled as the
 # catalogue spells it; anything else keeps the line's own words.
@@ -176,7 +184,7 @@ def test_a_name_outside_the_catalogue_wants_a_look() -> None:
 
     assert parsed.confidence is Confidence.MEDIUM
     assert parsed.catalog_item is None
-    assert parsed.warnings == ("Not in the catalogue.",)
+    assert parsed.warnings == (NOT_KNOWN,)
 
 
 def test_a_range_says_which_end_it_took() -> None:
@@ -236,3 +244,63 @@ def test_a_pasted_list_skips_blank_lines_and_headings() -> None:
     parsed = parse_lines(pasted)
 
     assert [line.name for line in parsed] == ["Soy Sauce", "Honey"]
+
+
+# --- A unit typed on its own -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("typed", "spelled"),
+    [
+        ("clove", "cloves"),
+        ("Cloves", "cloves"),
+        ("Tbsp.", "tbsp"),
+        ("tablespoons", "tbsp"),
+        ("grams", "g"),
+        ("l", "L"),
+        ("litre", "L"),
+        ("tin", "cans"),
+        ("cup", "cups"),
+        ("fl. oz", "fl oz"),
+        (" g ", "g"),
+        ("", ""),
+        ("Heaped Spoon", "Heaped Spoon"),  # not known: kept as written
+    ],
+)
+def test_a_typed_unit_is_spelled_as_the_app_spells_it(typed, spelled) -> None:
+    assert canonical_unit(typed) == spelled
+
+
+# --- Bounded work ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "1 " * 5_000,
+        "(" * 10_000,
+        "1 x " * 2_500,
+        "1-" * 5_000,
+        "a" * 10_000,
+        "1/2 " * 2_500,
+        ", " * 5_000,
+        "large " * 1_700,
+    ],
+    ids=[
+        "numbers",
+        "brackets",
+        "packs",
+        "ranges",
+        "one word",
+        "fractions",
+        "commas",
+        "describing words",
+    ],
+)
+def test_a_hostile_line_is_still_read_quickly(line) -> None:
+    """The API caps a line at 200 characters; this is fifty times that, so
+    a pattern that backtracks would show as seconds, not milliseconds."""
+    start = time.perf_counter()
+    parse_line(line)
+
+    assert time.perf_counter() - start < 0.25

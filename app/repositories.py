@@ -20,6 +20,7 @@ of silently starting one that nobody commits.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date, datetime
 from typing import Any, cast
 
@@ -55,6 +56,7 @@ from app.models import (
     persisted_id,
 )
 from app.models import Session as SessionRow
+from app.parsing import canonical_unit
 from app.templates import MealTemplate
 
 
@@ -247,8 +249,25 @@ class MealRepository(_Repository):
         """
         link = self._require_link(meal_id, ingredient_id)
         link.qty = qty
-        link.unit = unit
+        link.unit = canonical_unit(unit)
         self._session.flush()
+
+    def replace_ingredients(
+        self, meal_id: int, items: Iterable[tuple[str, float, str]]
+    ) -> None:
+        """Make a meal's ingredients exactly `items` (name, qty, unit).
+
+        The same ingredient twice in one unit adds up, as adding it twice
+        does; in two different units it raises UnitMismatchError, and the
+        caller's rollback leaves the list as it was. Raises
+        MealNotFoundError for a meal that is not this user's.
+        """
+        self._get_or_raise(meal_id)
+        self._session.execute(
+            delete(MealIngredient).where(col(MealIngredient.meal_id) == meal_id)
+        )
+        for name, qty, unit in items:
+            self._attach_ingredient(meal_id, name, qty, unit)
 
     def remove_ingredient(self, meal_id: int, ingredient_id: int) -> None:
         """Detach an ingredient from a meal, leaving the ingredient itself.
@@ -358,6 +377,9 @@ class MealRepository(_Repository):
     def _attach_ingredient(
         self, meal_id: int, name: str, qty: float, unit: str
     ) -> None:
+        """Every unit is stored as the app spells it ("clove" as cloves), so
+        amounts of one thing typed differently still add up."""
+        unit = canonical_unit(unit)
         ingredient_id = persisted_id(self._get_or_create_ingredient(name))
         link = self._find_link(meal_id, ingredient_id)
         if link is None:
@@ -372,12 +394,15 @@ class MealRepository(_Repository):
             self._session.flush()
             return
 
-        if link.unit != unit:
+        # Compared as spelled now: a line saved before units were tidied
+        # may still say "clove".
+        if canonical_unit(link.unit) != unit:
             raise UnitMismatchError(
                 f"{name} is already on this meal measured in '{link.unit}'. "
                 f"Use the same unit to add more, or remove the existing entry first."
             )
         link.qty = link.qty + qty
+        link.unit = unit
         self._session.flush()
 
 

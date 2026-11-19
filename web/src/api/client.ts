@@ -16,7 +16,9 @@ import type {
   AppState,
   DayAssignmentWrite,
   GroceryLine,
+  IngredientLine,
   Meal,
+  ParsedIngredient,
   Problem,
   WeekPlan,
 } from "./types";
@@ -227,6 +229,21 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ qty, unit }),
     }),
+
+  /** A meal's whole ingredient list, replaced in one request: all of it
+   *  is saved, or none of it. */
+  replaceIngredients: (mealId: number, ingredients: IngredientLine[]): Promise<Meal> =>
+    request(`/api/meals/${mealId}/ingredients`, {
+      method: "PUT",
+      body: JSON.stringify({ ingredients }),
+    }),
+
+  /** Read pasted lines for a preview. Saves nothing. */
+  parseIngredients: (text: string): Promise<ParsedIngredient[]> =>
+    request<{ lines: ParsedIngredient[] }>("/api/ingredients/parse", {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }).then((body) => body.lines),
 
   removeIngredient: (mealId: number, ingredientId: number): Promise<Meal> =>
     request(`/api/meals/${mealId}/ingredients/${ingredientId}`, {

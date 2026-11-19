@@ -35,7 +35,7 @@ describe("a session that ends mid-use", () => {
     );
     const { queryClient, result } = setup();
     await waitFor(() => expect(result.current.account?.email).toBe("a@b.co"));
-    queryClient.setQueryData(queryKeys.library, { meals: [], ingredient_names: [], templates: [] });
+    queryClient.setQueryData(queryKeys.library, { meals: [], ingredient_suggestions: [], templates: [] });
 
     // The session has expired: the next read is refused, the client starts
     // a guest session and retries.

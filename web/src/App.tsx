@@ -177,6 +177,8 @@ export default function App() {
                 onAddIngredient={planner.addIngredient}
                 onUpdateIngredient={planner.updateIngredient}
                 onRemoveIngredient={planner.removeIngredient}
+                onReadIngredients={planner.readIngredients}
+                onReplaceIngredients={planner.replaceIngredients}
               />
             )}
             {page.id === "plan" && (

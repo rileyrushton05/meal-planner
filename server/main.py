@@ -26,7 +26,16 @@ from server.problems import (
     document_problem_responses,
     install_problem_handlers,
 )
-from server.routers import account, auth, health, meals, monitoring, plans, state
+from server.routers import (
+    account,
+    auth,
+    health,
+    ingredients,
+    meals,
+    monitoring,
+    plans,
+    state,
+)
 
 configure_logging()
 init_error_tracking()
@@ -94,5 +103,6 @@ app.include_router(auth.router)
 app.include_router(account.router)
 app.include_router(state.router)
 app.include_router(meals.router)
+app.include_router(ingredients.router)
 app.include_router(plans.router)
 app.include_router(monitoring.router)

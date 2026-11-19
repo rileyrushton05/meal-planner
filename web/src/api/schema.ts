@@ -357,7 +357,13 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /**
+         * Replace Ingredients
+         * @description Replace a meal's whole ingredient list in one transaction: a pasted
+         *     list is saved in one request, and either all of it is or none of it.
+         *     The same ingredient twice in one unit adds up; in two units is 409.
+         */
+        put: operations["replace_ingredients_api_meals__meal_id__ingredients_put"];
         /**
          * Add Ingredient
          * @description Attach an ingredient, creating it if the name is new.
@@ -391,6 +397,32 @@ export interface paths {
          * @description Overwrite the quantity and unit of one ingredient on a meal.
          */
         patch: operations["update_ingredient_api_meals__meal_id__ingredients__ingredient_id__patch"];
+        trace?: never;
+    };
+    "/api/ingredients/parse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Parse Ingredients
+         * @description Read pasted lines as amounts, units and names, for a preview. Saves
+         *     nothing: the client sends the checked list to
+         *     `PUT /api/meals/{id}/ingredients`.
+         *
+         *     Needs a session like every data route, though it reads no data, so the
+         *     parser is not open to anyone on the internet. The body's size and line
+         *     count are bounded (IngredientText), so the work is too.
+         */
+        post: operations["parse_ingredients_api_ingredients_parse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/plan/{week}": {
@@ -552,13 +584,18 @@ export interface components {
             week_start: string;
             /** Meals */
             meals: components["schemas"]["MealRead"][];
-            /** Ingredient Names */
-            ingredient_names: string[];
+            /** Ingredient Suggestions */
+            ingredient_suggestions: components["schemas"]["IngredientSuggestion"][];
             /** Plan */
             plan: components["schemas"]["DayAssignment"][];
             /** Templates */
             templates: components["schemas"]["TemplateRead"][];
         };
+        /**
+         * Confidence
+         * @enum {string}
+         */
+        Confidence: "high" | "medium" | "low";
         /**
          * Credentials
          * @description An email and password, for signup and login.
@@ -692,6 +729,32 @@ export interface components {
             /** Unit */
             unit: string;
         };
+        /**
+         * IngredientList
+         * @description A meal's whole ingredient list, replacing the one it has.
+         */
+        IngredientList: {
+            /** Ingredients */
+            ingredients: components["schemas"]["IngredientAdd"][];
+        };
+        /**
+         * IngredientSuggestion
+         * @description A name the ingredient field offers, and the unit to fill in with it.
+         */
+        IngredientSuggestion: {
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * IngredientText
+         * @description Ingredient lines as a person typed or pasted them, one per line.
+         */
+        IngredientText: {
+            /** Text */
+            text: string;
+        };
         /** IngredientUpdate */
         IngredientUpdate: {
             /** Qty */
@@ -738,6 +801,32 @@ export interface components {
              * @default 1
              */
             servings: number;
+        };
+        /**
+         * ParsedIngredient
+         * @description One line as read, for a person to check before it is saved.
+         */
+        ParsedIngredient: {
+            /** Text */
+            text: string;
+            /** Qty */
+            qty: number | null;
+            /** Unit */
+            unit: string;
+            /** Name */
+            name: string;
+            /** Prep */
+            prep: string;
+            /** Catalog Item */
+            catalog_item: string | null;
+            confidence: components["schemas"]["Confidence"];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** ParsedIngredients */
+        ParsedIngredients: {
+            /** Lines */
+            lines: components["schemas"]["ParsedIngredient"][];
         };
         /** PasswordConfirmation */
         PasswordConfirmation: {
@@ -1527,6 +1616,50 @@ export interface operations {
             };
         };
     };
+    replace_ingredients_api_meals__meal_id__ingredients_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngredientList"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     add_ingredient_api_meals__meal_id__ingredients_post: {
         parameters: {
             query?: never;
@@ -1635,6 +1768,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MealRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    parse_ingredients_api_ingredients_parse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IngredientText"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParsedIngredients"];
                 };
             };
             /** @description Validation Error */
@@ -1857,4 +2032,5 @@ type ReadonlyArray<T> = [
 ] extends [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
+export const confidenceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Confidence"]> = ["high", "medium", "low"];
 export const dayOfWeekValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DayOfWeek"]> = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

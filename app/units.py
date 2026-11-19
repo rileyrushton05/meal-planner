@@ -53,3 +53,37 @@ def format_qty(qty: float) -> str:
     if rounded == int(rounded):
         return str(int(rounded))
     return f"{rounded:g}"
+
+
+#: Counted units are stored plural, so that every amount of a thing adds up
+#: ("1 cloves" and "2 cloves" are one line); exactly one reads singular.
+#: web/src/lib/quantities.ts has the same list.
+_SINGULAR = {
+    "cups": "cup",
+    "cloves": "clove",
+    "slices": "slice",
+    "rashers": "rasher",
+    "stalks": "stalk",
+    "sticks": "stick",
+    "sprigs": "sprig",
+    "pinches": "pinch",
+    "dashes": "dash",
+    "handfuls": "handful",
+    "bunches": "bunch",
+    "cans": "can",
+    "jars": "jar",
+    "packets": "packet",
+    "bottles": "bottle",
+    "punnets": "punnet",
+    "bags": "bag",
+    "tubs": "tub",
+    "cartons": "carton",
+}
+
+
+def format_amount(qty: float, unit: str) -> str:
+    """ "400 g", "2 cloves", "1 clove", or "3" for a plain count."""
+    shown = format_qty(qty)
+    if shown == "1":
+        unit = _SINGULAR.get(unit, unit)
+    return f"{shown} {unit}".strip()

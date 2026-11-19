@@ -3,7 +3,7 @@
  *
  * Three kinds of server state, each with its own cache entry:
  *
- * - the library (meals, ingredient names, templates), which does not vary by
+ * - the library (meals, ingredient suggestions, templates), which does not vary by
  *   week;
  * - one plan per week visited;
  * - one grocery list per week, fetched by the pages that show it.
@@ -29,10 +29,16 @@ import { useState } from "react";
 
 import { ApiError, api } from "../api/client";
 import { queryKeys } from "../api/queryClient";
-import type { AppState, Meal, WeekPlan } from "../api/types";
+import type {
+  AppState,
+  IngredientLine,
+  IngredientSuggestion,
+  Meal,
+  WeekPlan,
+} from "../api/types";
 import { parseWeek, useSearchParam } from "../lib/location";
 
-type Library = Pick<AppState, "meals" | "ingredient_names" | "templates">;
+type Library = Pick<AppState, "meals" | "ingredient_suggestions" | "templates">;
 
 export function usePlanner({
   loadGroceries = false,
@@ -61,7 +67,7 @@ export function usePlanner({
       });
       return {
         meals: state.meals,
-        ingredient_names: state.ingredient_names,
+        ingredient_suggestions: state.ingredient_suggestions,
         templates: state.templates,
       };
     },
@@ -104,12 +110,10 @@ export function usePlanner({
               ? current.meals.map((m) => (m.id === meal.id ? meal : m))
               : [...current.meals, meal],
             // A new ingredient may have appeared, and the picker reads this.
-            ingredient_names: Array.from(
-              new Set([
-                ...current.ingredient_names,
-                ...meal.ingredients.map((i) => i.name),
-              ]),
-            ).sort(),
+            ingredient_suggestions: withNewIngredients(
+              current.ingredient_suggestions,
+              meal,
+            ),
           }
         : current,
     );
@@ -149,6 +153,12 @@ export function usePlanner({
       );
       forgetGroceries();
     },
+    onError: report,
+  });
+
+  const reading = useMutation({
+    mutationFn: (text: string) => api.parseIngredients(text),
+    onMutate: clearError,
     onError: report,
   });
 
@@ -206,6 +216,12 @@ export function usePlanner({
     removeIngredient: (mealId: number, ingredientId: number) =>
       run(mealChange.mutateAsync(() => api.removeIngredient(mealId, ingredientId))),
 
+    // Both resolve with the result, or null if it failed.
+    readIngredients: (text: string) => runFor(reading.mutateAsync(text)),
+
+    replaceIngredients: (mealId: number, ingredients: IngredientLine[]) =>
+      runFor(mealChange.mutateAsync(() => api.replaceIngredients(mealId, ingredients))),
+
     // The week is named by the caller, not read from the URL at send time:
     // a save made just before changing week must still land on its own week.
     // Both resolve with the saved plan, or null if it failed.
@@ -239,11 +255,29 @@ export function usePlanner({
       setDismissedError(loadError);
     },
     // Pending work per area, so one slow save does not freeze the whole app.
-    mealsPending: mealChange.isPending || mealDeletion.isPending,
+    mealsPending: mealChange.isPending || mealDeletion.isPending || reading.isPending,
     planPending: planChange.isPending,
     grocery: grocery.data ?? null,
     ...actions,
   };
+}
+
+/**
+ * The suggestions with any ingredient of `meal` they lack, offered in the
+ * unit it was just used in. Sorted as the server sorts them.
+ */
+function withNewIngredients(
+  suggestions: IngredientSuggestion[],
+  meal: Meal,
+): IngredientSuggestion[] {
+  const known = new Set(suggestions.map((s) => s.name.toLowerCase()));
+  const added = meal.ingredients
+    .filter((i) => !known.has(i.name.toLowerCase()))
+    .map((i) => ({ name: i.name, unit: i.unit }));
+  if (added.length === 0) return suggestions;
+  return [...suggestions, ...added].sort((a, b) =>
+    a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+  );
 }
 
 function describe(err: unknown): string {

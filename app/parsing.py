@@ -78,6 +78,10 @@ class ParsedLine:
     warnings: tuple[str, ...]
 
 
+#: The warning for a name that is no catalogue item.
+NOT_KNOWN = "Not one of the groceries the app knows. Check the spelling."
+
+
 # --- Vocabulary ----------------------------------------------------------------
 
 #: Canonical unit -> every spelling of it. Counted things are plural, as the
@@ -298,7 +302,8 @@ def parse_line(text: str, catalogue: Mapping[str, str] | None = None) -> ParsedL
     if not name:
         warnings.append("No ingredient name found.")
     elif item is None:
-        warnings.append("Not in the catalogue.")
+        # Said for the person checking: "catalogue" is the code's word.
+        warnings.append(NOT_KNOWN)
 
     if qty is None or not name:
         confidence = Confidence.LOW
@@ -329,6 +334,16 @@ def parse_lines(
         for line in text.splitlines()
         if line.strip() and not line.strip().endswith(":")
     ]
+
+
+def canonical_unit(unit: str) -> str:
+    """A unit as the app spells it, so amounts typed differently still add
+    up: "Tbsp" is tbsp, "grams" is g, "clove" is cloves, "tin" is cans. A
+    unit it does not know is kept as written, trimmed."""
+    tidy = " ".join(unit.split())
+    if _FLUID_OUNCE.fullmatch(tidy):
+        return "fl oz"
+    return _UNIT_OF.get(tidy.lower().rstrip("."), tidy)
 
 
 # --- Steps -----------------------------------------------------------------------

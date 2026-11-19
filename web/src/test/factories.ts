@@ -25,7 +25,7 @@ export function makeState(overrides: Partial<AppState> = {}): AppState {
   return {
     week_start: "2026-08-03",
     meals: [],
-    ingredient_names: [],
+    ingredient_suggestions: [],
     plan: [],
     templates: [],
     ...overrides,

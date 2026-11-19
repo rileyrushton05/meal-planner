@@ -146,6 +146,191 @@ def test_remove_ingredient(client):
     assert body["ingredients"] == []
 
 
+def test_units_are_stored_as_the_app_spells_them(client):
+    """So that "1 clove" and "2 cloves" of the same thing add up."""
+    meal = _create_meal(client)
+    client.post(
+        f"/api/meals/{meal['id']}/ingredients",
+        json={"name": "Garlic", "qty": 1, "unit": "clove"},
+    )
+
+    body = client.post(
+        f"/api/meals/{meal['id']}/ingredients",
+        json={"name": "Garlic", "qty": 2, "unit": "Cloves"},
+    ).json()
+
+    assert _amounts(body) == [("Garlic", 3, "cloves")]
+
+
+# ------------------------------------------------ replacing the whole list
+
+
+def _amounts(meal: dict) -> list[tuple[str, float, str]]:
+    return sorted((i["name"], i["qty"], i["unit"]) for i in meal["ingredients"])
+
+
+def _replace(client, meal_id: int, *lines: tuple[str, float, str]):
+    return client.put(
+        f"/api/meals/{meal_id}/ingredients",
+        json={
+            "ingredients": [
+                {"name": name, "qty": qty, "unit": unit} for name, qty, unit in lines
+            ]
+        },
+    )
+
+
+def test_replacing_the_ingredients_sets_exactly_the_list_sent(client):
+    meal = _create_meal(client)
+    client.post(
+        f"/api/meals/{meal['id']}/ingredients",
+        json={"name": "Pasta", "qty": 200, "unit": "g"},
+    )
+
+    response = _replace(
+        client,
+        meal["id"],
+        ("Beef Mince", 500, "g"),
+        ("Onion", 2, ""),
+        ("Pasta", 1, "kg"),
+    )
+
+    assert response.status_code == 200, response.text
+    assert _amounts(response.json()) == [
+        ("Beef Mince", 500, "g"),
+        ("Onion", 2, ""),
+        ("Pasta", 1, "kg"),
+    ]
+    assert _amounts(client.get(f"/api/meals/{meal['id']}").json()) == _amounts(
+        response.json()
+    )
+
+
+def test_replacing_with_nothing_empties_the_meal(client):
+    meal = _create_meal(client)
+    _replace(client, meal["id"], ("Pasta", 200, "g"))
+
+    assert _replace(client, meal["id"]).json()["ingredients"] == []
+
+
+def test_the_same_ingredient_twice_in_one_unit_adds_up(client):
+    meal = _create_meal(client)
+
+    body = _replace(client, meal["id"], ("Butter", 50, "g"), ("butter", 20, "g")).json()
+
+    assert _amounts(body) == [("Butter", 70, "g")]
+
+
+def test_a_list_that_cannot_be_saved_leaves_the_old_one(client):
+    """One transaction: the conflict on the last line undoes the delete and
+    the inserts before it."""
+    meal = _create_meal(client)
+    _replace(client, meal["id"], ("Pasta", 200, "g"))
+
+    response = _replace(
+        client, meal["id"], ("Onion", 2, ""), ("Butter", 50, "g"), ("Butter", 1, "tbsp")
+    )
+
+    assert response.status_code == 409
+    assert response.json()["type"].endswith("unit-mismatch")
+    assert _amounts(client.get(f"/api/meals/{meal['id']}").json()) == [
+        ("Pasta", 200, "g")
+    ]
+
+
+def test_a_list_is_saved_in_one_request_however_long(client):
+    meal = _create_meal(client)
+    lines = [(f"Thing {n}", n, "g") for n in range(1, 101)]
+
+    assert _replace(client, meal["id"], *lines).status_code == 200
+    assert _replace(
+        client, meal["id"], *lines, ("One too many", 1, "g")
+    ).status_code == (422)
+
+
+def test_every_line_of_a_list_is_checked(client):
+    meal = _create_meal(client)
+
+    response = _replace(client, meal["id"], ("Onion", 2, ""), ("Salt", 0, "g"))
+
+    assert response.status_code == 422
+
+
+# ---------------------------------------------------- reading pasted lines
+
+
+def test_pasted_lines_are_read_for_a_preview(client):
+    body = client.post(
+        "/api/ingredients/parse",
+        json={"text": "500g beef mince\n\nFor the sauce:\n2-3 garlic cloves, crushed"},
+    ).json()
+
+    assert body["lines"] == [
+        {
+            "text": "500g beef mince",
+            "qty": 500,
+            "unit": "g",
+            "name": "Beef Mince",
+            "prep": "",
+            "catalog_item": "Beef Mince",
+            "confidence": "high",
+            "warnings": [],
+        },
+        {
+            "text": "2-3 garlic cloves, crushed",
+            "qty": 3,
+            "unit": "cloves",
+            "name": "Garlic",
+            "prep": "crushed",
+            "catalog_item": "Garlic",
+            "confidence": "medium",
+            "warnings": ["Read 2 to 3 as 3."],
+        },
+    ]
+
+
+def test_reading_lines_saves_nothing(client):
+    client.post("/api/ingredients/parse", json={"text": "500g beef mince"})
+
+    assert client.get("/api/meals").json() == []
+    names = {
+        s["name"] for s in client.get("/api/state").json()["ingredient_suggestions"]
+    }
+    assert "500g beef mince" not in names
+
+
+def test_a_line_with_no_amount_comes_back_unsure(client):
+    (line,) = client.post(
+        "/api/ingredients/parse", json={"text": "Salt to taste"}
+    ).json()["lines"]
+
+    assert (line["qty"], line["confidence"]) == (None, "low")
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("\n".join(["1 onion"] * 101), "Paste up to 100 lines at a time."),
+        ("1 onion\n" + "x" * 201, "Line 2 is longer than 200 characters."),
+    ],
+    ids=["too many lines", "a line too long"],
+)
+def test_reading_is_bounded(client, text, message):
+    response = client.post("/api/ingredients/parse", json={"text": text})
+
+    assert response.status_code == 422
+    assert message in response.text
+
+
+def test_a_hundred_lines_with_blank_ones_between_are_allowed(client):
+    text = "\n\n".join(["1 onion"] * 100)
+
+    response = client.post("/api/ingredients/parse", json={"text": text})
+
+    assert response.status_code == 200
+    assert len(response.json()["lines"]) == 100
+
+
 # -------------------------------------------------------------- templates
 
 
@@ -248,7 +433,10 @@ def test_state_returns_everything_in_one_response(client):
     assert body["week_start"] == MONDAY.isoformat()
     assert [m["name"] for m in body["meals"]] == ["Spaghetti"]
     assert body["meals"][0]["ingredients"][0]["name"] == "Pasta"
-    assert body["ingredient_names"] == ["Pasta"]
+    suggestions = {s["name"]: s["unit"] for s in body["ingredient_suggestions"]}
+    # Their own, with the unit they used, and the catalogue's.
+    assert suggestions["Pasta"] == "g"
+    assert suggestions["Beef Mince"] == "g"
     assert {d["day"] for d in body["plan"]} == {"Monday"}
     assert len(body["templates"]) == len(MEAL_TEMPLATES)
 
@@ -269,6 +457,7 @@ def test_state_defaults_to_the_current_week(client):
         ("post", "/api/meals/999/ingredients", {"name": "X", "qty": 1, "unit": "g"}),
         ("patch", "/api/meals/999/ingredients/1", {"qty": 5, "unit": "g"}),
         ("delete", "/api/meals/999/ingredients/1", None),
+        ("put", "/api/meals/999/ingredients", {"ingredients": []}),
         ("delete", "/api/meals/999", None),
     ],
 )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.units import format_qty, humanize, normalize
+from app.units import format_amount, format_qty, humanize, normalize
 
 
 @pytest.mark.parametrize(
@@ -56,3 +56,21 @@ def test_whole_numbers_render_without_a_decimal_tail(qty, expected):
 )
 def test_amounts_scale_up_past_a_thousand(qty, unit, expected):
     assert humanize(qty, unit) == expected
+
+
+@pytest.mark.parametrize(
+    ("qty", "unit", "expected"),
+    [
+        (1, "cloves", "1 clove"),
+        (2, "cloves", "2 cloves"),
+        (1, "pinches", "1 pinch"),
+        (1, "cups", "1 cup"),
+        (0.5, "cups", "0.5 cups"),
+        (1.001, "cans", "1 can"),  # shown as 1, so read as one
+        (1, "g", "1 g"),
+        (1, "L", "1 L"),
+        (3, "", "3"),
+    ],
+)
+def test_one_of_a_counted_unit_reads_singular(qty, unit, expected):
+    assert format_amount(qty, unit) == expected

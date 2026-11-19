@@ -21,6 +21,12 @@ export type Day = Schemas["DayOfWeek"];
 export const DAYS: readonly Day[] = dayOfWeekValues;
 
 export type IngredientAmount = Schemas["IngredientAmount"];
+/** An ingredient as sent to be saved: a name, an amount and its unit. */
+export type IngredientLine = Schemas["IngredientAdd"];
+/** A name the ingredient field offers, with the unit to fill in. */
+export type IngredientSuggestion = Schemas["IngredientSuggestion"];
+/** One pasted line as the server read it, for a person to check. */
+export type ParsedIngredient = Schemas["ParsedIngredient"];
 export type Meal = Schemas["MealRead"];
 export type DayAssignment = Schemas["DayAssignment"];
 export type DayAssignmentWrite = Schemas["DayAssignmentWrite"];
