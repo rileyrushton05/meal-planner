@@ -79,10 +79,6 @@ export default function App() {
             onLogOut={session.logOut}
             loggingOut={session.loggingOut}
           />
-          <div className="flex items-center justify-between gap-3">
-            <span className="hidden text-xs text-muted-foreground lg:inline">Theme</span>
-            <ThemeSwitcher theme={theme.theme} onChange={theme.setTheme} />
-          </div>
           {/* On a phone, the Account page links here instead: the top bar has no room. */}
           <AppLink
             to="/privacy"
@@ -91,6 +87,11 @@ export default function App() {
           >
             Privacy
           </AppLink>
+          {/* Last, so on a desktop the theme sits in the bottom-left corner. */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="hidden text-xs text-muted-foreground lg:inline">Theme</span>
+            <ThemeSwitcher theme={theme.theme} onChange={theme.setTheme} />
+          </div>
         </>
       }
     >

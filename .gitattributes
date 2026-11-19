@@ -2,3 +2,6 @@
 # stats. Regenerate rather than edit (see web/src/api/types.ts).
 docs/openapi.json linguist-generated=true
 web/src/api/schema.ts linguist-generated=true
+
+# Generated from a public password list by scripts/build_common_passwords.py.
+app/common_passwords.py linguist-generated=true

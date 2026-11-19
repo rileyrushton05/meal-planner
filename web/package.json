@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate:api": "npm --prefix tools/codegen ci --silent --no-audit --no-fund && tools/codegen/node_modules/.bin/openapi-typescript ../docs/openapi.json --enum-values --output src/api/schema.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
