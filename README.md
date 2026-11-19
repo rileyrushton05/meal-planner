@@ -1,6 +1,6 @@
 # The Fridge Door
 
-[![Tests](https://github.com/rileyrushton05/meal-planner/actions/workflows/tests.yml/badge.svg)](https://github.com/rileyrushton05/meal-planner/actions/workflows/tests.yml)
+[![Tests](https://github.com/rileyrushton05/the-fridge-door/actions/workflows/tests.yml/badge.svg)](https://github.com/rileyrushton05/the-fridge-door/actions/workflows/tests.yml)
 
 A meal planner: plan a week of meals and get a consolidated grocery list. A React frontend
 over a FastAPI backend, backed by Postgres.
@@ -143,7 +143,7 @@ changing page or opening a dropdown touches no network at all. Only changes
 hit the API.
 
 ```
-meal-planner/
+the-fridge-door/
 ├── app/                  # Domain layer
 │   ├── db.py             #   Database: owns the engine, opens the one transaction per request
 │   ├── models.py         #   SQLModel tables + the DayOfWeek enum
@@ -190,7 +190,7 @@ The full schema, an ER diagram, and what happens on delete are in
 ## Setup
 
 ```bash
-git clone <repo-url> && cd meal-planner
+git clone https://github.com/rileyrushton05/the-fridge-door.git && cd the-fridge-door
 python3 -m venv venv && source venv/bin/activate
 pip install -e ".[dev]"
 cd web && npm install && cd ..
