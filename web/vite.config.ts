@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -21,8 +22,48 @@ function pageHeaders(): Record<string, string> {
   return Object.fromEntries(rule.headers.map(({ key, value }) => [key, value]));
 }
 
+/**
+ * Error tracking (src/lib/monitoring.ts), from the deployment's environment.
+ *
+ * Only these three values are built into the page, each named here. The
+ * environment also holds SENTRY_AUTH_TOKEN, a real secret, which is why
+ * this does not widen Vite's `envPrefix` to let SENTRY_* through.
+ */
+const errorTracking = {
+  "import.meta.env.VITE_SENTRY_DSN": JSON.stringify(process.env.SENTRY_DSN ?? ""),
+  "import.meta.env.VITE_SENTRY_ENVIRONMENT": JSON.stringify(process.env.VERCEL_ENV ?? "development"),
+  "import.meta.env.VITE_SENTRY_RELEASE": JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA ?? ""),
+};
+
+/**
+ * With an auth token (deployments only), upload source maps so a report
+ * from the minified page shows the real file and line, then delete them:
+ * they are for Sentry, not for anyone browsing the site. A failed upload
+ * warns rather than failing the deploy.
+ */
+const uploadSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN);
+const sourceMapPlugins = uploadSourceMaps
+  ? [
+      sentryVitePlugin({
+        org: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+        release: { name: process.env.VERCEL_GIT_COMMIT_SHA },
+        sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
+        telemetry: false,
+        errorHandler: (error) => console.warn("Sentry source map upload failed:", error.message),
+      }),
+    ]
+  : [];
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), ...sourceMapPlugins],
+  define: errorTracking,
+  build: {
+    // "hidden": maps are written for the upload, but the page never points
+    // at them.
+    sourcemap: uploadSourceMaps ? "hidden" : false,
+  },
   resolve: {
     alias: { "@": new URL("./src", import.meta.url).pathname },
   },

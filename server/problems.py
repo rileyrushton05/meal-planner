@@ -39,6 +39,8 @@ from app.exceptions import (
     UnitMismatchError,
     WeakPasswordError,
 )
+from server.monitoring import report_unexpected_error
+from server.observability import current_request_id
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
 _TYPE_PREFIX = "urn:meal-planner:problem:"
@@ -217,11 +219,18 @@ class UnexpectedErrorMiddleware:
 
         try:
             await self.app(scope, receive, tracking_send)
-        except Exception:
-            # Anything else is a bug: the traceback goes to the logs, and the
-            # client gets a message in the usual shape without internals.
+        except Exception as error:
+            # Anything else is a bug: the traceback goes to the logs and to
+            # error tracking, and the client gets a message in the usual
+            # shape without internals.
             logger.exception(
                 "%s %s failed unexpectedly", scope["method"], scope["path"]
+            )
+            report_unexpected_error(
+                error,
+                request_id=current_request_id(),
+                method=scope["method"],
+                path=scope["path"],
             )
             if response_started:
                 # Too late to replace the response; let the server close it.

@@ -87,6 +87,16 @@ unscoped, and someone else's meal answers 404, never 403.
   end-to-end tests use reads them from there, and every Playwright test fails
   on any violation. API responses get a stricter set from the app itself
   (`server/headers.py`): no content allowed at all, `no-store`, `nosniff`.
+- **Error tracking:** unexpected failures in the API and crashes in the
+  browser are reported to Sentry, each tagged with the request id that finds
+  its log lines. The browser sends its reports through the app's own API
+  (`server/routers/monitoring.py`), so the CSP stays `'self'`-only, and the
+  relay forwards only reports addressed to this app's Sentry project. Reports
+  carry no user, cookies, headers, bodies, query strings or local variables,
+  and every email address is replaced, on both sides; tests check each of
+  these. The SDK loads after the page has started, so the first paint never
+  waits for it, and a crash shows a way back instead of a blank page. All of
+  it is off unless `SENTRY_DSN` is set.
 - **Recovery codes, not email:** a forgotten password is reset with a
   recovery code shown once at signup (16 characters, 80 random bits),
   rather than an emailed link. The app never sends email, so no third

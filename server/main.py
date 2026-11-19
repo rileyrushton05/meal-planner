@@ -16,6 +16,7 @@ from app.db import is_local_database
 from app.migrations import upgrade_to_head
 from server.deps import get_database
 from server.headers import SecurityHeadersMiddleware
+from server.monitoring import init_error_tracking
 from server.observability import RequestContextMiddleware, configure_logging
 from server.origin import reject_cross_site_writes, trusted_origins
 from server.problems import (
@@ -23,9 +24,10 @@ from server.problems import (
     document_problem_responses,
     install_problem_handlers,
 )
-from server.routers import account, auth, health, meals, plans, state
+from server.routers import account, auth, health, meals, monitoring, plans, state
 
 configure_logging()
+init_error_tracking()
 
 #: Whether to apply migrations at startup. Sensible for a long-lived server,
 #: wrong for serverless: every cold start would re-check the schema, and two
@@ -87,3 +89,4 @@ app.include_router(account.router)
 app.include_router(state.router)
 app.include_router(meals.router)
 app.include_router(plans.router)
+app.include_router(monitoring.router)

@@ -7,6 +7,7 @@
  */
 
 import { mondayOf } from "../lib/dates";
+import { noteApiFailure } from "../lib/monitoring";
 import type {
   Account,
   AccountExport,
@@ -111,6 +112,9 @@ async function request<T>(
 
   if (!response.ok) {
     const error = await toApiError(response);
+    if (response.status >= 500) {
+      noteApiFailure(init?.method ?? "GET", path, response.status, error.requestId);
+    }
     // Signed out (first visit, or a session that ended): start a guest
     // session. Never for the routes that sign in and out, and never twice,
     // so a server that keeps refusing cannot cause a loop.

@@ -22,6 +22,7 @@ from app.repositories import UserRepository
 from app.security import PASSWORD_PARAMETERS
 from server.deps import SESSION_COOKIE
 from server.main import app
+from server.routers.monitoring import ENVELOPE_PATH
 
 PASSWORD = "lettuce harbour spoon"
 EMAIL = "cook@example.com"
@@ -67,6 +68,15 @@ def _problem_type(response) -> str:
 # --- Every data route needs a session ------------------------------------------
 
 
+#: API routes that deliberately need no session, each with its reason. Kept
+#: short and explicit, so opening a route is a decision someone wrote down.
+OPEN_ROUTES = {
+    # Browser error reports: the errors most worth hearing about can happen
+    # before a session exists (server/routers/monitoring.py).
+    ENVELOPE_PATH: "error reports",
+}
+
+
 def _every_data_route() -> list[tuple[str, str]]:
     """From the OpenAPI document, which lists every route the app serves."""
     examples = {
@@ -78,6 +88,8 @@ def _every_data_route() -> list[tuple[str, str]]:
     routes = []
     for path, operations in app.openapi()["paths"].items():
         if not path.startswith("/api/") or path.startswith("/api/auth/"):
+            continue
+        if path in OPEN_ROUTES:
             continue
         concrete = re.sub(r"\{(\w+)\}", lambda m: examples[m.group(1)], path)
         routes.extend((method.upper(), concrete) for method in sorted(operations))

@@ -27,6 +27,8 @@ dependencies = [
 api = [
     "fastapi==0.141.1",
     "uvicorn[standard]==0.52.4",
+    # Error tracking (server/monitoring.py); off unless SENTRY_DSN is set.
+    "sentry-sdk==2.73.0",
 ]
 dev = [
     "meal-planner[api]",
