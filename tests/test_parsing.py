@@ -120,6 +120,33 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("2 tsp smoked paprika", 2, "tsp", "Smoked paprika"),
     ("1 bunch coriander", 1, "bunches", "Coriander"),
     ("3 sprigs thyme", 3, "sprigs", "Thyme"),
+    # As recipe sites write them (found importing real pages, 2026-11-19).
+    # Notes in nested brackets, some starting with a stray comma:
+    ("2 garlic cloves (, minced)", 2, "cloves", "Garlic"),
+    ("1 onion (, diced (white or brown))", 1, "", "Onion"),
+    ("2 tsp sugar (, if needed (Note 3))", 2, "tsp", "Sugar"),
+    ("1 cup red wine ((or beef stock))", 1, "cups", "Red wine"),
+    ("Grated parmesan (and parsley (optional))", None, "", "Parmesan"),
+    # Two measures of one amount: the metric one.
+    ("1 lb / 500g beef mince", 500, "g", "Beef Mince"),
+    ("400 g / 14 oz spaghetti", 400, "g", "Pasta"),
+    ("800g / 28 oz can crushed tomatoes", 800, "g", "Diced Tomatoes"),
+    ("800g / 28 oz can crushed tomato", 800, "g", "Diced Tomatoes"),
+    ("1 can whole peeled tomatoes", 1, "cans", "Diced Tomatoes"),
+    ("2 cups / 500 ml milk", 500, "ml", "Milk"),
+    # Preparation after the name, with no comma before it.
+    ("2 carrots peeled and finely chopped", 2, "", "Carrots"),
+    ("3 garlic cloves finely chopped", 3, "cloves", "Garlic"),
+    ("250 g cherry tomatoes sliced in half", 250, "g", "Cherry Tomatoes"),
+    ("1 red chilli deseeded and sliced (optional)", 1, "", "Red chilli"),
+    ("2 eggs beaten", 2, "", "Eggs"),
+    ("1 tbsp sun dried tomatoes", 1, "tbsp", "Sun dried tomatoes"),
+    # A count of cans of a size, with no "x".
+    ("1 15oz. can cannellini beans, drained", 15, "oz", "Cannellini beans"),
+    ("2 400 g tins chickpeas", 800, "g", "Chickpeas"),
+    # Footnote marks and prices are not part of the name.
+    ("2 cups vegetable stock*", 2, "cups", "Vegetable Stock"),
+    ("1 cup ditalini (uncooked)** ($0.39)", 1, "cups", "Ditalini"),
     # No amount.
     ("Salt and pepper, to taste", None, "", "Salt and pepper"),
     ("Salt to taste", None, "", "Salt"),
@@ -162,6 +189,16 @@ def test_the_table_is_long_enough_to_mean_something() -> None:
         ("Juice of 1 lemon", "juice"),
         ("a few sprigs of thyme", "a few"),
         ("2 onions", ""),
+        ("2 garlic cloves (, minced)", "minced"),
+        ("1 onion (, diced (white or brown))", "diced (white or brown)"),
+        ("2 tsp sugar (, if needed (Note 3))", "if needed"),
+        ("2 carrots peeled and finely chopped", "peeled and finely chopped"),
+        ("1 cup ditalini (uncooked)** ($0.39)", "uncooked"),
+        ("1 can beans, drained and rinsed ($0.89)", "drained and rinsed"),
+        (
+            "1 red chilli deseeded and sliced (optional)",
+            "deseeded and sliced, optional",
+        ),
     ],
 )
 def test_preparation_is_kept_apart_from_the_name(line, prep) -> None:

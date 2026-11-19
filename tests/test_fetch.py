@@ -307,10 +307,21 @@ def test_a_page_that_trickles_in_is_cut_off_at_five_seconds_in_all() -> None:
     assert now[0] <= 6
 
 
-def test_an_error_page_is_refused() -> None:
-    network = Network({"recipes.example": lambda r: httpx.Response(404, text="gone")})
+@pytest.mark.parametrize(
+    ("status", "message"),
+    [
+        (404, "no page at that link"),
+        (500, r"error \(500\)"),
+        # Real recipe sites answered 402 and 403 when tried, 2026-11-19.
+        (402, "doesn't let apps read its recipes"),
+        (403, "doesn't let apps read its recipes"),
+        (429, "doesn't let apps read its recipes"),
+    ],
+)
+def test_an_error_page_is_refused_and_says_what_to_do(status, message) -> None:
+    network = Network({"recipes.example": lambda r: httpx.Response(status, text="no")})
 
-    with pytest.raises(FetchRefused, match=r"error \(404\)"):
+    with pytest.raises(FetchRefused, match=message):
         fetch("https://recipes.example/", network)
 
 
