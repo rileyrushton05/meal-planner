@@ -259,6 +259,13 @@ every response carries an `X-Request-ID` that appears in every log line for
 that request, and `/health/ready` checks the database. The full set, and the
 test that enforces each, is in [docs/conventions.md](docs/conventions.md).
 
+Readiness checks every application table and required column without reading
+rows or writing probe data. On Postgres it also checks the runtime role's
+table, sequence and row-security-function permissions. Missing required tables,
+columns or grants return 503; compatible additive schema changes still pass.
+The probe does not need access to Alembic's version table, and `/health/live` stays
+independent of the database.
+
 ## Tests
 
 ```bash

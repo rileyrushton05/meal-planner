@@ -33,16 +33,17 @@ export interface paths {
         };
         /**
          * Ready
-         * @description The configuration is complete and the database answers a trivial
-         *     query.
+         * @description The configuration is complete and the database has the tables,
+         *     columns and permissions this application needs.
          *
          *     Configuration first: a deployment missing a required secret can reach
          *     its database and serve reads, then fail on the first sign-in. That
          *     happened to preview deployments, which had the database URL but not the
          *     rate-limit key; this makes it visible to anyone who checks.
          *
-         *     The wait is bounded by the engine's connect timeout, so a probe never
-         *     hangs on an unreachable database.
+         *     The probes are read-only, need no session or access to migration
+         *     history, and accept compatible additive schema changes. PostgreSQL
+         *     queries and lock waits have transaction-local timeouts.
          */
         get: operations["ready_health_ready_get"];
         put?: never;

@@ -11,9 +11,9 @@ import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import text
 
 from app import ratelimit
+from app.readiness import check_database_ready
 from server.deps import get_database
 from server.problems import problem_response
 
@@ -30,16 +30,17 @@ def live() -> dict[str, str]:
 
 @router.get("/health/ready", response_model=None)
 def ready(request: Request) -> dict[str, str] | JSONResponse:
-    """The configuration is complete and the database answers a trivial
-    query.
+    """The configuration is complete and the database has the tables,
+    columns and permissions this application needs.
 
     Configuration first: a deployment missing a required secret can reach
     its database and serve reads, then fail on the first sign-in. That
     happened to preview deployments, which had the database URL but not the
     rate-limit key; this makes it visible to anyone who checks.
 
-    The wait is bounded by the engine's connect timeout, so a probe never
-    hangs on an unreachable database.
+    The probes are read-only, need no session or access to migration
+    history, and accept compatible additive schema changes. PostgreSQL
+    queries and lock waits have transaction-local timeouts.
     """
     try:
         ratelimit.check_configured()
@@ -54,14 +55,13 @@ def ready(request: Request) -> dict[str, str] | JSONResponse:
             detail="The service is missing required configuration.",
         )
     try:
-        with get_database().engine.connect() as connection:
-            connection.execute(text("select 1"))
+        check_database_ready(get_database().engine)
     except Exception as exc:
         logger.warning("readiness check failed: %s", type(exc).__name__)
         return problem_response(
             request,
             status=503,
             slug="not-ready",
-            detail="The service cannot reach its database right now.",
+            detail="The service's database is unavailable or not ready.",
         )
     return {"status": "ok"}

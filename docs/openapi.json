@@ -48,7 +48,7 @@
           "ops"
         ],
         "summary": "Ready",
-        "description": "The configuration is complete and the database answers a trivial\nquery.\n\nConfiguration first: a deployment missing a required secret can reach\nits database and serve reads, then fail on the first sign-in. That\nhappened to preview deployments, which had the database URL but not the\nrate-limit key; this makes it visible to anyone who checks.\n\nThe wait is bounded by the engine's connect timeout, so a probe never\nhangs on an unreachable database.",
+        "description": "The configuration is complete and the database has the tables,\ncolumns and permissions this application needs.\n\nConfiguration first: a deployment missing a required secret can reach\nits database and serve reads, then fail on the first sign-in. That\nhappened to preview deployments, which had the database URL but not the\nrate-limit key; this makes it visible to anyone who checks.\n\nThe probes are read-only, need no session or access to migration\nhistory, and accept compatible additive schema changes. PostgreSQL\nqueries and lock waits have transaction-local timeouts.",
         "operationId": "ready_health_ready_get",
         "responses": {
           "200": {

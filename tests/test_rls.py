@@ -220,6 +220,59 @@ def test_rows_that_would_belong_to_or_point_at_someone_else_are_refused(
 # --- The whole app, running as the role ------------------------------------------
 
 
+def test_readiness_works_as_the_runtime_role_without_migration_table_access(
+    owner: Engine, runtime_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MEAL_PLANNER_DB_URL", runtime_url)
+    monkeypatch.setenv("MEAL_PLANNER_AUTO_MIGRATE", "false")
+
+    def sequence_values():
+        with owner.connect() as connection:
+            return {
+                table: tuple(
+                    connection.execute(
+                        text(f"SELECT last_value, is_called FROM {table}_id_seq")
+                    ).one()
+                )
+                for table in ("users", "meals", "ingredients", "weekly_plans")
+            }
+
+    before = sequence_values()
+    with api_client(as_guest=False) as client:
+        assert client.get("/health/ready").json() == {"status": "ok"}
+    assert sequence_values() == before
+
+
+@pytest.mark.parametrize(
+    "revocation",
+    [
+        f"REVOKE SELECT ON users FROM {RUNTIME_ROLE}",
+        f"REVOKE INSERT ON meals FROM {RUNTIME_ROLE}",
+        f"REVOKE UPDATE ON sessions FROM {RUNTIME_ROLE}",
+        f"REVOKE DELETE ON weekly_plans FROM {RUNTIME_ROLE}",
+        f"REVOKE USAGE ON SEQUENCE users_id_seq FROM {RUNTIME_ROLE}",
+        f"REVOKE EXECUTE ON FUNCTION current_app_user_id() FROM PUBLIC, {RUNTIME_ROLE}",
+    ],
+)
+def test_readiness_refuses_missing_runtime_permissions(
+    owner: Engine,
+    runtime_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    revocation: str,
+) -> None:
+    with owner.begin() as connection:
+        connection.execute(text(revocation))
+    monkeypatch.setenv("MEAL_PLANNER_DB_URL", runtime_url)
+    monkeypatch.setenv("MEAL_PLANNER_AUTO_MIGRATE", "false")
+
+    with api_client(as_guest=False) as client:
+        response = client.get("/health/ready")
+        assert response.status_code == 503
+        assert response.json()["type"] == "urn:meal-planner:problem:not-ready"
+        assert "permission" not in response.text
+        assert client.get("/health/live").status_code == 200
+
+
 def test_the_app_works_end_to_end_as_the_runtime_role(
     runtime_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

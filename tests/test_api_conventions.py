@@ -13,8 +13,10 @@ import uuid
 
 import pytest
 from api_client import api_client
+from sqlalchemy import text
 
 from app.db import Database
+from app.models import ALL_TABLES
 from app.repositories import MealRepository
 from server.observability import configure_logging
 from server.routers import health
@@ -276,6 +278,57 @@ def test_liveness_needs_no_database(client, monkeypatch):
 
 def test_readiness_checks_the_database(client):
     assert client.get("/health/ready").json() == {"status": "ok"}
+
+
+def test_readiness_refuses_an_unmigrated_database(client, monkeypatch, tmp_path):
+    unmigrated = Database(f"sqlite:///{tmp_path / 'unmigrated.db'}")
+    monkeypatch.setattr(health, "get_database", lambda: unmigrated)
+
+    response = client.get("/health/ready")
+
+    assert (
+        _assert_problem(response, 503)["type"] == "urn:meal-planner:problem:not-ready"
+    )
+    assert "users" not in response.text
+    assert client.get("/health/live").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "damage",
+    [
+        "DROP TABLE rate_limits",
+        "ALTER TABLE users RENAME COLUMN recovery_code_hash TO old_recovery_code_hash",
+    ],
+)
+def test_readiness_refuses_missing_application_tables_or_columns(client, db, damage):
+    with db.engine.begin() as connection:
+        connection.execute(text(damage))
+
+    response = client.get("/health/ready")
+
+    assert (
+        _assert_problem(response, 503)["type"] == "urn:meal-planner:problem:not-ready"
+    )
+    assert "rate_limits" not in response.text
+    assert "recovery_code_hash" not in response.text
+
+
+def test_readiness_is_read_only_and_accepts_additive_schema_changes(client, db):
+    with db.engine.begin() as connection:
+        connection.execute(text("ALTER TABLE users ADD COLUMN future_column TEXT"))
+
+    def counts():
+        with db.engine.connect() as connection:
+            return {
+                model.__tablename__: connection.execute(
+                    text(f"SELECT count(*) FROM {model.__tablename__}")
+                ).scalar_one()
+                for model in ALL_TABLES
+            }
+
+    before = counts()
+    assert client.get("/health/ready").json() == {"status": "ok"}
+    assert counts() == before
 
 
 def test_readiness_fails_as_a_problem_when_the_database_is_down(
