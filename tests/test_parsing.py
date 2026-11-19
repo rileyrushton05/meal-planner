@@ -146,7 +146,7 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("2 400 g tins chickpeas", 800, "g", "Chickpeas"),
     # Footnote marks and prices are not part of the name.
     ("2 cups vegetable stock*", 2, "cups", "Vegetable Stock"),
-    ("1 cup ditalini (uncooked)** ($0.39)", 1, "cups", "Ditalini"),
+    ("1 cup ditalini (uncooked)** ($0.39)", 1, "cups", "Pasta"),
     # No amount.
     ("Salt and pepper, to taste", None, "", "Salt and pepper"),
     ("Salt to taste", None, "", "Salt"),

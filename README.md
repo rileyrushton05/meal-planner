@@ -23,6 +23,10 @@ planned.
 
 ## Engineering highlights
 
+- **Recipe import from any link, safely.** The server fetches a page a
+  stranger chose, so it is held to server-side request forgery guards, reads
+  hostile input in linear time, and parses ingredient lines with rules
+  checked against live recipe sites. ([how it works](#import-a-recipe-from-a-link))
 - **Two walls around everyone's data.** Every query is scoped to the person
   asking, and Postgres row-level security filters again underneath, so a
   query that forgot its filter still returns nothing of anyone else's. The
@@ -47,6 +51,57 @@ planned.
   browser test, and error reports that never say who.
   ([security](docs/security.md))
 
+## Import a recipe from a link
+
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/import-light.png">
+  <img align="right" width="360" alt="Checking an imported recipe: Weeknight Beef Ragu, serves 6, with seven ingredient rows. Each shows the line as the page wrote it above how it was read, such as 2 x 400 g cans diced tomatoes read as 800 g of Diced Tomatoes. Salt and pepper, to taste, is flagged for having no amount." src="docs/images/import-dark.png">
+</picture>
+
+Paste a recipe page's link and the app reads its name, servings and every
+ingredient. You check each line, then the meal is created in one request.
+
+**How it works**
+
+1. **The page describes itself.** Recipe sites publish a machine-readable
+   copy of each recipe for search engines: schema.org `Recipe` data, as
+   JSON-LD inside the page. The server fetches the page and reads that, so
+   one reader works across sites and survives a redesign.
+2. **Each line is read by rules.** "2 x 400 g cans diced tomatoes" is 800 g
+   of Diced Tomatoes; "1 lb / 500g beef mince" keeps the metric 500 g;
+   "2 garlic cloves, crushed" is 2 cloves of Garlic, with "crushed" set
+   aside. Names are matched to the ingredient catalogue, so the grocery list
+   adds them up with every other meal.
+3. **You check before anything is saved.** Each row shows the line as the
+   page wrote it above how it was read, with a note on anything doubtful: no
+   amount, a range resolved, a name the app does not know.
+
+**The engineering in it**
+
+- **Fetching a URL someone else chose.** Only public addresses: private,
+  loopback, link-local, cloud metadata and IPv4-mapped forms are refused.
+  The server connects to the exact address it checked, sending the name as
+  Host and as the TLS server name, so DNS rebinding cannot swap in an
+  internal address while the certificate is still verified. Every redirect
+  is checked again; 5 seconds, 2 MB and HTML only; 20 imports an hour per
+  person, failures included. Each refusal is tested without the network.
+  ([security](docs/security.md#requests))
+- **Linear on hostile input.** Python's `html.parser` took minutes on a page
+  of two megabytes of `<`, which anyone could host. It was replaced with a
+  single-pass scan, and a timed test holds every hostile shape found, at the
+  full 2 MB, to under a second.
+- **Rules, not a language model.** Free to run, the same answer every time,
+  and nothing on a page can talk it into anything. 109 table-driven example
+  lines pin its behaviour, and 14 of its rules were broken on purpose, one
+  at a time: the table caught every one.
+- **Checked against live sites.** Real pages exposed lines the hand-written
+  fixtures had not: notes in nested brackets, one amount in two units,
+  preparation with no comma before it. Each became a failing test line, then
+  a fix. Sites that turn away non-browser clients get a plain message
+  suggesting paste, not a disguised User-Agent.
+
+<br clear="right">
+
 ## Features
 
 <img align="right" width="230" alt="The grocery list on a phone, with the tab bar along the bottom" src="docs/images/groceries-phone.png">
@@ -57,16 +112,12 @@ planned.
   device brings it back.
 - **This week** opens on tonight's meal and what it needs, tomorrow's, and
   how much of the week is planned.
-- **Meals** with a serving size and ingredients. **Paste a recipe's whole
-  ingredient list** and each line is read for you ("1 x 400 g can chopped
-  tomatoes" is 400 g of Diced Tomatoes, "2-3 garlic cloves" is 3 cloves),
-  shown to check and correct, then saved in one request. **Or import a
-  recipe from its link:** the page's recipe data gives the name, servings
-  and ingredients, checked the same way before the meal is created. Or add
-  them one at
-  a time, with autocomplete that fills in the usual unit. Names match
-  ignoring case and units are stored one way ("clove", "Cloves"), so "Eggs"
-  and "eggs" stay one item rather than splitting the shopping list.
+- **Meals** with a serving size and ingredients, three ways in: import a
+  recipe from its link ([above](#import-a-recipe-from-a-link)), paste a
+  recipe's ingredient list to be read the same way, or add them one at a
+  time with autocomplete that fills in the usual unit. Names match ignoring
+  case and units are stored one way ("clove", "Cloves"), so "Eggs" and
+  "eggs" stay one item rather than splitting the shopping list.
 - **About 40 templates** of common meals, ingredients filled in, added in
   one click.
 - **Weekly plan:** pick a meal and servings for each day of any week; it
