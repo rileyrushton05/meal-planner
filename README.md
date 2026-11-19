@@ -189,6 +189,7 @@ the-fridge-door/
 │   ├── units.py            #   Unit conversion and quantity formatting
 │   ├── catalog.py          #   Ingredient catalogue: loading, matching, syncing
 │   ├── catalog.csv         #   The catalogue itself: items, aisles, aliases
+│   ├── parsing.py          #   Reading a typed line: "1 x 400 g can tomatoes"
 │   ├── templates.py        #   Starter meals
 │   ├── samples.py          #   What a new guest starts with
 │   ├── readiness.py        #   The database checks behind /health/ready
