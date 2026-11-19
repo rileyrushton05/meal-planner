@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
+from app import jobs, units
 from app.models import DayOfWeek
 from app.planner import generate_weekly_grocery_list
 
@@ -140,3 +141,76 @@ def test_results_are_sorted_by_ingredient_name(meals, plans):
 
     names = [item.name for item in generate_weekly_grocery_list(plans, WEEK_1)]
     assert names == sorted(names)
+
+
+# --- Counted things are bought whole --------------------------------------------
+
+
+def test_half_a_counted_item_is_one_to_buy(meals, plans):
+    """A recipe for four planned for two needs half a lettuce: buy one."""
+    meal = meals.add("Caesar Salad", servings=4)
+    meals.add_ingredient(meal.id, "Lettuce", 1, "")
+    plans.set_day(WEEK_1, DayOfWeek.MONDAY, meal.id, servings=2)
+
+    assert as_pairs(generate_weekly_grocery_list(plans, WEEK_1)) == {"Lettuce": "1"}
+
+
+def test_counted_items_are_rounded_up_only_once_totalled(meals, plans):
+    """Half a lettuce on two nights is one lettuce, not two."""
+    meal = meals.add("Caesar Salad", servings=4)
+    meals.add_ingredient(meal.id, "Lettuce", 1, "")
+    plans.set_day(WEEK_1, DayOfWeek.MONDAY, meal.id, servings=2)
+    plans.set_day(WEEK_1, DayOfWeek.FRIDAY, meal.id, servings=2)
+
+    assert as_pairs(generate_weekly_grocery_list(plans, WEEK_1)) == {"Lettuce": "1"}
+
+
+def test_counted_units_round_up_and_measures_do_not(meals, plans):
+    meal = meals.add("Chilli", servings=4)
+    meals.add_ingredient(meal.id, "Kidney Beans", 1, "cans")
+    meals.add_ingredient(meal.id, "Garlic", 3, "cloves")
+    meals.add_ingredient(meal.id, "Rice", 1, "cups")
+    meals.add_ingredient(meal.id, "Beef Mince", 500, "g")
+    plans.set_day(WEEK_1, DayOfWeek.MONDAY, meal.id, servings=2)
+
+    assert as_pairs(generate_weekly_grocery_list(plans, WEEK_1)) == {
+        "Kidney Beans": "1 can",
+        "Garlic": "2 cloves",
+        "Rice": "0.5 cups",
+        "Beef Mince": "250 g",
+    }
+
+
+def test_to_buy_rounds_only_counted_units() -> None:
+    assert units.to_buy(0.5, "") == 1
+    assert units.to_buy(1.5, "bunches") == 2
+    # A total floating point left a hair over a whole number is that number.
+    assert 0.1 * 3 * 10 > 3
+    assert units.to_buy(0.1 * 3 * 10, "") == 3
+    assert units.to_buy(0.5, "tbsp") == 0.5
+    assert units.to_buy(250, "g") == 250
+
+
+# --- Aisles ---------------------------------------------------------------------
+
+
+def test_lines_come_in_aisle_order_with_the_unknown_last(db, meals, plans):
+    with db.transaction() as session:
+        jobs.sync_catalog(
+            session, now=datetime(2026, 11, 19, tzinfo=UTC), dry_run=False
+        )
+    meal = meals.add("Everything")
+    for name in ("Frozen Peas", "Dragon Fruit", "Milk", "Pasta", "Onion", "Bacon"):
+        meals.add_ingredient(meal.id, name, 1, "")
+    plans.set_day(WEEK_1, DayOfWeek.MONDAY, meal.id)
+
+    items = generate_weekly_grocery_list(plans, WEEK_1)
+
+    assert [(item.name, item.category) for item in items] == [
+        ("Onion", "produce"),
+        ("Bacon", "meat"),
+        ("Milk", "dairy"),
+        ("Pasta", "pantry"),
+        ("Frozen Peas", "frozen"),
+        ("Dragon Fruit", None),
+    ]

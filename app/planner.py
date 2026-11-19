@@ -6,7 +6,11 @@ from dataclasses import dataclass
 from datetime import date
 
 from app import units
+from app.models import Category
 from app.repositories import WeeklyPlanRepository
+
+#: Aisle order, as a supermarket is walked; the unknown last.
+_AISLE = {category.value: index for index, category in enumerate(Category)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,6 +25,9 @@ class GroceryItem:
     qty: float
     #: Empty for count-based items ("2 onions").
     unit: str
+    #: The aisle (a `Category` value), or None when the catalogue does not
+    #: know the ingredient.
+    category: str | None = None
 
     @property
     def display_qty(self) -> str:
@@ -34,26 +41,44 @@ class GroceryItem:
 def generate_weekly_grocery_list(
     plans: WeeklyPlanRepository, week_start_date: date
 ) -> list[GroceryItem]:
-    """Total everything needed for one week, sorted by ingredient then unit.
+    """Total everything needed for one week, in aisle order, then by
+    ingredient and unit.
 
     Quantities scale when a day's planned servings differ from the recipe,
     and convert to a common base unit where that is unambiguous. Units that
-    cannot be converted between each other stay as separate lines.
+    cannot be converted between each other stay as separate lines. Counted
+    things are rounded up to whole ones once totalled, since that is how
+    they are bought: half a lettuce on Monday and half on Friday is one.
 
     Takes the repository rather than a Database so the read joins whatever
     transaction the caller already has open, instead of starting a second.
     """
     totals: dict[tuple[str, str], float] = {}
+    aisles: dict[str, str | None] = {}
 
-    for name, qty, unit, planned, base in plans.ingredient_rows_for_week(
+    for name, qty, unit, planned, base, category in plans.ingredient_rows_for_week(
         week_start_date
     ):
         scale = planned / base if planned and base else 1.0
         scaled_qty, base_unit = units.normalize((qty or 0) * scale, unit)
         key = (name, base_unit)
         totals[key] = totals.get(key, 0.0) + scaled_qty
+        aisles[name] = category
 
-    return [
-        GroceryItem(name=name, qty=qty, unit=unit)
-        for (name, unit), qty in sorted(totals.items())
+    items = [
+        GroceryItem(
+            name=name,
+            qty=units.to_buy(qty, unit),
+            unit=unit,
+            category=aisles[name],
+        )
+        for (name, unit), qty in totals.items()
     ]
+    return sorted(
+        items,
+        key=lambda item: (
+            _AISLE.get(item.category or "", len(_AISLE)),
+            item.name,
+            item.unit,
+        ),
+    )

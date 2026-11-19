@@ -212,8 +212,8 @@ describe("weeks already visited", () => {
 });
 
 describe("the grocery list", () => {
-  const thisWeek = [{ name: "Pasta", qty: 400, unit: "g", display: "400 g" }];
-  const nextWeek = [{ name: "Rice", qty: 300, unit: "g", display: "300 g" }];
+  const thisWeek = [{ name: "Pasta", qty: 400, unit: "g", display: "400 g", category: null }];
+  const nextWeek = [{ name: "Rice", qty: 300, unit: "g", display: "300 g", category: null }];
 
   beforeEach(() => {
     mocked.getGroceryList.mockImplementation(async (week: string) =>
