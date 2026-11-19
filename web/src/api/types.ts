@@ -33,8 +33,13 @@ export type Meal = Schemas["MealRead"];
 export type DayAssignment = Schemas["DayAssignment"];
 export type DayAssignmentWrite = Schemas["DayAssignmentWrite"];
 export type GroceryLine = Schemas["GroceryLine"];
-/** A supermarket aisle; grocery lines arrive in this order. */
+/** A supermarket aisle; grocery lines arrive in the person's aisle order. */
 export type Category = Schemas["Category"];
+/** In the basket, or already at home. */
+export type CheckState = Schemas["CheckState"];
+export type GroceryUsual = Schemas["GroceryUsualRead"];
+/** A week's list with what the page needs to change it. */
+export type GroceryList = Schemas["GroceryList"];
 export type TemplateIngredient = Schemas["TemplateIngredientRead"];
 export type MealTemplate = Schemas["TemplateRead"];
 /** Everything needed to render one week, fetched in a single request. */

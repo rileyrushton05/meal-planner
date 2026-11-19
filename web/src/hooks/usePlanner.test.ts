@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, api } from "@/api/client";
 import { createQueryClient } from "@/api/queryClient";
+import type { GroceryList } from "@/api/types";
 import { usePlanner } from "@/hooks/usePlanner";
 import { makeMeal, makeState } from "@/test/factories";
 
@@ -15,7 +16,10 @@ vi.mock("@/api/client", async (importOriginal) => ({
     getPlan: vi.fn(),
     setPlan: vi.fn(),
     deleteMeal: vi.fn(),
-    getGroceryList: vi.fn(),
+    getGroceries: vi.fn(),
+    setGroceryCheck: vi.fn(),
+    addExtra: vi.fn(),
+    setAisleOrder: vi.fn(),
   },
 }));
 
@@ -212,11 +216,28 @@ describe("weeks already visited", () => {
 });
 
 describe("the grocery list", () => {
-  const thisWeek = [{ name: "Pasta", qty: 400, unit: "g", display: "400 g", category: null }];
-  const nextWeek = [{ name: "Rice", qty: 300, unit: "g", display: "300 g", category: null }];
+  const listFor = (week: string, name: string): GroceryList => ({
+    week_start: week,
+    lines: [
+      {
+        key: `${name.toLowerCase()}|g`,
+        name,
+        qty: 400,
+        unit: "g",
+        display: "400 g",
+        category: null,
+        state: null,
+        extra_id: null,
+      },
+    ],
+    usuals: [],
+    aisle_order: ["produce", "meat", "dairy", "bakery", "pantry", "frozen"],
+  });
+  const thisWeek = listFor("2026-08-24", "Pasta");
+  const nextWeek = listFor("2026-08-31", "Rice");
 
   beforeEach(() => {
-    mocked.getGroceryList.mockImplementation(async (week: string) =>
+    mocked.getGroceries.mockImplementation(async (week: string) =>
       week === "2026-08-24" ? thisWeek : nextWeek,
     );
   });
@@ -224,12 +245,12 @@ describe("the grocery list", () => {
   it("loads itself on a page that shows it, and not on any other", async () => {
     const elsewhere = await renderPlanner();
     expect(elsewhere.result.current.grocery).toBeNull();
-    expect(mocked.getGroceryList).not.toHaveBeenCalled();
+    expect(mocked.getGroceries).not.toHaveBeenCalled();
     elsewhere.unmount();
 
     const { result } = await renderPlanner({ loadGroceries: true });
     await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
-    expect(mocked.getGroceryList).toHaveBeenCalledWith("2026-08-24");
+    expect(mocked.getGroceries).toHaveBeenCalledWith("2026-08-24");
   });
 
   it("belongs to its week, and comes back from memory on returning", async () => {
@@ -241,7 +262,7 @@ describe("the grocery list", () => {
 
     act(() => result.current.setWeek("2026-08-24"));
     await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
-    expect(mocked.getGroceryList).toHaveBeenCalledTimes(2);
+    expect(mocked.getGroceries).toHaveBeenCalledTimes(2);
   });
 
   it("is fetched again after the plan changes, since it is made from the plan", async () => {
@@ -251,14 +272,91 @@ describe("the grocery list", () => {
 
     await act(() => result.current.savePlan("2026-08-24", []));
 
-    await waitFor(() => expect(mocked.getGroceryList).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mocked.getGroceries).toHaveBeenCalledTimes(2));
   });
 
   it("reports a list that fails to load", async () => {
-    mocked.getGroceryList.mockRejectedValue(new ApiError(500, "The list could not be made."));
+    mocked.getGroceries.mockRejectedValue(new ApiError(500, "The list could not be made."));
     const { result } = await renderPlanner({ loadGroceries: true });
 
     await waitFor(() => expect(result.current.error).toBe("The list could not be made."));
+  });
+
+  it("shows a tick at once, then fetches the list again once it is saved", async () => {
+    let save!: () => void;
+    mocked.setGroceryCheck.mockImplementation(
+      () => new Promise<void>((resolve) => (save = resolve)),
+    );
+    const { result } = await renderPlanner({ loadGroceries: true });
+    await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
+
+    act(() => void result.current.setGroceryCheck("2026-08-24", "pasta|g", "basket"));
+
+    // Before the server has answered.
+    await waitFor(() => expect(result.current.grocery?.lines[0].state).toBe("basket"));
+    expect(mocked.getGroceries).toHaveBeenCalledTimes(1);
+
+    await act(async () => save());
+
+    // Then made sure of: whatever else changed on another device shows too.
+    await waitFor(() => expect(mocked.getGroceries).toHaveBeenCalledTimes(2));
+    expect(mocked.setGroceryCheck).toHaveBeenCalledWith("2026-08-24", "pasta|g", "basket");
+  });
+
+  it("puts a tick right, and says so, when it could not be saved", async () => {
+    mocked.setGroceryCheck.mockRejectedValue(new ApiError(503, "Couldn't save that tick."));
+    const { result } = await renderPlanner({ loadGroceries: true });
+    await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
+
+    await act(() => result.current.setGroceryCheck("2026-08-24", "pasta|g", "basket"));
+
+    expect(result.current.error).toBe("Couldn't save that tick.");
+    // The list is fetched again, and the server's (unticked) version wins.
+    await waitFor(() => expect(result.current.grocery?.lines[0].state).toBeNull());
+  });
+
+  it("orders the aisles at once, and back again if that fails", async () => {
+    mocked.setAisleOrder.mockRejectedValue(new ApiError(503, "Not saved."));
+    const { result } = await renderPlanner({ loadGroceries: true });
+    await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
+    const before = thisWeek.aisle_order;
+
+    await act(() =>
+      result.current.setAisleOrder(["frozen", "pantry", "bakery", "dairy", "meat", "produce"]),
+    );
+
+    expect(result.current.grocery?.aisle_order).toEqual(before);
+    expect(result.current.error).toBe("Not saved.");
+  });
+
+  it("files an added extra under the week the server says, and resolves true", async () => {
+    const milk = { ...thisWeek.lines[0], key: "+milk", name: "Milk", extra_id: 4 };
+    const withMilk = { ...thisWeek, lines: [...thisWeek.lines, milk] };
+    mocked.addExtra.mockResolvedValue(withMilk);
+    const { result } = await renderPlanner({ loadGroceries: true });
+    await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.addExtra("2026-08-24", "milk");
+    });
+
+    expect(added).toBe(true);
+    expect(result.current.grocery).toEqual(withMilk);
+  });
+
+  it("resolves false when an extra is refused, so the field keeps it", async () => {
+    mocked.addExtra.mockRejectedValue(new ApiError(422, "Say what to add, like 2 L milk."));
+    const { result } = await renderPlanner({ loadGroceries: true });
+    await waitFor(() => expect(result.current.grocery).toEqual(thisWeek));
+
+    let added: boolean | undefined;
+    await act(async () => {
+      added = await result.current.addExtra("2026-08-24", "2 kg");
+    });
+
+    expect(added).toBe(false);
+    expect(result.current.error).toBe("Say what to add, like 2 L milk.");
   });
 });
 

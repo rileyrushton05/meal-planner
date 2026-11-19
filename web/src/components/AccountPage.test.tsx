@@ -15,6 +15,12 @@ const EXPORT: AccountExport = {
   account: { email: "cook@example.com", is_guest: false, created_at: null },
   meals: [{ name: "Tacos", servings: 4, ingredients: [] }],
   plans: [],
+  groceries: {
+    usuals: [],
+    extras: [],
+    ticks: [],
+    aisle_order: ["produce", "meat", "dairy", "bakery", "pantry", "frozen"],
+  },
 };
 
 afterEach(() => vi.restoreAllMocks());

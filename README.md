@@ -125,12 +125,16 @@ ingredient. You check each line, then the meal is created in one request.
   cooked for longest in one click (one Undo puts them back), and "copy last
   week" carries a week forward.
 - **Grocery list:** everything planned for the week, totalled and grouped
-  by aisle in the order a shop is walked. Metric mass and volume (mg/g/kg,
-  ml/L) convert to a common unit before merging, quantities scale when a day
-  cooks for more or fewer than the recipe, and counted things round up to
-  whole ones once totalled (half a lettuce on two nights is one lettuce).
-  Tick things off as they go in the basket and copy what's left, or download
-  the whole list.
+  by aisle, in the order of your own shop (set once, with up and down
+  buttons). Metric mass and volume (mg/g/kg, ml/L) convert to a common unit
+  before merging, quantities scale when a day cooks for more or fewer than
+  the recipe, and counted things round up to whole ones once totalled (half
+  a lettuce on two nights is one lettuce). Add extras no meal needs by
+  typing them as you'd say them ("2 L milk"), keep the ones you buy every
+  week as usuals and add them all in one click, and set aside what's
+  already in the cupboard. Ticks are saved to your account, so the phone in
+  the shop and the laptop at home show the same list, and two people
+  shopping see each other's. Copy what's left, or download the whole list.
 - **An ingredient catalogue** links ingredients to about 80 common grocery
   items by name or alias, which is how the list knows each one's aisle.
 - **Your data is yours:** download all of it as JSON, or delete the account
@@ -271,13 +275,13 @@ the-fridge-door/
 │   ├── headers.py          #   Security headers on API responses
 │   ├── observability.py    #   Request ids and structured logs
 │   ├── monitoring.py       #   Error reports to Sentry, scrubbed
-│   └── routers/            #   auth, account, meals, plans, state, health, monitoring
+│   └── routers/            #   auth, account, meals, plans, groceries, state, health, monitoring
 ├── api/index.py            # Vercel serverless entry point
 ├── web/                    # React + TypeScript + Tailwind
 │   ├── src/
 │   │   ├── api/            #   Typed client; schema.ts is generated from the API
 │   │   ├── components/     #   Pages and parts; ui/ holds the shadcn primitives
-│   │   ├── hooks/          #   Server state (TanStack Query), basket, theme
+│   │   ├── hooks/          #   Server state (TanStack Query), theme
 │   │   └── lib/            #   Dates, the URL as state, quantities, monitoring
 │   ├── e2e/                #   Playwright specs
 │   └── screenshots/        #   The images in this README (npm run screenshots)

@@ -40,7 +40,10 @@ export function PrivacyPage() {
               "Your password and recovery code",
               "Only as one-way hashes, so they can be checked but never read back, even by the app.",
             ],
-            ["Your meals and plans", "The meals, ingredients and planned days you add, tied to your account."],
+            [
+              "Your meals, plans and grocery list",
+              "The meals, ingredients and planned days you add, and on the grocery list what you tick off, add, keep as usuals and the order of your aisles, tied to your account.",
+            ],
             [
               "Your session",
               "A cookie that keeps you signed in. The app stores only a hash of it, and it ends after 30 days.",
@@ -51,7 +54,7 @@ export function PrivacyPage() {
             ],
             [
               "In your browser only",
-              "Your light or dark choice, and the grocery items you've ticked off. Never sent anywhere.",
+              "Your light or dark choice. Never sent anywhere.",
             ],
           ]}
         />

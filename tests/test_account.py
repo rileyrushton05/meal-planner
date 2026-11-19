@@ -54,6 +54,18 @@ def _fill(client, meal: str, ingredient: str) -> int:
         },
     )
     assert planned.status_code == 200, planned.text
+    # And something of every kind on the grocery list.
+    groceries = f"/api/groceries/{WEEK}"
+    tick = {"key": f"{ingredient.casefold()}|g", "state": "basket"}
+    assert client.put(f"{groceries}/checks", json=tick).status_code == 204
+    extra = client.post(f"{groceries}/extras", json={"text": f"2 {meal} candles"})
+    assert extra.status_code == 200, extra.text
+    usual = client.post("/api/usuals", json={"text": f"{meal} napkins"})
+    assert usual.status_code == 200, usual.text
+    order = ["frozen", "pantry", "bakery", "dairy", "meat", "produce"]
+    assert (
+        client.put("/api/aisle-order", json={"aisle_order": order}).status_code == 200
+    )
     return meal_id
 
 
@@ -177,6 +189,19 @@ def test_the_export_is_everything_of_yours_and_nothing_of_anyone_elses(
             "servings": None,
         },
     ]
+    assert body["groceries"] == {
+        "usuals": [{"name": "Mine Lasagne napkins", "qty": None, "unit": ""}],
+        "extras": [
+            {
+                "week_start": WEEK,
+                "name": "Mine Lasagne candles",
+                "qty": 2,
+                "unit": "",
+            }
+        ],
+        "ticks": [{"week_start": WEEK, "item": "pasta|g", "state": "basket"}],
+        "aisle_order": ["frozen", "pantry", "bakery", "dairy", "meat", "produce"],
+    }
     assert "Their Curry" not in response.text
     assert "Rice" not in response.text
 
@@ -215,6 +240,8 @@ def test_a_guest_deletes_everything_without_a_password(guest, someone_else, db) 
     me = _user_id(db, meal="Guest Soup")
     them = _user_id(db, meal="Their Curry")
     theirs_before = _rows_owned_by(db, them)
+    # Something in every table, so "all gone" below proves each one goes.
+    assert 0 not in _rows_owned_by(db, me).values()
 
     response = guest.delete("/api/account")
 

@@ -16,7 +16,10 @@ import type {
   AppState,
   Day,
   DayAssignmentWrite,
-  GroceryLine,
+  Category,
+  CheckState,
+  GroceryList,
+  GroceryUsual,
   ImportedRecipe,
   IngredientLine,
   Meal,
@@ -286,8 +289,49 @@ export const api = {
   copyPreviousWeek: (week: string): Promise<WeekPlan> =>
     request(`/api/plan/${week}/copy-previous`, { method: "POST" }),
 
-  getGroceryList: (week: string): Promise<GroceryLine[]> =>
-    request(`/api/grocery-list/${week}`),
+  /** The week's list with its ticks, extras, usuals and aisle order. */
+  getGroceries: (week: string): Promise<GroceryList> => request(`/api/groceries/${week}`),
+
+  /** Tick a line off, mark it as at home, or (null) put it back to get. */
+  setGroceryCheck: (week: string, key: string, state: CheckState | null): Promise<void> =>
+    request(`/api/groceries/${week}/checks`, {
+      method: "PUT",
+      body: JSON.stringify({ key, state }),
+    }),
+
+  /** Untick everything in the basket; what is at home stays marked. */
+  emptyBasket: (week: string): Promise<GroceryList> =>
+    request(`/api/groceries/${week}/basket`, { method: "DELETE" }),
+
+  /** "2 L milk", read on the server as a recipe line is. */
+  addExtra: (week: string, text: string): Promise<GroceryList> =>
+    request(`/api/groceries/${week}/extras`, {
+      method: "POST",
+      body: JSON.stringify({ text }),
+    }),
+
+  removeExtra: (week: string, extraId: number): Promise<GroceryList> =>
+    request(`/api/groceries/${week}/extras/${extraId}`, { method: "DELETE" }),
+
+  /** Keep an extra as a usual, at its amount. */
+  keepExtra: (week: string, extraId: number): Promise<GroceryList> =>
+    request(`/api/groceries/${week}/extras/${extraId}/keep`, { method: "POST" }),
+
+  /** Every usual onto the week's list. */
+  addUsuals: (week: string): Promise<GroceryList> =>
+    request(`/api/groceries/${week}/add-usuals`, { method: "POST" }),
+
+  addUsual: (text: string): Promise<GroceryUsual[]> =>
+    request("/api/usuals", { method: "POST", body: JSON.stringify({ text }) }),
+
+  removeUsual: (id: number): Promise<GroceryUsual[]> =>
+    request(`/api/usuals/${id}`, { method: "DELETE" }),
+
+  setAisleOrder: (order: Category[]): Promise<Category[]> =>
+    request("/api/aisle-order", {
+      method: "PUT",
+      body: JSON.stringify({ aisle_order: order }),
+    }),
 
   /** Who is signed in. Signed out, this starts a guest session first. */
   me: (): Promise<Account> => request("/api/auth/me"),

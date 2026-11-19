@@ -17,6 +17,7 @@ from app.auth import AuthService, CurrentUser
 from app.db import Database, act_as, load_env_file
 from app.exceptions import NotSignedInError
 from app.repositories import (
+    GroceryRepository,
     IngredientRepository,
     MealRepository,
     WeeklyPlanRepository,
@@ -36,6 +37,7 @@ class Services:
     meals: MealRepository
     ingredients: IngredientRepository
     plans: WeeklyPlanRepository
+    groceries: GroceryRepository
 
 
 @lru_cache(maxsize=1)
@@ -128,6 +130,7 @@ def get_services(session: TransactionDep, user: CurrentUserDep) -> Services:
         meals=MealRepository(session, user_id=user.id),
         ingredients=IngredientRepository(session, user_id=user.id),
         plans=WeeklyPlanRepository(session, user_id=user.id),
+        groceries=GroceryRepository(session, user_id=user.id),
     )
 
 

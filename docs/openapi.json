@@ -360,7 +360,7 @@
           "account"
         ],
         "summary": "Export Account",
-        "description": "Everything that is yours, as a JSON file to download: the account,\nevery meal with its ingredients, and every planned day.",
+        "description": "Everything that is yours, as a JSON file to download: the account,\nevery meal with its ingredients, every planned day, and the grocery\nlist's usuals, extras, ticks and aisle order.",
         "operationId": "export_account_api_account_export_get",
         "responses": {
           "200": {
@@ -1466,7 +1466,7 @@
           "plan"
         ],
         "summary": "Grocery List",
-        "description": "Consolidated shopping list for the week containing `week`.",
+        "description": "The week's lines alone. Superseded by GET /api/groceries/{week};\nkept so a page loaded before that existed keeps working until reloaded.",
         "operationId": "grocery_list_api_grocery_list__week__get",
         "parameters": [
           {
@@ -1491,6 +1491,581 @@
                     "$ref": "#/components/schemas/GroceryLine"
                   },
                   "title": "Response Grocery List Api Grocery List  Week  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}": {
+      "get": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Get Groceries",
+        "description": "The week's list: the meals' lines and the extras, each marked as\nstill to get, in the basket or at home, in the person's aisle order.",
+        "operationId": "get_groceries_api_groceries__week__get",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}/checks": {
+      "put": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Set Check",
+        "description": "Tick a line off, mark it as at home, or put it back to get.\n\nAnswers with nothing rather than the list: ticking happens fast, in the\nshop, and the page already shows the tick. A key no line has is stored\nharmlessly, since lines come and go with the plan.",
+        "operationId": "set_check_api_groceries__week__checks_put",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroceryCheckWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}/basket": {
+      "delete": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Empty Basket",
+        "description": "Start the shop again: untick everything, keeping what is at home.",
+        "operationId": "empty_basket_api_groceries__week__basket_delete",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}/extras": {
+      "post": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Add Extra",
+        "description": "Add something no meal needs. Already on the list: its amount changes.",
+        "operationId": "add_extra_api_groceries__week__extras_post",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroceryItemText"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}/extras/{extra_id}": {
+      "delete": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Remove Extra",
+        "operationId": "remove_extra_api_groceries__week__extras__extra_id__delete",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          },
+          {
+            "name": "extra_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Extra Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}/extras/{extra_id}/keep": {
+      "post": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Keep As Usual",
+        "description": "Keep an extra as a usual, at its amount, for adding to later weeks.",
+        "operationId": "keep_as_usual_api_groceries__week__extras__extra_id__keep_post",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          },
+          {
+            "name": "extra_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Extra Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/groceries/{week}/add-usuals": {
+      "post": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Add Usuals",
+        "description": "Every usual onto the week's list in one go; ones already there by\nname keep the amount they have.",
+        "operationId": "add_usuals_api_groceries__week__add_usuals_post",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroceryList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuals": {
+      "post": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Add Usual",
+        "operationId": "add_usual_api_usuals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GroceryItemText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroceryUsualRead"
+                  },
+                  "type": "array",
+                  "title": "Response Add Usual Api Usuals Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usuals/{usual_id}": {
+      "delete": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Remove Usual",
+        "operationId": "remove_usual_api_usuals__usual_id__delete",
+        "parameters": [
+          {
+            "name": "usual_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Usual Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GroceryUsualRead"
+                  },
+                  "title": "Response Remove Usual Api Usuals  Usual Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/aisle-order": {
+      "put": {
+        "tags": [
+          "groceries"
+        ],
+        "summary": "Set Aisle Order",
+        "description": "The order of the aisles in this person's shop, for every week.",
+        "operationId": "set_aisle_order_api_aisle_order_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AisleOrder"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Category"
+                  },
+                  "type": "array",
+                  "title": "Response Set Aisle Order Api Aisle Order Put"
                 }
               }
             }
@@ -1629,6 +2204,9 @@
             },
             "type": "array",
             "title": "Plans"
+          },
+          "groceries": {
+            "$ref": "#/components/schemas/ExportedGroceries"
           }
         },
         "type": "object",
@@ -1638,10 +2216,28 @@
           "exported_at",
           "account",
           "meals",
-          "plans"
+          "plans",
+          "groceries"
         ],
         "title": "AccountExport",
         "description": "Everything the app holds that is the caller's own, in a form a person\ncan read and another program can import: names rather than internal\nids, which mean nothing outside this database.\n\nNot included, because they are not content: the password hash, session\ntokens, and throttle records, which are keyed hashes of an email or\nnetwork and expire on their own."
+      },
+      "AisleOrder": {
+        "properties": {
+          "aisle_order": {
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "type": "array",
+            "title": "Aisle Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "aisle_order"
+        ],
+        "title": "AisleOrder"
       },
       "AppState": {
         "properties": {
@@ -1702,6 +2298,15 @@
         ],
         "title": "Category",
         "description": "Where an item is in a supermarket, so a grocery list can follow the\naisles. Declaration order is shopping order."
+      },
+      "CheckState": {
+        "type": "string",
+        "enum": [
+          "basket",
+          "have"
+        ],
+        "title": "CheckState",
+        "description": "Where a grocery line stands in this week's shop, besides still to get."
       },
       "Confidence": {
         "type": "string",
@@ -1898,6 +2503,112 @@
         ],
         "title": "ExportedDay"
       },
+      "ExportedExtra": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "qty",
+          "unit",
+          "week_start"
+        ],
+        "title": "ExportedExtra"
+      },
+      "ExportedGroceries": {
+        "properties": {
+          "usuals": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedGroceryItem"
+            },
+            "type": "array",
+            "title": "Usuals"
+          },
+          "extras": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedExtra"
+            },
+            "type": "array",
+            "title": "Extras"
+          },
+          "ticks": {
+            "items": {
+              "$ref": "#/components/schemas/ExportedTick"
+            },
+            "type": "array",
+            "title": "Ticks"
+          },
+          "aisle_order": {
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "type": "array",
+            "title": "Aisle Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "usuals",
+          "extras",
+          "ticks",
+          "aisle_order"
+        ],
+        "title": "ExportedGroceries"
+      },
+      "ExportedGroceryItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "qty",
+          "unit"
+        ],
+        "title": "ExportedGroceryItem"
+      },
       "ExportedIngredient": {
         "properties": {
           "name": {
@@ -1947,14 +2658,93 @@
         ],
         "title": "ExportedMeal"
       },
+      "ExportedTick": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "item": {
+            "type": "string",
+            "title": "Item"
+          },
+          "state": {
+            "$ref": "#/components/schemas/CheckState"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "item",
+          "state"
+        ],
+        "title": "ExportedTick"
+      },
+      "GroceryCheckWrite": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 220,
+            "minLength": 1,
+            "title": "Key"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "state"
+        ],
+        "title": "GroceryCheckWrite",
+        "description": "Tick a line off (basket), mark it as at home (have), or put it back\nto get (null)."
+      },
+      "GroceryItemText": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "GroceryItemText",
+        "description": "Something to buy as a person types it: \"2 L milk\", \"bin bags\"."
+      },
       "GroceryLine": {
         "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
           "name": {
             "type": "string",
             "title": "Name"
           },
           "qty": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Qty"
           },
           "unit": {
@@ -1974,18 +2764,121 @@
                 "type": "null"
               }
             ]
+          },
+          "state": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "extra_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extra Id"
           }
         },
         "type": "object",
         "required": [
+          "key",
           "name",
           "qty",
           "unit",
           "display",
-          "category"
+          "category",
+          "state",
+          "extra_id"
         ],
         "title": "GroceryLine",
         "description": "One shopping line. qty stays numeric so clients can sort or price it;\ncounted things arrive already rounded up to whole ones."
+      },
+      "GroceryList": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/GroceryLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          },
+          "usuals": {
+            "items": {
+              "$ref": "#/components/schemas/GroceryUsualRead"
+            },
+            "type": "array",
+            "title": "Usuals"
+          },
+          "aisle_order": {
+            "items": {
+              "$ref": "#/components/schemas/Category"
+            },
+            "type": "array",
+            "title": "Aisle Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "lines",
+          "usuals",
+          "aisle_order"
+        ],
+        "title": "GroceryList",
+        "description": "A week's shopping, and what the page needs to change it."
+      },
+      "GroceryUsualRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "qty": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qty"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "display": {
+            "type": "string",
+            "title": "Display"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "qty",
+          "unit",
+          "display"
+        ],
+        "title": "GroceryUsualRead"
       },
       "GuestStart": {
         "properties": {

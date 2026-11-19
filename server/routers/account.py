@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Response, status
 from fastapi.responses import JSONResponse
 
+from app.models import CheckState
 from app.repositories import UserRepository
 from server.deps import AuthDep, CurrentUserDep, ServicesDep, TransactionDep
 from server.routers.auth import clear_session_cookie
@@ -16,8 +17,12 @@ from server.schemas import (
     AccountExport,
     ExportedAccount,
     ExportedDay,
+    ExportedExtra,
+    ExportedGroceries,
+    ExportedGroceryItem,
     ExportedIngredient,
     ExportedMeal,
+    ExportedTick,
     PasswordConfirmation,
     RecoveryCode,
 )
@@ -30,7 +35,8 @@ def export_account(
     current: CurrentUserDep, services: ServicesDep, session: TransactionDep
 ) -> JSONResponse:
     """Everything that is yours, as a JSON file to download: the account,
-    every meal with its ingredients, and every planned day."""
+    every meal with its ingredients, every planned day, and the grocery
+    list's usuals, extras, ticks and aisle order."""
     user = UserRepository(session).get(current.id)
     meals = services.meals.list_all_with_ingredients()
     names = {meal.id: meal.name for meal, _ in meals}
@@ -66,6 +72,27 @@ def export_account(
             for day in services.plans.list_planned()
             if day.meal_id in names
         ],
+        groceries=ExportedGroceries(
+            usuals=[
+                ExportedGroceryItem(name=u.name, qty=u.qty, unit=u.unit)
+                for u in services.groceries.usuals()
+            ],
+            extras=[
+                ExportedExtra(
+                    week_start=e.week_start_date, name=e.name, qty=e.qty, unit=e.unit
+                )
+                for e in services.groceries.every_extra()
+            ],
+            ticks=[
+                ExportedTick(
+                    week_start=c.week_start_date,
+                    item=c.item_key,
+                    state=CheckState(c.state),
+                )
+                for c in services.groceries.every_check()
+            ],
+            aisle_order=services.groceries.aisle_order(),
+        ),
     )
     filename = f"the-fridge-door-export-{now.date().isoformat()}.json"
     return JSONResponse(

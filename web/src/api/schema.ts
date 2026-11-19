@@ -197,7 +197,8 @@ export interface paths {
         /**
          * Export Account
          * @description Everything that is yours, as a JSON file to download: the account,
-         *     every meal with its ingredients, and every planned day.
+         *     every meal with its ingredients, every planned day, and the grocery
+         *     list's usuals, extras, ticks and aisle order.
          */
         get: operations["export_account_api_account_export_get"];
         put?: never;
@@ -534,10 +535,208 @@ export interface paths {
         };
         /**
          * Grocery List
-         * @description Consolidated shopping list for the week containing `week`.
+         * @description The week's lines alone. Superseded by GET /api/groceries/{week};
+         *     kept so a page loaded before that existed keeps working until reloaded.
          */
         get: operations["grocery_list_api_grocery_list__week__get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Groceries
+         * @description The week's list: the meals' lines and the extras, each marked as
+         *     still to get, in the basket or at home, in the person's aisle order.
+         */
+        get: operations["get_groceries_api_groceries__week__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Check
+         * @description Tick a line off, mark it as at home, or put it back to get.
+         *
+         *     Answers with nothing rather than the list: ticking happens fast, in the
+         *     shop, and the page already shows the tick. A key no line has is stored
+         *     harmlessly, since lines come and go with the plan.
+         */
+        put: operations["set_check_api_groceries__week__checks_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}/basket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Empty Basket
+         * @description Start the shop again: untick everything, keeping what is at home.
+         */
+        delete: operations["empty_basket_api_groceries__week__basket_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}/extras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Extra
+         * @description Add something no meal needs. Already on the list: its amount changes.
+         */
+        post: operations["add_extra_api_groceries__week__extras_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}/extras/{extra_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Extra */
+        delete: operations["remove_extra_api_groceries__week__extras__extra_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}/extras/{extra_id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep As Usual
+         * @description Keep an extra as a usual, at its amount, for adding to later weeks.
+         */
+        post: operations["keep_as_usual_api_groceries__week__extras__extra_id__keep_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/groceries/{week}/add-usuals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Usuals
+         * @description Every usual onto the week's list in one go; ones already there by
+         *     name keep the amount they have.
+         */
+        post: operations["add_usuals_api_groceries__week__add_usuals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Usual */
+        post: operations["add_usual_api_usuals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usuals/{usual_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Usual */
+        delete: operations["remove_usual_api_usuals__usual_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/aisle-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Aisle Order
+         * @description The order of the aisles in this person's shop, for every week.
+         */
+        put: operations["set_aisle_order_api_aisle_order_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -619,6 +818,12 @@ export interface components {
             meals: components["schemas"]["ExportedMeal"][];
             /** Plans */
             plans: components["schemas"]["ExportedDay"][];
+            groceries: components["schemas"]["ExportedGroceries"];
+        };
+        /** AisleOrder */
+        AisleOrder: {
+            /** Aisle Order */
+            aisle_order: components["schemas"]["Category"][];
         };
         /**
          * AppState
@@ -651,6 +856,12 @@ export interface components {
          * @enum {string}
          */
         Category: "produce" | "meat" | "dairy" | "bakery" | "pantry" | "frozen";
+        /**
+         * CheckState
+         * @description Where a grocery line stands in this week's shop, besides still to get.
+         * @enum {string}
+         */
+        CheckState: "basket" | "have";
         /**
          * Confidence
          * @enum {string}
@@ -722,6 +933,40 @@ export interface components {
             /** Servings */
             servings: number | null;
         };
+        /** ExportedExtra */
+        ExportedExtra: {
+            /** Name */
+            name: string;
+            /** Qty */
+            qty: number | null;
+            /** Unit */
+            unit: string;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+        };
+        /** ExportedGroceries */
+        ExportedGroceries: {
+            /** Usuals */
+            usuals: components["schemas"]["ExportedGroceryItem"][];
+            /** Extras */
+            extras: components["schemas"]["ExportedExtra"][];
+            /** Ticks */
+            ticks: components["schemas"]["ExportedTick"][];
+            /** Aisle Order */
+            aisle_order: components["schemas"]["Category"][];
+        };
+        /** ExportedGroceryItem */
+        ExportedGroceryItem: {
+            /** Name */
+            name: string;
+            /** Qty */
+            qty: number | null;
+            /** Unit */
+            unit: string;
+        };
         /** ExportedIngredient */
         ExportedIngredient: {
             /** Name */
@@ -740,21 +985,85 @@ export interface components {
             /** Ingredients */
             ingredients: components["schemas"]["ExportedIngredient"][];
         };
+        /** ExportedTick */
+        ExportedTick: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Item */
+            item: string;
+            state: components["schemas"]["CheckState"];
+        };
+        /**
+         * GroceryCheckWrite
+         * @description Tick a line off (basket), mark it as at home (have), or put it back
+         *     to get (null).
+         */
+        GroceryCheckWrite: {
+            /** Key */
+            key: string;
+            state: components["schemas"]["CheckState"] | null;
+        };
+        /**
+         * GroceryItemText
+         * @description Something to buy as a person types it: "2 L milk", "bin bags".
+         */
+        GroceryItemText: {
+            /** Text */
+            text: string;
+        };
         /**
          * GroceryLine
          * @description One shopping line. qty stays numeric so clients can sort or price it;
          *     counted things arrive already rounded up to whole ones.
          */
         GroceryLine: {
+            /** Key */
+            key: string;
             /** Name */
             name: string;
             /** Qty */
-            qty: number;
+            qty: number | null;
             /** Unit */
             unit: string;
             /** Display */
             display: string;
             category: components["schemas"]["Category"] | null;
+            state: components["schemas"]["CheckState"] | null;
+            /** Extra Id */
+            extra_id: number | null;
+        };
+        /**
+         * GroceryList
+         * @description A week's shopping, and what the page needs to change it.
+         */
+        GroceryList: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Lines */
+            lines: components["schemas"]["GroceryLine"][];
+            /** Usuals */
+            usuals: components["schemas"]["GroceryUsualRead"][];
+            /** Aisle Order */
+            aisle_order: components["schemas"]["Category"][];
+        };
+        /** GroceryUsualRead */
+        GroceryUsualRead: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Qty */
+            qty: number | null;
+            /** Unit */
+            unit: string;
+            /** Display */
+            display: string;
         };
         /**
          * GuestStart
@@ -2183,6 +2492,418 @@ export interface operations {
             };
         };
     };
+    get_groceries_api_groceries__week__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_check_api_groceries__week__checks_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryCheckWrite"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    empty_basket_api_groceries__week__basket_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_extra_api_groceries__week__extras_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryItemText"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_extra_api_groceries__week__extras__extra_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+                extra_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    keep_as_usual_api_groceries__week__extras__extra_id__keep_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+                extra_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_usuals_api_groceries__week__add_usuals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    add_usual_api_usuals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryItemText"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryUsualRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    remove_usual_api_usuals__usual_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                usual_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryUsualRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_aisle_order_api_aisle_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AisleOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Category"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     relay_error_report_api_monitoring_envelope_post: {
         parameters: {
             query?: never;
@@ -2220,5 +2941,6 @@ type ReadonlyArray<T> = [
     unknown[]
 ] ? Readonly<Exclude<T, undefined>> : Readonly<Exclude<T, undefined>[]>;
 export const categoryValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Category"]> = ["produce", "meat", "dairy", "bakery", "pantry", "frozen"];
+export const checkStateValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["CheckState"]> = ["basket", "have"];
 export const confidenceValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["Confidence"]> = ["high", "medium", "low"];
 export const dayOfWeekValues: ReadonlyArray<FlattenedDeepRequired<components>["schemas"]["DayOfWeek"]> = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

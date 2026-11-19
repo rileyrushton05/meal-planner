@@ -48,6 +48,18 @@ class InvalidDayError(MealPlannerError):
     """A day was given that is not one of the seven weekdays."""
 
 
+class GroceryItemNotFoundError(MealPlannerError):
+    """No such extra on that week's list, or no such usual."""
+
+
+class GroceryLimitError(MealPlannerError):
+    """A week's extras, or someone's usuals, are at their cap."""
+
+
+class NothingToAddError(MealPlannerError):
+    """An item to add to a grocery list that names nothing, such as "2 kg"."""
+
+
 class WeakPasswordError(MealPlannerError):
     """A password chosen at signup is too short, too long or too common."""
 

@@ -1,15 +1,20 @@
 import type { Category, GroceryLine } from "@/api/types";
 
-/** The aisles in the order a supermarket is walked (the server's `Category`
- *  order), with the names a shopper reads. */
-const AISLES: readonly { category: Category; label: string }[] = [
-  { category: "produce", label: "Fruit & veg" },
-  { category: "meat", label: "Meat & seafood" },
-  { category: "dairy", label: "Dairy & eggs" },
-  { category: "bakery", label: "Bakery" },
-  { category: "pantry", label: "Pantry" },
-  { category: "frozen", label: "Frozen" },
-];
+/** The names a shopper reads, in the default order (the server's
+ *  `Category` order: the way most supermarkets are walked). */
+const LABELS: Record<Category, string> = {
+  produce: "Fruit & veg",
+  meat: "Meat & seafood",
+  dairy: "Dairy & eggs",
+  bakery: "Bakery",
+  pantry: "Pantry",
+  frozen: "Frozen",
+};
+
+export const DEFAULT_AISLE_ORDER = Object.keys(LABELS) as Category[];
+
+export const aisleLabel = (category: Category | null) =>
+  category ? LABELS[category] : "Other";
 
 export interface Aisle<T> {
   /** Null for the things the catalogue does not know, which come last. */
@@ -18,37 +23,40 @@ export interface Aisle<T> {
   lines: T[];
 }
 
-const order = (category: Category | null) => {
-  const index = AISLES.findIndex((aisle) => aisle.category === category);
-  return index === -1 ? AISLES.length : index;
-};
-
 /**
- * Lines grouped by aisle, in shopping order, each aisle keeping the order
- * the lines came in. Aisles with nothing in them are left out.
+ * Lines grouped by aisle, in `order` (the person's shop), each aisle
+ * keeping the order the lines came in. Aisles with nothing in them are
+ * left out.
  */
-export function byAisle<T extends Pick<GroceryLine, "category">>(lines: readonly T[]): Aisle<T>[] {
+export function byAisle<T extends Pick<GroceryLine, "category">>(
+  lines: readonly T[],
+  order: readonly Category[] = DEFAULT_AISLE_ORDER,
+): Aisle<T>[] {
+  const position = (category: Category | null) => {
+    const index = category === null ? -1 : order.indexOf(category);
+    return index === -1 ? order.length : index;
+  };
   const groups = new Map<Category | null, T[]>();
   for (const line of lines) {
     const category = line.category ?? null;
     groups.set(category, [...(groups.get(category) ?? []), line]);
   }
   return [...groups.entries()]
-    .sort(([a], [b]) => order(a) - order(b))
-    .map(([category, of]) => ({
-      category,
-      label: AISLES.find((aisle) => aisle.category === category)?.label ?? "Other",
-      lines: of,
-    }));
+    .sort(([a], [b]) => position(a) - position(b))
+    .map(([category, of]) => ({ category, label: aisleLabel(category), lines: of }));
 }
 
 /**
  * The list as text to send to someone: under aisle headings when it spans
  * more than one aisle, plain when a heading would say nothing.
  */
-export function listAsText(lines: readonly GroceryLine[]): string {
-  const item = (line: GroceryLine) => `- ${line.name}: ${line.display}`;
-  const aisles = byAisle(lines);
+export function listAsText(
+  lines: readonly GroceryLine[],
+  order: readonly Category[] = DEFAULT_AISLE_ORDER,
+): string {
+  const item = (line: GroceryLine) =>
+    line.display ? `- ${line.name}: ${line.display}` : `- ${line.name}`;
+  const aisles = byAisle(lines, order);
   if (aisles.length < 2) return lines.map(item).join("\n");
   return aisles.map((aisle) => [aisle.label, ...aisle.lines.map(item)].join("\n")).join("\n\n");
 }

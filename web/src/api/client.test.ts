@@ -182,7 +182,7 @@ describe("signed-out requests", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const first = api.getGroceryList("2026-08-03");
+    const first = api.getGroceries("2026-08-03");
     const second = api.getPlan("2026-08-03");
     await vi.waitFor(() =>
       expect(fetchMock.mock.calls.filter(([p]) => p === "/api/auth/guest")).toHaveLength(1),

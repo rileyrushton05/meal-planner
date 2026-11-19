@@ -430,11 +430,14 @@ def test_grocery_list_says_the_aisle_and_buys_counted_things_whole(client):
 
     assert lines == [
         {
+            "key": "lettuce|",
             "name": "Lettuce",
             "qty": 1,
             "unit": "",
             "display": "1",
             "category": "produce",
+            "state": None,
+            "extra_id": None,
         }
     ]
 

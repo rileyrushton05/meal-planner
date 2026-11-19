@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.models import (
     Category,
     DayOfWeek,
+    GroceryUsual,
     Ingredient,
     Meal,
     MealIngredient,
@@ -17,6 +18,7 @@ from app.templates import MealTemplate
 from server.schemas import (
     DayAssignment,
     GroceryLine,
+    GroceryUsualRead,
     IngredientAmount,
     MealRead,
     ParsedIngredient,
@@ -55,11 +57,24 @@ def day_assignment(plan: WeeklyPlan) -> DayAssignment:
 
 def grocery_line(item: GroceryItem) -> GroceryLine:
     return GroceryLine(
+        key=item.key,
         name=item.name,
         qty=item.qty,
         unit=item.unit,
         display=item.display_qty,
         category=Category(item.category) if item.category else None,
+        state=item.state,
+        extra_id=item.extra_id,
+    )
+
+
+def grocery_usual(usual: GroceryUsual) -> GroceryUsualRead:
+    return GroceryUsualRead(
+        id=persisted_id(usual),
+        name=usual.name,
+        qty=usual.qty,
+        unit=usual.unit,
+        display=GroceryItem(usual.name, usual.qty, usual.unit).display_qty,
     )
 
 

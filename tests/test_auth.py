@@ -84,6 +84,8 @@ def _every_data_route() -> list[tuple[str, str]]:
         "ingredient_id": "1",
         "week": "2026-08-03",
         "template_name": "Omelette",
+        "extra_id": "1",
+        "usual_id": "1",
     }
     routes = []
     for path, operations in app.openapi()["paths"].items():

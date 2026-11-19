@@ -374,6 +374,23 @@ def test_the_app_works_end_to_end_as_the_runtime_role(
         }
         assert client.post("/api/plan/2026-08-10/copy-previous").status_code == 200
 
+        # Every kind of grocery state, each a table under row security, two
+        # of them with id sequences the role must be allowed to use.
+        week = "/api/groceries/2026-08-03"
+        key = client.get(week).json()["lines"][0]["key"]
+        tick = {"key": key, "state": "basket"}
+        assert client.put(f"{week}/checks", json=tick).status_code == 204
+        extra = client.post(f"{week}/extras", json={"text": "2 L milk"}).json()
+        (milk,) = [line for line in extra["lines"] if line["extra_id"]]
+        assert client.post(f"{week}/extras/{milk['extra_id']}/keep").status_code == 200
+        order = ["frozen", "pantry", "bakery", "dairy", "meat", "produce"]
+        assert (
+            client.put("/api/aisle-order", json={"aisle_order": order}).json() == order
+        )
+        after = client.get(week).json()
+        assert {line["key"]: line["state"] for line in after["lines"]}[key] == "basket"
+        assert [u["name"] for u in after["usuals"]] == ["Milk"]
+
         # Bob's meal 2 exists, and is invisible.
         assert client.get("/api/meals/2").status_code == 404
         bad_plan = {"days": [{"day": "Tuesday", "meal_id": 2}]}

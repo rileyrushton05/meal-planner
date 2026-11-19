@@ -6,6 +6,17 @@ import type { AppState, DayAssignment, GroceryLine, Meal, WeekPlan } from "@/api
 import { ThisWeekPage } from "@/components/home/ThisWeekPage";
 import { makeMeal, makeState } from "@/test/factories";
 
+const groceryLine: GroceryLine = {
+  key: "",
+  name: "",
+  qty: 1,
+  unit: "",
+  display: "1",
+  category: null,
+  state: null,
+  extra_id: null,
+};
+
 const WEEK = "2026-08-03"; // a Monday
 const WEDNESDAY = "2026-08-05";
 
@@ -217,8 +228,11 @@ describe("the numbers", () => {
     renderHome({
       plan: [{ day: "Monday", meal_id: 1, servings: 4 }],
       groceries: [
-        { name: "Beef mince", qty: 500, unit: "g", display: "500 g", category: null },
-        { name: "Tortillas", qty: 8, unit: "", display: "8", category: null },
+        { ...groceryLine, key: "beef mince|g", name: "Beef mince", display: "500 g" },
+        { ...groceryLine, key: "tortillas|", name: "Tortillas", display: "8" },
+        // Neither is left to buy: one is in the basket, one already at home.
+        { ...groceryLine, key: "salsa|", name: "Salsa", state: "basket" },
+        { ...groceryLine, key: "cumin|", name: "Cumin", state: "have" },
       ],
     });
     expect(stat(/^To buy/)).toHaveTextContent("2items");
