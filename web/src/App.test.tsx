@@ -48,6 +48,16 @@ async function renderApp(path = "/") {
 }
 
 const heading = () => screen.getByRole("heading", { level: 1 });
+
+/** The row at the foot of the sidebar that says who you are. */
+const whoAmI = (name: "Guest Not signed in" | "Account Signed in") =>
+  screen.findByRole("button", { name });
+
+/** Open the account menu from that row, and return it. */
+async function openAccountMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: /signed in$/i }));
+  return screen.findByRole("menu");
+}
 const currentLink = () =>
   within(screen.getByRole("navigation", { name: "Pages" }))
     .getAllByRole("link")
@@ -177,10 +187,8 @@ describe("the account", () => {
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     // Kept out of the cache, so it is nowhere in the app once shown.
     expect(document.body).not.toHaveTextContent("K7QM-3XRD-9PWT-HB2F");
-    expect(screen.getByRole("link", { name: "Account" })).toHaveAttribute(
-      "title",
-      "cook@example.com",
-    );
+    // The email is not on show, but the row that says "Signed in" has it.
+    expect(await whoAmI("Account Signed in")).toHaveAttribute("title", "cook@example.com");
 
     // Same account, same meals: nothing is refetched.
     expect(mocked.getState).toHaveBeenCalledTimes(1);
@@ -226,10 +234,7 @@ describe("the account", () => {
 
     expect(await screen.findByRole("article", { name: "Their Curry" })).toBeInTheDocument();
     expect(screen.queryByRole("article", { name: "Spaghetti" })).not.toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Account" })).toHaveAttribute(
-      "title",
-      "cook@example.com",
-    );
+    expect(await whoAmI("Account Signed in")).toHaveAttribute("title", "cook@example.com");
   });
 
   it("starts over as a guest after logging out", async () => {
@@ -240,24 +245,45 @@ describe("the account", () => {
     });
     await renderApp();
 
-    await user.click(await screen.findByRole("button", { name: "Log out" }));
+    const menu = await openAccountMenu(user);
+    await user.click(within(menu).getByRole("menuitem", { name: "Log out" }));
 
     expect(
       await screen.findByRole("button", { name: "Sign up to keep your meals" }),
     ).toBeInTheDocument();
     expect(mocked.getState).toHaveBeenCalledTimes(2);
   });
+
+  it("gives a guest's menu the account, privacy and logging in", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    await whoAmI("Guest Not signed in");
+    const menu = await openAccountMenu(user);
+    expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Account",
+      "Privacy",
+      "Log in",
+    ]);
+
+    await user.click(within(menu).getByRole("menuitem", { name: "Log in" }));
+    expect(await screen.findByRole("dialog", { name: "Log in" })).toBeInTheDocument();
+  });
 });
 
 describe("the privacy page", () => {
-  it("is linked from the sidebar and the account page, and named in the tab", async () => {
+  it("is linked from the account menu and the account page, and named in the tab", async () => {
     const user = userEvent.setup();
     await renderApp("/account");
 
     await user.click(screen.getByRole("link", { name: "How The Fridge Door handles your data" }));
     expect(heading()).toHaveTextContent("Privacy");
     expect(document.title).toBe("Privacy · The Fridge Door");
-    expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute("aria-current", "page");
+    const menu = await openAccountMenu(user);
+    expect(within(menu).getByRole("menuitem", { name: "Privacy" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
 
     const nav = screen.getByRole("navigation", { name: "Pages" });
     expect(within(nav).queryByRole("link", { name: "Privacy" })).not.toBeInTheDocument();
@@ -277,16 +303,22 @@ describe("the privacy page", () => {
 });
 
 describe("the account page", () => {
-  it("is reached from the account controls, not the main navigation", async () => {
+  it("is reached from the account menu, not the main navigation", async () => {
     const user = userEvent.setup();
     await renderApp("/meals");
 
     const nav = screen.getByRole("navigation", { name: "Pages" });
     expect(within(nav).queryByRole("link", { name: "Account" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("link", { name: "Account" }));
+    await user.click(within(await openAccountMenu(user)).getByRole("menuitem", { name: "Account" }));
     expect(heading()).toHaveTextContent("Account");
-    expect(screen.getByRole("link", { name: "Account" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    const menu = await openAccountMenu(user);
+    expect(within(menu).getByRole("menuitem", { name: "Account" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   it("after deleting, lands home in a fresh session with nothing of the old account", async () => {

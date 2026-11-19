@@ -13,8 +13,11 @@ test("dark by default; a chosen theme is there from the first paint after a relo
   await page.goto("/");
   await expect(html(page)).toHaveClass(/\bdark\b/);
 
-  await page.getByRole("button", { name: "Light theme" }).click();
+  const toggle = page.getByRole("banner").getByRole("button", { name: "Dark theme" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await toggle.click();
   await expect(html(page)).not.toHaveClass(/\bdark\b/);
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
 
   // Hold back the app's own code: whatever theme shows now was put there by
   // the pre-paint script alone.
@@ -28,5 +31,8 @@ test("the device's own setting does not override the choice", async ({ page }) =
   await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/");
   await expect(html(page)).toHaveClass(/\bdark\b/);
-  await expect(page.getByRole("button", { name: /theme$/ })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });

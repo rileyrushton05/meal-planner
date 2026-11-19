@@ -7,9 +7,12 @@ import { expect, test, watchForCspViolations } from "./fixtures.ts";
 import {
   addMeal,
   dayPicker,
+  expectGuest,
   expectSignedInAs,
   goTo,
+  logOut,
   mealRow,
+  openAccountPage,
   openWeek,
   saveRecoveryCode,
   uniqueName,
@@ -53,7 +56,7 @@ test("a first visit lands in a guest session with sample meals planned this week
   await page.goto("/");
 
   // Home is this week, already part filled.
-  await expect(page.getByText("You're using a guest session.")).toBeVisible();
+  await expectGuest(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("This week");
   await expect(
     page.getByRole("region", { name: "The week" }).getByRole("link", { name: /^Monday/ }),
@@ -98,8 +101,8 @@ test("signing up keeps everything made as a guest, under a new session", async (
   await expect(mealRow(page, mine)).toBeVisible();
 
   // Logging out starts a fresh guest; logging back in brings the meal back.
-  await page.getByRole("button", { name: "Log out" }).click();
-  await expect(page.getByText("You're using a guest session.")).toBeVisible();
+  await logOut(page);
+  await expectGuest(page);
   await expect(mealRow(page, mine)).toHaveCount(0);
 
   await page.getByRole("button", { name: "Log in" }).click();
@@ -132,7 +135,7 @@ test("take a copy of everything, then delete the account for good", async ({ pag
   await saveRecoveryCode(page);
   await expectSignedInAs(page, email);
 
-  await page.getByRole("link", { name: "Account" }).click();
+  await openAccountPage(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Account");
 
   // The download is the account's data, readable as it is.
@@ -157,7 +160,7 @@ test("take a copy of everything, then delete the account for good", async ({ pag
   // Home, in a fresh guest session, with none of it left.
   await expect(page).toHaveURL(/\/\?week=2026-04-13$/);
   await expect(page.getByText(/everything in it have been deleted/)).toBeVisible();
-  await expect(page.getByText("You're using a guest session.")).toBeVisible();
+  await expectGuest(page);
   await goTo(page, "Meals");
   await expect(mealRow(page, mine)).toHaveCount(0);
 
@@ -184,8 +187,8 @@ test("a forgotten password is reset with the recovery code from signup", async (
   await signUp.getByLabel("Password").fill("lettuce harbour spoon");
   await signUp.getByRole("button", { name: "Create account" }).click();
   const code = await saveRecoveryCode(page);
-  await page.getByRole("button", { name: "Log out" }).click();
-  await expect(page.getByText("You're using a guest session.")).toBeVisible();
+  await logOut(page);
+  await expectGuest(page);
 
   // The password is forgotten; the code, typed carelessly, gets back in.
   await page.getByRole("button", { name: "Log in" }).click();
@@ -202,7 +205,7 @@ test("a forgotten password is reset with the recovery code from signup", async (
   await expect(mealRow(page, mine)).toBeVisible();
 
   // The code was used up: it cannot reset the password again.
-  await page.getByRole("button", { name: "Log out" }).click();
+  await logOut(page);
   await page.getByRole("button", { name: "Log in" }).click();
   await page.getByRole("button", { name: "Forgot your password?" }).click();
   await reset.getByLabel("Email").fill(email);
