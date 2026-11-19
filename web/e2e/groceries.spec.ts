@@ -59,14 +59,21 @@ test("extras, usuals, things already at home and the aisle order all stay put", 
   await expect(page.getByRole("checkbox", { name: "Milk extra 2 L" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Add something else" })).toHaveValue("");
 
-  // Kept as a usual, from its menu.
+  // Kept as a usual, from its menu. Each menu's items are looked for in
+  // that menu, and each menu is gone before the next opens: a closing menu
+  // fades out for a moment, and on CI's slower machines the next one opened
+  // while the last was still there, with an "Already have it" of its own.
   await page.getByRole("button", { name: "More for Milk" }).click();
-  await page.getByRole("menuitem", { name: "Keep as a usual" }).click();
+  const milkMenu = page.getByRole("menu", { name: "More for Milk" });
+  await milkMenu.getByRole("menuitem", { name: "Keep as a usual" }).click();
+  await expect(milkMenu).toBeHidden();
   await expect(page.getByRole("button", { name: /^My usuals/ })).toContainText("1");
 
   // Something already in the cupboard.
   await page.getByRole("button", { name: "More for Pasta" }).click();
-  await page.getByRole("menuitem", { name: "Already have it" }).click();
+  const pastaMenu = page.getByRole("menu", { name: "More for Pasta" });
+  await pastaMenu.getByRole("menuitem", { name: "Already have it" }).click();
+  await expect(pastaMenu).toBeHidden();
   const atHome = page.getByRole("region", { name: /^Already have/ });
   await expect(atHome.getByText("Pasta")).toBeVisible();
 
