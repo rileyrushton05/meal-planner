@@ -29,6 +29,7 @@ _ALLOWED = frozenset(
         "retry_after_seconds",
         "subject",  # a prefix of a keyed hash; correlates attempts only
         "removed",  # counts of rows deleted, by kind
+        "changed",  # counts of rows a sync changed, by kind
         "dry_run",
     }
 )

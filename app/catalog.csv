@@ -1,0 +1,79 @@
+name,category,measure,each_grams,aliases
+Onion,produce,count,150,onions|brown onion|brown onions|white onion|yellow onion
+Red Onion,produce,count,150,red onions|spanish onion
+Garlic,produce,count,5,garlic clove|garlic cloves|clove garlic|cloves garlic
+Tomato,produce,count,120,tomatoes|roma tomato|roma tomatoes
+Cherry Tomatoes,produce,mass,,cherry tomato|grape tomatoes
+Lettuce,produce,count,500,iceberg lettuce|iceberg
+Cos Lettuce,produce,count,300,romaine|romaine lettuce|baby cos
+Spring Onion,produce,count,15,spring onions|scallion|scallions|green onion|green onions
+Potatoes,produce,mass,200,potato|white potatoes
+Carrots,produce,mass,120,carrot
+Broccoli,produce,count,350,broccoli head
+Capsicum,produce,count,200,capsicums|red capsicum|bell pepper|bell peppers
+Pumpkin,produce,mass,,butternut pumpkin|kent pumpkin|butternut squash
+Mushrooms,produce,mass,,mushroom|button mushrooms|cup mushrooms
+Cucumber,produce,count,300,cucumbers|lebanese cucumber
+Bean Sprouts,produce,mass,,beansprouts|bean sprout
+Celery,produce,count,60,celery stalk|celery stalks|celery stick|celery sticks
+Beef Mince,meat,mass,,mince|minced beef|ground beef|lean beef mince
+Beef Strips,meat,mass,,stir fry beef|beef stir fry strips
+Beef Chuck,meat,mass,,chuck steak|stewing beef|diced beef
+Rump Steak,meat,mass,,steak|steaks|rump|rump steaks|beef steak
+Chicken Breast,meat,mass,,chicken breasts|chicken breast fillet|chicken breast fillets
+Chicken Thigh,meat,mass,,chicken thighs|chicken thigh fillet|chicken thigh fillets
+Whole Chicken,meat,mass,,whole chickens
+Bacon,meat,mass,,bacon rashers|rindless bacon|short cut bacon|middle bacon
+Sausages,meat,count,75,sausage|snags|beef sausages|pork sausages
+Lamb Leg,meat,mass,,leg of lamb|lamb roast
+Fish Fillets,meat,mass,,fish fillet|white fish|white fish fillets
+Salmon Fillets,meat,mass,,salmon|salmon fillet
+Prawns,meat,mass,,prawn|shrimp|raw prawns
+Eggs,dairy,count,50,egg
+Milk,dairy,volume,,full cream milk|whole milk
+Cream,dairy,volume,,thickened cream|cooking cream|pure cream
+Butter,dairy,mass,,unsalted butter|salted butter
+Cheese,dairy,mass,,grated cheese|tasty cheese|cheddar|cheddar cheese|shredded cheese|cheese slices
+Parmesan,dairy,mass,,parmesan cheese|parmigiano
+Feta,dairy,mass,,feta cheese
+Sour Cream,dairy,mass,,light sour cream
+Bread,bakery,count,35,bread slices|sliced bread|white bread|wholemeal bread
+Burger Buns,bakery,count,70,burger bun|hamburger buns
+Naan,bakery,count,90,naan bread|garlic naan
+Tortillas,bakery,count,40,tortilla|wraps|wrap|flour tortillas
+Rice,pantry,mass,,white rice|jasmine rice|basmati rice|long grain rice
+Arborio Rice,pantry,mass,,risotto rice
+Pasta,pantry,mass,,spaghetti|penne|fusilli|dried pasta
+Lasagne Sheets,pantry,mass,,lasagna sheets|lasagne|lasagna
+Rice Noodles,pantry,mass,,rice noodle|rice stick noodles|pad thai noodles
+Egg Noodles,pantry,mass,,egg noodle
+Flour,pantry,mass,,plain flour|all purpose flour
+Breadcrumbs,pantry,mass,,bread crumbs|panko|panko breadcrumbs
+Croutons,pantry,mass,,crouton
+Taco Shells,pantry,count,12,taco shell|hard taco shells
+Corn Chips,pantry,mass,,tortilla chips|corn chip
+Tomato Passata,pantry,mass,,passata
+Diced Tomatoes,pantry,mass,,tinned tomatoes|canned tomatoes|chopped tomatoes|crushed tomatoes
+Kidney Beans,pantry,mass,,red kidney beans
+Tuna,pantry,mass,,tinned tuna|canned tuna|tuna in springwater
+Coconut Milk,pantry,volume,,light coconut milk
+Vegetable Stock,pantry,volume,,veg stock|vegetable broth
+Chicken Stock,pantry,volume,,chicken broth
+Beef Stock,pantry,volume,,beef broth
+Olive Oil,pantry,volume,,extra virgin olive oil|evoo
+Soy Sauce,pantry,volume,,light soy sauce|soy
+Oyster Sauce,pantry,volume,,
+Teriyaki Sauce,pantry,volume,,teriyaki
+Pad Thai Sauce,pantry,volume,,pad thai paste
+Butter Chicken Sauce,pantry,volume,,butter chicken simmer sauce
+Caesar Dressing,pantry,volume,,caesar salad dressing
+Curry Paste,pantry,mass,,red curry paste|green curry paste
+Basil Pesto,pantry,mass,,pesto
+Salsa,pantry,mass,,tomato salsa|chunky salsa
+Mayonnaise,pantry,mass,,mayo|whole egg mayonnaise
+Honey,pantry,mass,,
+Peanuts,pantry,mass,,peanut|roasted peanuts
+Olives,pantry,mass,,kalamata olives|black olives|olive
+Fajita Seasoning,pantry,mass,,fajita spice|fajita spice mix
+Frozen Peas,frozen,mass,,peas|green peas|baby peas
+Mixed Vegetables,frozen,mass,,frozen mixed vegetables|mixed veg|frozen veg|stir fry vegetables

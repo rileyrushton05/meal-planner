@@ -1,6 +1,6 @@
 # Database schema
 
-Seven tables. Everything a person creates is owned by one row in `users`, and
+Nine tables. Everything a person creates is owned by one row in `users`, and
 deleting that row deletes everything it owns. The conventions behind the
 names and constraints are in [conventions.md](conventions.md), and
 `tests/test_conventions.py` checks them.
@@ -14,6 +14,8 @@ erDiagram
     meals ||--o{ meal_ingredients : "made from"
     ingredients ||--o{ meal_ingredients : "used in"
     meals |o--o{ weekly_plans : "planned on"
+    catalog_items |o--o{ ingredients : "is"
+    catalog_items ||--o{ catalog_aliases : "spelled as"
 
     users {
         int id PK
@@ -37,6 +39,19 @@ erDiagram
         int id PK
         int user_id FK
         text name "unique per user, ignoring case"
+        int catalog_item_id FK "NULL: not in the catalogue"
+    }
+    catalog_items {
+        int id PK
+        text name
+        text name_key UK "the name, case and spacing ignored"
+        text category "produce, meat, dairy, bakery, pantry, frozen"
+        text measure "mass, volume or count"
+        int each_grams "weight of one, for counted items"
+    }
+    catalog_aliases {
+        text alias_key PK "a spelling, case and spacing ignored"
+        int catalog_item_id FK
     }
     meal_ingredients {
         int meal_id PK, FK
@@ -86,6 +101,17 @@ serves every lookup by owner.
 Per person rather than global, so one person's spelling never becomes
 everyone's and the autocomplete never suggests a stranger's ingredient.
 
+**catalog_items** and **catalog_aliases.** The ingredient catalogue:
+common grocery items shared by everyone, with each item's aisle, how it is
+measured and the typical weight of one. Every spelling that means an item,
+its own name included, is a row in `catalog_aliases`, so linking a name is
+one lookup. Reference data, not anyone's: loaded from `app/catalog.csv` by
+`python -m app.jobs sync-catalog` (run by the migrate workflow, and
+automatically for a local database), and read-only to the web app. An
+ingredient links to the item its name or an alias matches when it is
+created, and the sync job relinks everything when the catalogue changes;
+anything unmatched stays private and unlinked. See app/catalog.py.
+
 **meal_ingredients.** How much of an ingredient a meal uses. `qty` is
 positive; `unit` is empty for count items ("2 onions").
 
@@ -101,6 +127,7 @@ deliberately cleared, which is different from a day never set (no row).
 | a user | their sessions, meals, ingredients and plans go too (`CASCADE`) | nothing a person owns outlives them |
 | a meal | its ingredient lines go (`CASCADE`); days it was planned on stay, cleared (`SET NULL`) | a plan for a week is still the week's plan with one day emptied |
 | an ingredient still on a meal | refused (`NO ACTION`) | the meal would silently lose a line |
+| a catalogue item | its aliases go (`CASCADE`); ingredients linked to it stay, unlinked (`SET NULL`) | a person's ingredient is theirs, whatever the catalogue does |
 
 The last is `NO ACTION` rather than `RESTRICT` on purpose. `RESTRICT` is
 checked the moment a row is deleted, so deleting a user - which removes
@@ -128,6 +155,9 @@ So a query that forgot its `WHERE user_id = ...` still returns only one
 person's rows, and a request that never declared a user sees nothing at
 all. `users` and `sessions` have no policy, because signing in must find a
 session or an email before anyone is known; only `app/auth.py` reads them.
+The catalogue tables have no policy either, because they are everyone's;
+the runtime role may only read them, so even a compromised app cannot
+rewrite the catalogue.
 The owner role, used by migrations and scheduled jobs, is not subject to
 the policies (they are enabled, not forced), because that work spans users.
 `tests/test_rls.py` proves all of this connected as `meal_planner_app`, to a

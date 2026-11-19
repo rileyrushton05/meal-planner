@@ -177,6 +177,76 @@ class Meal(_Timestamps, table=True):
     servings: int = 1
 
 
+class Category(StrEnum):
+    """Where an item is in a supermarket, so a grocery list can follow the
+    aisles. Declaration order is shopping order."""
+
+    PRODUCE = "produce"
+    MEAT = "meat"
+    DAIRY = "dairy"
+    BAKERY = "bakery"
+    PANTRY = "pantry"
+    FROZEN = "frozen"
+
+
+class Measure(StrEnum):
+    """How an item is naturally measured: by weight, by volume, or by count
+    ("3 eggs")."""
+
+    MASS = "mass"
+    VOLUME = "volume"
+    COUNT = "count"
+
+
+def _in(column: str, values: type[StrEnum]) -> str:
+    listed = ", ".join(f"'{value}'" for value in values)
+    return f"{column} IN ({listed})"
+
+
+class CatalogItem(_Timestamps, table=True):
+    """A common grocery item, shared by everyone: the canonical name a
+    person's own ingredient can be linked to, so it can be grouped by aisle
+    and, later, priced.
+
+    Reference data, not anyone's: loaded from app/catalog.csv by
+    `python -m app.jobs sync-catalog`, and read-only to the web app.
+    """
+
+    __tablename__: str = "catalog_items"  # pyright: ignore[reportIncompatibleVariableOverride]
+    __table_args__ = (
+        CheckConstraint(_in("category", Category), name="category_known"),
+        CheckConstraint(_in("measure", Measure), name="measure_known"),
+        CheckConstraint(
+            "each_grams IS NULL OR each_grams > 0", name="each_grams_positive"
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    #: `catalog_key(name)`: how the sync job recognises an item it loaded
+    #: before, so a fix to its spelling or category updates it in place.
+    name_key: str = Field(unique=True)
+    category: str
+    measure: str
+    #: The typical weight of one, for count items ("1 onion" is about 150 g).
+    each_grams: int | None = None
+
+
+class CatalogAlias(_Timestamps, table=True):
+    """A spelling that means a catalogue item: its own name, plurals and
+    other names ("mince" -> Beef Mince). Matching an ingredient is then one
+    lookup by key."""
+
+    __tablename__: str = "catalog_aliases"  # pyright: ignore[reportIncompatibleVariableOverride]
+
+    #: `catalog_key(spelling)`. Unique across the catalogue, so a spelling
+    #: never means two items.
+    alias_key: str = Field(primary_key=True)
+    catalog_item_id: int = Field(
+        foreign_key="catalog_items.id", ondelete="CASCADE", index=True
+    )
+
+
 class Ingredient(_Timestamps, table=True):
     """A shopping item in one person's kitchen, shared by their meals.
 
@@ -198,6 +268,13 @@ class Ingredient(_Timestamps, table=True):
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", ondelete="CASCADE")
     name: str
+    #: The catalogue item this is, when its name or an alias matches. Set when
+    #: the ingredient is created and by the sync job; NULL for anything the
+    #: catalogue does not know, which simply stays private and unpriced.
+    #: SET NULL: an item dropped from the catalogue leaves the ingredient.
+    catalog_item_id: int | None = Field(
+        default=None, foreign_key="catalog_items.id", ondelete="SET NULL", index=True
+    )
 
 
 class MealIngredient(_Timestamps, table=True):
@@ -298,15 +375,26 @@ ALL_TABLES: tuple[type[SQLModel], ...] = (
     MealIngredient,
     WeeklyPlan,
     RateLimit,
+    CatalogItem,
+    CatalogAlias,
 )
+
+#: Shared reference data: the web app's role may read these and nothing
+#: more (app/readiness.py, tests/test_rls.py).
+REFERENCE_TABLES: tuple[type[SQLModel], ...] = (CatalogItem, CatalogAlias)
 
 __all__ = [
     "ALL_TABLES",
     "NAMING_CONVENTION",
+    "REFERENCE_TABLES",
+    "CatalogAlias",
+    "CatalogItem",
+    "Category",
     "DayOfWeek",
     "Ingredient",
     "Meal",
     "MealIngredient",
+    "Measure",
     "RateLimit",
     "Session",
     "User",

@@ -21,8 +21,9 @@ from sqlalchemy import (
 )
 from sqlmodel import SQLModel
 
-# Register the application's tables, as app.db does before create_tables().
-from app import models  # noqa: F401
+# Importing the models registers the application's tables, as app.db does
+# before create_tables().
+from app.models import REFERENCE_TABLES
 
 _TABLE_PRIVILEGES = ("SELECT", "INSERT", "UPDATE", "DELETE")
 
@@ -67,12 +68,17 @@ def _set_probe_timeouts(connection: Connection) -> None:
 def _check_postgres_permissions(
     connection: Connection, tables: Sequence[Table]
 ) -> None:
+    # Shared reference data (the catalogue) is read-only to the app, so it
+    # needs SELECT and nothing more; everything else, the full set.
+    reference = {model.__table__.name for model in REFERENCE_TABLES}  # type: ignore[attr-defined]
     privileges: list[ColumnElement[bool]] = [
         func.has_table_privilege(table.fullname, privilege, type_=Boolean)
         for table in tables
-        for privilege in _TABLE_PRIVILEGES
+        for privilege in (("SELECT",) if table.name in reference else _TABLE_PRIVILEGES)
     ]
     for table in tables:
+        if table.name in reference:
+            continue  # never inserts, so needs no sequence
         column = table.autoincrement_column
         if column is not None:
             sequence = func.pg_get_serial_sequence(table.fullname, column.name)

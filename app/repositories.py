@@ -29,6 +29,12 @@ from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.engine import CursorResult
 from sqlmodel import Session, col, select
 
+from app.catalog import (
+    StoredIngredient,
+    StoredItem,
+    SyncPlan,
+    catalog_key,
+)
 from app.exceptions import (
     DuplicateNameError,
     IngredientNotOnMealError,
@@ -37,6 +43,8 @@ from app.exceptions import (
     UnitMismatchError,
 )
 from app.models import (
+    CatalogAlias,
+    CatalogItem,
     DayOfWeek,
     Ingredient,
     Meal,
@@ -332,7 +340,11 @@ class MealRepository(_Repository):
 
         self._session.execute(
             _dialect_insert(self._session, Ingredient)
-            .values(user_id=self._user_id, name=name)
+            .values(
+                user_id=self._user_id,
+                name=name,
+                catalog_item_id=CatalogRepository.item_matching(name),
+            )
             .on_conflict_do_nothing(
                 # The unique index `uq_ingredients_user_id_lower_name`.
                 index_elements=[col(Ingredient.user_id), func.lower(Ingredient.name)]
@@ -744,3 +756,104 @@ class RateLimitRepository:
             ),
             dry_run=dry_run,
         )
+
+
+class CatalogRepository:
+    """The ingredient catalogue (app/catalog.py): read by everyone, written
+    only by the sync job, which runs as the database owner."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    @staticmethod
+    def item_matching(name: str) -> Any:
+        """The id of the catalogue item a name means, as a subquery, so an
+        ingredient is linked in the same statement that creates it. NULL when
+        nothing matches."""
+        return (
+            sa_select(col(CatalogAlias.catalog_item_id))
+            .where(col(CatalogAlias.alias_key) == catalog_key(name))
+            .scalar_subquery()
+        )
+
+    def items(self) -> list[StoredItem]:
+        return [
+            StoredItem(
+                persisted_id(item),
+                item.name,
+                item.name_key,
+                item.category,
+                item.measure,
+                item.each_grams,
+            )
+            for item in self._session.exec(
+                select(CatalogItem).order_by(col(CatalogItem.id))
+            )
+        ]
+
+    def every_ingredient(self) -> list[StoredIngredient]:
+        """Every user's ingredients: the sync job relinks them all."""
+        return [
+            StoredIngredient(persisted_id(row), row.name, row.catalog_item_id)
+            for row in self._session.exec(
+                select(Ingredient).order_by(col(Ingredient.id))
+            )
+        ]
+
+    def apply(self, plan: SyncPlan) -> None:
+        """Make the catalogue and every ingredient's link match the plan."""
+        for entry in plan.add:
+            self._session.add(
+                CatalogItem(
+                    name=entry.name,
+                    name_key=entry.name_key,
+                    category=entry.category.value,
+                    measure=entry.measure.value,
+                    each_grams=entry.each_grams,
+                )
+            )
+        for entry in plan.update:
+            self._session.execute(
+                update(CatalogItem)
+                .where(col(CatalogItem.name_key) == entry.name_key)
+                .values(
+                    name=entry.name,
+                    category=entry.category.value,
+                    measure=entry.measure.value,
+                    each_grams=entry.each_grams,
+                )
+            )
+        if plan.remove:
+            # Their aliases go with them; ingredients linked to them are
+            # unlinked by ON DELETE SET NULL.
+            self._session.execute(
+                delete(CatalogItem).where(col(CatalogItem.id).in_(plan.remove))
+            )
+        self._session.flush()
+
+        id_of = {item.name_key: item.id for item in self.items()}
+        wanted = {alias: id_of[key] for alias, key in plan.aliases.items()}
+        stored = {
+            alias.alias_key: alias.catalog_item_id
+            for alias in self._session.exec(select(CatalogAlias))
+        }
+        stale = [alias for alias, item in stored.items() if wanted.get(alias) != item]
+        if stale:
+            self._session.execute(
+                delete(CatalogAlias).where(col(CatalogAlias.alias_key).in_(stale))
+            )
+        fresh = [
+            {"alias_key": alias, "catalog_item_id": item}
+            for alias, item in wanted.items()
+            if stored.get(alias) != item
+        ]
+        if fresh:
+            self._session.execute(insert(CatalogAlias), fresh)
+
+        for ingredient_id, key in plan.relink.items():
+            self._session.execute(
+                update(Ingredient)
+                .where(col(Ingredient.id) == ingredient_id)
+                .values(catalog_item_id=id_of[key] if key else None)
+            )
+        self._session.flush()

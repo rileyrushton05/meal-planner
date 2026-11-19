@@ -23,7 +23,14 @@ from sqlmodel import Session, select
 
 from app.db import RUNTIME_ROLE, act_as, is_local_database
 from app.migrations import upgrade_to_head
-from app.models import ALL_TABLES, Ingredient, Meal, MealIngredient, WeeklyPlan
+from app.models import (
+    ALL_TABLES,
+    REFERENCE_TABLES,
+    Ingredient,
+    Meal,
+    MealIngredient,
+    WeeklyPlan,
+)
 from app.readiness import check_database_ready
 
 pytestmark = pytest.mark.skipif(
@@ -36,6 +43,9 @@ pytestmark = pytest.mark.skipif(
 #: before anyone is known, and throttle buckets are keyed by hashed
 #: networks and emails, not accounts.
 AUTH_TABLES = {"users", "sessions", "rate_limits"}
+#: Shared reference data: everyone's, so no row security, and the runtime
+#: role may only read it (the next test but one).
+REFERENCE = {model.__table__.name for model in REFERENCE_TABLES}  # type: ignore[attr-defined]
 #: A password for the test server only, never a real deployment's.
 TEST_PASSWORD = "rls-test-only-password"
 ALICE, BOB = 1, 2
@@ -120,7 +130,7 @@ def test_the_runtime_role_cannot_bypass_row_security(app_role: Engine) -> None:
     assert tuple(row) == (RUNTIME_ROLE, False, False)
 
 
-def test_every_table_is_under_row_security_unless_it_is_an_auth_table(
+def test_every_table_is_under_row_security_unless_auth_or_reference(
     owner: Engine,
 ) -> None:
     with owner.connect() as connection:
@@ -138,7 +148,38 @@ def test_every_table_is_under_row_security_unless_it_is_an_auth_table(
     # A new table holding someone's data must get a policy, or be named here
     # with a reason.
     assert set(protected) == {model.__table__.name for model in ALL_TABLES}  # type: ignore[attr-defined]
-    assert {t for t, on in protected.items() if not on} == AUTH_TABLES
+    assert {t for t, on in protected.items() if not on} == AUTH_TABLES | REFERENCE
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "INSERT INTO catalog_items (name, name_key, category, measure) "
+        "VALUES ('Fake', 'fake', 'pantry', 'mass')",
+        "UPDATE catalog_items SET category = 'frozen'",
+        "DELETE FROM catalog_aliases",
+    ],
+    ids=["insert", "update", "delete"],
+)
+def test_the_runtime_role_can_read_the_catalogue_but_never_change_it(
+    owner: Engine, app_role: Engine, statement: str
+) -> None:
+    """The catalogue is everyone's; a compromised app must not be able to
+    rewrite it (or, later, the prices that hang off it)."""
+    with owner.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO catalog_items (name, name_key, category, measure) "
+                "VALUES ('Rice', 'rice', 'pantry', 'mass')"
+            )
+        )
+    with app_role.connect() as connection:
+        assert (
+            connection.execute(text("SELECT name FROM catalog_items")).scalar()
+            == "Rice"
+        )
+    with app_role.connect() as connection, pytest.raises(ProgrammingError):
+        connection.execute(text(statement))
 
 
 def test_the_runtime_role_cannot_change_the_schema(app_role: Engine) -> None:

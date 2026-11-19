@@ -5,7 +5,9 @@ name: Migrate production
 # concurrent functions could race), so this is the one release step that
 # changes the schema.
 #
-# It runs when a push to main changes the migration history, or by hand.
+# It runs when a push to main changes the migration history or the
+# ingredient catalogue (app/catalog.csv, reference data the schema needs),
+# or by hand. After migrating it loads the catalogue, which is idempotent.
 # The `production` environment requires Riley's approval before the job
 # starts: approve it once the Tests workflow for the same commit is green.
 #
@@ -21,6 +23,7 @@ on:
     paths:
       - "migrations/**"
       - "alembic.ini"
+      - "app/catalog.csv"
   workflow_dispatch:
 
 # Never two migration runs at once, and never cancel one half way.
@@ -74,3 +77,9 @@ jobs:
         run: |
           alembic current
           test "$(alembic current 2>/dev/null | awk '{print $1}')" = "$(alembic heads | awk '{print $1}')"
+
+      # Reference data the app reads but cannot write (app/catalog.py).
+      # Prints counts only: Actions logs of a public repository are public,
+      # so ingredient names are never listed here.
+      - name: Load the ingredient catalogue
+        run: python -m app.jobs sync-catalog

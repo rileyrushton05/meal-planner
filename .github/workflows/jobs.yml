@@ -24,7 +24,7 @@ on:
       job:
         description: Job to run
         type: choice
-        options: [purge-guests]
+        options: [purge-guests, sync-catalog]
         default: purge-guests
       dry_run:
         description: Only count what would change
