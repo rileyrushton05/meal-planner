@@ -38,6 +38,11 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
+    # Node's types follow the Node the app runs on (24, on Vercel and in CI),
+    # not the newest release. Raise both together, by hand.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
     open-pull-requests-limit: 5
 
   # The type generator lives apart from the app because openapi-typescript
