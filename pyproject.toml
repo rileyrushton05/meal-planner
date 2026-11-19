@@ -13,11 +13,11 @@ license = { file = "LICENSE" }
 # deployment installs from; tests/test_packaging.py fails if they drift.
 # Shared by every entry point: the domain layer and its storage.
 dependencies = [
-    "sqlmodel==0.0.37",
+    "sqlmodel==0.0.48",
     # Postgres driver, needed wherever MEAL_PLANNER_DB_URL points at Neon.
-    "psycopg[binary]==3.3.4",
+    "psycopg[binary]==3.3.8",
     # Schema migrations, applied automatically at application startup.
-    "alembic==1.19.1",
+    "alembic==1.20.1",
     # argon2id password hashing (app/security.py).
     "argon2-cffi==25.1.0",
 ]
@@ -25,21 +25,21 @@ dependencies = [
 [project.optional-dependencies]
 # The HTTP API consumed by the React frontend. Deployed on its own.
 api = [
-    "fastapi==0.141.1",
-    "uvicorn[standard]==0.52.4",
+    "fastapi==0.162.0",
+    "uvicorn[standard]==0.54.0",
     # Error tracking (server/monitoring.py); off unless SENTRY_DSN is set.
     "sentry-sdk==2.73.0",
 ]
 dev = [
     "meal-planner[api]",
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     # Drives the API in tests via fastapi.testclient.
     "httpx==0.28.1",
     # Loads .env for local work; deployments use real environment variables.
-    "python-dotenv==1.2.3",
+    "python-dotenv==1.2.4",
     # Lint and format. The frontend has had both since it was written; this
     # keeps the Python held to the same standard rather than a lower one.
-    "ruff==0.15.1",
+    "ruff==0.17.3",
     # Static type checking for app/ and server/, run in CI.
     "pyright==1.1.414",
     # Coverage, with a floor in [tool.coverage.report] that CI enforces.

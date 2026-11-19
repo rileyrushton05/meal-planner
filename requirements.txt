@@ -6,10 +6,10 @@
 #
 # Keep in sync with [project].dependencies + the [api] extra in
 # pyproject.toml.
-sqlmodel==0.0.37
-psycopg[binary]==3.3.4
-alembic==1.19.1
+sqlmodel==0.0.48
+psycopg[binary]==3.3.8
+alembic==1.20.1
 argon2-cffi==25.1.0
-fastapi==0.141.1
+fastapi==0.162.0
 # Error tracking (server/monitoring.py); off unless SENTRY_DSN is set.
 sentry-sdk==2.73.0
