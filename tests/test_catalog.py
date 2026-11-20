@@ -26,7 +26,7 @@ from app.repositories import MealRepository, UserRepository
 from app.templates import MEAL_TEMPLATES
 
 NOW = datetime(2026, 11, 19, tzinfo=UTC)
-HEADER = "name,category,measure,each_grams,aliases\n"
+HEADER = "name,category,measure,each_grams,aliases,unit\n"
 
 
 def _write(tmp_path: Path, rows: str) -> Path:
@@ -101,6 +101,7 @@ def test_every_template_ingredient_is_a_catalogue_item_by_name() -> None:
         ("Onion,produce,count,-5,\n", "whole number above 0"),
         (",produce,mass,,\n", "name is empty"),
         ("Onion,produce,count,150,onions|Onions\n", "listed twice"),
+        ("Salt,pantry,mass,,,teaspoon\n", "as the app does: 'tsp'"),
         (
             "Onion,produce,count,150,shallot\nShallot,produce,count,30,\n",
             "'shallot' means both Onion and Shallot",
@@ -113,6 +114,7 @@ def test_every_template_ingredient_is_a_catalogue_item_by_name() -> None:
         "negative weight",
         "no name",
         "spelling twice in a row",
+        "a unit spelled its own way",
         "spelling for two items",
     ],
 )

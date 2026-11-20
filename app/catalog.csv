@@ -1,80 +1,145 @@
-name,category,measure,each_grams,aliases
-Onion,produce,count,150,onions|brown onion|brown onions|white onion|yellow onion
-Red Onion,produce,count,150,red onions|spanish onion
-Garlic,produce,count,5,garlic clove|garlic cloves|clove garlic|cloves garlic
-Tomato,produce,count,120,tomatoes|roma tomato|roma tomatoes
-Cherry Tomatoes,produce,mass,,cherry tomato|grape tomatoes
-Lettuce,produce,count,500,iceberg lettuce|iceberg
-Cos Lettuce,produce,count,300,romaine|romaine lettuce|baby cos
-Spring Onion,produce,count,15,spring onions|scallion|scallions|green onion|green onions
-Potatoes,produce,mass,200,potato|white potatoes
-Carrots,produce,mass,120,carrot
-Broccoli,produce,count,350,broccoli head
-Capsicum,produce,count,200,capsicums|red capsicum|bell pepper|bell peppers
-Pumpkin,produce,mass,,butternut pumpkin|kent pumpkin|butternut squash
-Mushrooms,produce,mass,,mushroom|button mushrooms|cup mushrooms
-Cucumber,produce,count,300,cucumbers|lebanese cucumber
-Bean Sprouts,produce,mass,,beansprouts|bean sprout
-Celery,produce,count,60,celery stalk|celery stalks|celery stick|celery sticks
-Beef Mince,meat,mass,,mince|minced beef|ground beef|lean beef mince
-Beef Strips,meat,mass,,stir fry beef|beef stir fry strips
-Beef Chuck,meat,mass,,chuck steak|stewing beef|diced beef
-Rump Steak,meat,mass,,steak|steaks|rump|rump steaks|beef steak
-Chicken Breast,meat,mass,,chicken breasts|chicken breast fillet|chicken breast fillets
-Chicken Thigh,meat,mass,,chicken thighs|chicken thigh fillet|chicken thigh fillets
-Whole Chicken,meat,mass,,whole chickens
-Bacon,meat,mass,,bacon rashers|rindless bacon|short cut bacon|middle bacon
-Sausages,meat,count,75,sausage|snags|beef sausages|pork sausages
-Lamb Leg,meat,mass,,leg of lamb|lamb roast
-Fish Fillets,meat,mass,,fish fillet|white fish|white fish fillets
-Salmon Fillets,meat,mass,,salmon|salmon fillet
-Prawns,meat,mass,,prawn|shrimp|raw prawns
-Eggs,dairy,count,50,egg
-Milk,dairy,volume,,full cream milk|whole milk
-Cream,dairy,volume,,thickened cream|cooking cream|pure cream
-Butter,dairy,mass,,unsalted butter|salted butter
-Cheese,dairy,mass,,grated cheese|tasty cheese|cheddar|cheddar cheese|shredded cheese|cheese slices
-Parmesan,dairy,mass,,parmesan cheese|parmigiano
-Feta,dairy,mass,,feta cheese
-Sour Cream,dairy,mass,,light sour cream
-Bread,bakery,count,35,bread slices|sliced bread|white bread|wholemeal bread
-Burger Buns,bakery,count,70,burger bun|hamburger buns
-Naan,bakery,count,90,naan bread|garlic naan
-Tortillas,bakery,count,40,tortilla|wraps|wrap|flour tortillas
-Rice,pantry,mass,,white rice|jasmine rice|basmati rice|long grain rice
-Arborio Rice,pantry,mass,,risotto rice
-Pasta,pantry,mass,,spaghetti|penne|fusilli|dried pasta|pappardelle|fettuccine|linguine|rigatoni|tagliatelle|macaroni|farfalle|orecchiette|ditalini|orzo|spaghettini|bucatini
-Lasagne Sheets,pantry,mass,,lasagna sheets|lasagne|lasagna
-Rice Noodles,pantry,mass,,rice noodle|rice stick noodles|pad thai noodles
-Egg Noodles,pantry,mass,,egg noodle
-Flour,pantry,mass,,plain flour|all purpose flour
-Breadcrumbs,pantry,mass,,bread crumbs|panko|panko breadcrumbs
-Croutons,pantry,mass,,crouton
-Taco Shells,pantry,count,12,taco shell|hard taco shells
-Corn Chips,pantry,mass,,tortilla chips|corn chip
-Tomato Passata,pantry,mass,,passata
-Tomato Paste,pantry,mass,,tomato puree|tomato purée|tomato concentrate
-Diced Tomatoes,pantry,mass,,tinned tomatoes|canned tomatoes|chopped tomatoes|crushed tomatoes|tinned tomato|canned tomato|chopped tomato|crushed tomato|diced tomato
-Kidney Beans,pantry,mass,,red kidney beans
-Tuna,pantry,mass,,tinned tuna|canned tuna|tuna in springwater
-Coconut Milk,pantry,volume,,light coconut milk
-Vegetable Stock,pantry,volume,,veg stock|vegetable broth
-Chicken Stock,pantry,volume,,chicken broth
-Beef Stock,pantry,volume,,beef broth
-Olive Oil,pantry,volume,,extra virgin olive oil|evoo
-Soy Sauce,pantry,volume,,light soy sauce|soy
-Oyster Sauce,pantry,volume,,
-Teriyaki Sauce,pantry,volume,,teriyaki
-Pad Thai Sauce,pantry,volume,,pad thai paste
-Butter Chicken Sauce,pantry,volume,,butter chicken simmer sauce
-Caesar Dressing,pantry,volume,,caesar salad dressing
-Curry Paste,pantry,mass,,red curry paste|green curry paste
-Basil Pesto,pantry,mass,,pesto
-Salsa,pantry,mass,,tomato salsa|chunky salsa
-Mayonnaise,pantry,mass,,mayo|whole egg mayonnaise
-Honey,pantry,mass,,
-Peanuts,pantry,mass,,peanut|roasted peanuts
-Olives,pantry,mass,,kalamata olives|black olives|olive
-Fajita Seasoning,pantry,mass,,fajita spice|fajita spice mix
-Frozen Peas,frozen,mass,,peas|green peas|baby peas
-Mixed Vegetables,frozen,mass,,frozen mixed vegetables|mixed veg|frozen veg|stir fry vegetables
+name,category,measure,each_grams,aliases,unit
+Onion,produce,count,150,onions|brown onion|brown onions|white onion|yellow onion,
+Red Onion,produce,count,150,red onions|spanish onion,
+Garlic,produce,count,5,garlic clove|garlic cloves|clove garlic|cloves garlic,
+Tomato,produce,count,120,tomatoes|roma tomato|roma tomatoes,
+Cherry Tomatoes,produce,mass,,cherry tomato|grape tomatoes,
+Lettuce,produce,count,500,iceberg lettuce|iceberg,
+Cos Lettuce,produce,count,300,romaine|romaine lettuce|baby cos,
+Spring Onion,produce,count,15,spring onions|scallion|scallions|green onion|green onions,
+Potatoes,produce,mass,200,potato|white potatoes,
+Carrots,produce,mass,120,carrot,
+Broccoli,produce,count,350,broccoli head,
+Capsicum,produce,count,200,capsicums|red capsicum|bell pepper|bell peppers,
+Pumpkin,produce,mass,,butternut pumpkin|kent pumpkin|butternut squash,
+Mushrooms,produce,mass,,mushroom|button mushrooms|cup mushrooms,
+Cucumber,produce,count,300,cucumbers|lebanese cucumber,
+Bean Sprouts,produce,mass,,beansprouts|bean sprout,
+Celery,produce,count,60,celery stalk|celery stalks|celery stick|celery sticks,
+Lemon,produce,count,120,lemons,
+Lime,produce,count,70,limes,
+Avocado,produce,count,200,avocados|avo,
+Zucchini,produce,count,200,zucchinis|courgette|courgettes,
+Eggplant,produce,count,350,eggplants|aubergine|aubergines,
+Sweet Potato,produce,mass,,sweet potatoes|kumara,
+Baby Spinach,produce,mass,,spinach|spinach leaves|baby spinach leaves|english spinach,
+Ginger,produce,mass,,fresh ginger|ginger root|root ginger,
+Red Chilli,produce,count,10,red chillies|chilli|chillies|chili|chilies|long red chilli|long red chillies|bird's eye chilli,
+Green Chilli,produce,count,10,green chillies|long green chilli,
+Coriander,produce,count,40,fresh coriander|coriander leaves|cilantro,bunches
+Parsley,produce,count,40,fresh parsley|flat leaf parsley|flat-leaf parsley|italian parsley|continental parsley|curly parsley,bunches
+Basil,produce,count,30,fresh basil|basil leaves|sweet basil,bunches
+Thyme,produce,count,15,fresh thyme|thyme sprigs,sprigs
+Rosemary,produce,count,15,fresh rosemary|rosemary sprigs,sprigs
+Mint,produce,count,30,fresh mint|mint leaves,bunches
+Corn,produce,count,250,corn cob|corn cobs|sweet corn|corn on the cob,
+Green Beans,produce,mass,,green bean|string beans,
+Snow Peas,produce,mass,,snow pea|mange tout,
+Cabbage,produce,count,1000,green cabbage|savoy cabbage,
+Bok Choy,produce,count,150,baby bok choy|pak choy|bok choi,
+Beef Mince,meat,mass,,mince|minced beef|ground beef|lean beef mince,
+Beef Strips,meat,mass,,stir fry beef|beef stir fry strips,
+Beef Chuck,meat,mass,,chuck steak|stewing beef|diced beef,
+Rump Steak,meat,mass,,steak|steaks|rump|rump steaks|beef steak,
+Chicken Breast,meat,mass,,chicken breasts|chicken breast fillet|chicken breast fillets,
+Chicken Thigh,meat,mass,,chicken thighs|chicken thigh fillet|chicken thigh fillets,
+Whole Chicken,meat,mass,,whole chickens,
+Bacon,meat,mass,,bacon rashers|rindless bacon|short cut bacon|middle bacon,
+Sausages,meat,count,75,sausage|snags|beef sausages|pork sausages,
+Lamb Leg,meat,mass,,leg of lamb|lamb roast,
+Fish Fillets,meat,mass,,fish fillet|white fish|white fish fillets,
+Salmon Fillets,meat,mass,,salmon|salmon fillet,
+Prawns,meat,mass,,prawn|shrimp|raw prawns,
+Pork Mince,meat,mass,,minced pork|ground pork,
+Chicken Mince,meat,mass,,minced chicken|ground chicken,
+Pork Chops,meat,mass,,pork chop|pork loin chops|pork cutlets,
+Lamb Chops,meat,mass,,lamb chop|lamb loin chops|lamb cutlets,
+Ham,meat,mass,,leg ham|sliced ham|shaved ham,
+Chorizo,meat,mass,,chorizo sausage|chorizo sausages,
+Eggs,dairy,count,50,egg,
+Milk,dairy,volume,,full cream milk|whole milk,
+Cream,dairy,volume,,thickened cream|cooking cream|pure cream,
+Butter,dairy,mass,,unsalted butter|salted butter,
+Cheese,dairy,mass,,grated cheese|tasty cheese|cheddar|cheddar cheese|shredded cheese|cheese slices,
+Parmesan,dairy,mass,,parmesan cheese|parmigiano,
+Feta,dairy,mass,,feta cheese,
+Sour Cream,dairy,mass,,light sour cream,
+Greek Yoghurt,dairy,mass,,greek yogurt|natural yoghurt|natural yogurt|plain yoghurt|plain yogurt|yoghurt|yogurt,
+Mozzarella,dairy,mass,,mozzarella cheese|grated mozzarella|shredded mozzarella,
+Cream Cheese,dairy,mass,,philadelphia|spreadable cream cheese,
+Bread,bakery,count,35,bread slices|sliced bread|white bread|wholemeal bread,
+Burger Buns,bakery,count,70,burger bun|hamburger buns,
+Naan,bakery,count,90,naan bread|garlic naan,
+Tortillas,bakery,count,40,tortilla|wraps|wrap|flour tortillas,
+Rice,pantry,mass,,white rice|jasmine rice|basmati rice|long grain rice,
+Arborio Rice,pantry,mass,,risotto rice,
+Pasta,pantry,mass,,spaghetti|penne|fusilli|dried pasta|pappardelle|fettuccine|linguine|rigatoni|tagliatelle|macaroni|farfalle|orecchiette|ditalini|orzo|spaghettini|bucatini,
+Lasagne Sheets,pantry,mass,,lasagna sheets|lasagne|lasagna,
+Rice Noodles,pantry,mass,,rice noodle|rice stick noodles|pad thai noodles,
+Egg Noodles,pantry,mass,,egg noodle,
+Flour,pantry,mass,,plain flour|all purpose flour,
+Breadcrumbs,pantry,mass,,bread crumbs|panko|panko breadcrumbs,
+Croutons,pantry,mass,,crouton,
+Taco Shells,pantry,count,12,taco shell|hard taco shells,
+Corn Chips,pantry,mass,,tortilla chips|corn chip,
+Tomato Passata,pantry,mass,,passata,
+Tomato Paste,pantry,mass,,tomato puree|tomato purée|tomato concentrate,
+Diced Tomatoes,pantry,mass,,tinned tomatoes|canned tomatoes|chopped tomatoes|crushed tomatoes|tinned tomato|canned tomato|chopped tomato|crushed tomato|diced tomato,
+Kidney Beans,pantry,mass,,red kidney beans,
+Tuna,pantry,mass,,tinned tuna|canned tuna|tuna in springwater,
+Coconut Milk,pantry,volume,,light coconut milk,
+Vegetable Stock,pantry,volume,,veg stock|vegetable broth,
+Chicken Stock,pantry,volume,,chicken broth,
+Beef Stock,pantry,volume,,beef broth,
+Olive Oil,pantry,volume,,extra virgin olive oil|evoo,
+Soy Sauce,pantry,volume,,light soy sauce|soy,
+Oyster Sauce,pantry,volume,,,
+Teriyaki Sauce,pantry,volume,,teriyaki,
+Pad Thai Sauce,pantry,volume,,pad thai paste,
+Butter Chicken Sauce,pantry,volume,,butter chicken simmer sauce,
+Caesar Dressing,pantry,volume,,caesar salad dressing,
+Curry Paste,pantry,mass,,red curry paste|green curry paste,
+Basil Pesto,pantry,mass,,pesto,
+Salsa,pantry,mass,,tomato salsa|chunky salsa,
+Mayonnaise,pantry,mass,,mayo|whole egg mayonnaise,
+Honey,pantry,mass,,,
+Peanuts,pantry,mass,,peanut|roasted peanuts,
+Olives,pantry,mass,,kalamata olives|black olives|olive,
+Fajita Seasoning,pantry,mass,,fajita spice|fajita spice mix,
+Salt,pantry,mass,,sea salt|table salt|salt flakes|sea salt flakes|kosher salt,tsp
+Black Pepper,pantry,mass,,pepper|ground black pepper|cracked black pepper|black peppercorns|peppercorns,tsp
+Sugar,pantry,mass,,white sugar|caster sugar|granulated sugar,
+Brown Sugar,pantry,mass,,light brown sugar|dark brown sugar|soft brown sugar,
+Red Wine,pantry,volume,,dry red wine,
+White Wine,pantry,volume,,dry white wine,
+Worcestershire Sauce,pantry,volume,,worcestershire|worcester sauce,tbsp
+Fish Sauce,pantry,volume,,,tbsp
+Sweet Chilli Sauce,pantry,volume,,sweet chili sauce,tbsp
+Tomato Sauce,pantry,volume,,ketchup|tomato ketchup,tbsp
+BBQ Sauce,pantry,volume,,barbecue sauce|barbeque sauce,tbsp
+Balsamic Vinegar,pantry,volume,,balsamic,tbsp
+White Vinegar,pantry,volume,,vinegar,tbsp
+Vegetable Oil,pantry,volume,,canola oil|sunflower oil|cooking oil|oil,tbsp
+Sesame Oil,pantry,volume,,toasted sesame oil,tbsp
+Dijon Mustard,pantry,mass,,dijon|mustard,tbsp
+Peanut Butter,pantry,mass,,smooth peanut butter|crunchy peanut butter,tbsp
+Cornflour,pantry,mass,,corn flour|cornstarch|corn starch,tbsp
+Chickpeas,pantry,mass,,chick peas|tinned chickpeas|canned chickpeas|garbanzo beans,
+Cannellini Beans,pantry,mass,,cannellini|white beans,
+Lentils,pantry,mass,,red lentils|brown lentils|green lentils|tinned lentils|canned lentils,
+Couscous,pantry,mass,,,
+Sun Dried Tomatoes,pantry,mass,,sundried tomatoes|sun-dried tomatoes,
+Bay Leaves,pantry,count,1,bay leaf|dried bay leaves|dried bay leaf,
+Dried Oregano,pantry,mass,,oregano,tsp
+Ground Cumin,pantry,mass,,cumin|cumin powder,tsp
+Paprika,pantry,mass,,sweet paprika,tsp
+Smoked Paprika,pantry,mass,,,tsp
+Chilli Flakes,pantry,mass,,chili flakes|dried chilli flakes|red pepper flakes,tsp
+Curry Powder,pantry,mass,,,tsp
+Garam Masala,pantry,mass,,,tsp
+Ground Cinnamon,pantry,mass,,cinnamon,tsp
+Mixed Herbs,pantry,mass,,dried mixed herbs|italian herbs|italian seasoning,tsp
+Frozen Peas,frozen,mass,,peas|green peas|baby peas,
+Mixed Vegetables,frozen,mass,,frozen mixed vegetables|mixed veg|frozen veg|stir fry vegetables,
+Puff Pastry,frozen,count,170,puff pastry sheet|puff pastry sheets|frozen puff pastry,
+Fish Fingers,frozen,count,25,fish finger|fish sticks|fish stick,
