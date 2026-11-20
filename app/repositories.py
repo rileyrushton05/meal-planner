@@ -20,8 +20,10 @@ of silently starting one that nobody commits.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from datetime import date, datetime
+from itertools import count
 from typing import Any, cast
 
 from sqlalchemy import ColumnElement, and_, delete, func, insert, or_, update
@@ -46,6 +48,7 @@ from app.exceptions import (
     UnitMismatchError,
 )
 from app.models import (
+    MAX_MEAL_NAME_LENGTH,
     CatalogAlias,
     CatalogItem,
     Category,
@@ -96,6 +99,10 @@ def _as_day(day: DayOfWeek | str) -> str:
         return DayOfWeek(day).value
     except ValueError:
         raise InvalidDayError(f"'{day}' is not a day of the week.") from None
+
+
+#: What a copy's name ends in: " (copy)", " (copy 2)".
+_COPY_SUFFIX = re.compile(r" \(copy(?: \d+)?\)$", re.IGNORECASE)
 
 
 class _Repository:
@@ -189,6 +196,28 @@ class MealRepository(_Repository):
         for item in template.ingredients:
             self._attach_ingredient(persisted_id(meal), item.name, item.qty, item.unit)
         return meal
+
+    def duplicate(self, meal_id: int) -> Meal:
+        """A copy of one of this user's meals, to make a variation of it: the
+        same servings and ingredient lines, under the first free name of
+        "Curry (copy)", "Curry (copy 2)"... Raises MealNotFoundError.
+
+        The lines are copied as they are, pointing at the same ingredients,
+        so nothing is looked up or parsed again.
+        """
+        source, lines = self.get_with_ingredients(meal_id)
+        copy = self.add(self._name_for_copy(source.name), servings=source.servings)
+        self._session.add_all(
+            MealIngredient(
+                meal_id=persisted_id(copy),
+                ingredient_id=link.ingredient_id,
+                qty=link.qty,
+                unit=link.unit,
+            )
+            for link, _ in lines
+        )
+        self._session.flush()
+        return copy
 
     def update(self, meal_id: int, name: str, servings: int) -> None:
         """Rename a meal or change its serving size.
@@ -321,6 +350,27 @@ class MealRepository(_Repository):
         existing = self._session.exec(statement).first()
         if existing:
             raise DuplicateNameError(f"A meal named '{existing.name}' already exists.")
+
+    def _name_for_copy(self, name: str) -> str:
+        """The first of "Curry (copy)", "Curry (copy 2)"... no meal has.
+
+        A copy of a copy counts on from the original's name rather than
+        stacking up "(copy) (copy)", and a long name is shortened to leave
+        room for the suffix.
+        """
+        base = _COPY_SUFFIX.sub("", name) or name
+        taken = {
+            existing.lower()
+            for existing in self._session.exec(
+                select(Meal.name).where(Meal.user_id == self._user_id)
+            ).all()
+        }
+        for n in count(1):
+            suffix = " (copy)" if n == 1 else f" (copy {n})"
+            candidate = base[: MAX_MEAL_NAME_LENGTH - len(suffix)].rstrip() + suffix
+            if candidate.lower() not in taken:
+                return candidate
+        raise AssertionError("unreachable")  # pragma: no cover
 
     def _find_link(self, meal_id: int, ingredient_id: int) -> MealIngredient | None:
         return self._session.exec(

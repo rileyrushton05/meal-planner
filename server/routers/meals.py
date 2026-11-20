@@ -91,6 +91,19 @@ def create_meal_from_template(
     return created
 
 
+@router.post(
+    "/{meal_id}/duplicate", response_model=MealRead, status_code=status.HTTP_201_CREATED
+)
+def duplicate_meal(meal_id: int, services: ServicesDep, response: Response) -> MealRead:
+    """A new meal with the same servings and ingredients, named
+    "<name> (copy)", to make a variation of: the veggie version, the one for
+    guests. Planned on no day."""
+    meal = services.meals.duplicate(meal_id)
+    created = _meal_response(services, persisted_id(meal))
+    response.headers["Location"] = _location(created)
+    return created
+
+
 @router.patch("/{meal_id}", response_model=MealRead)
 def update_meal(meal_id: int, payload: MealUpdate, services: ServicesDep) -> MealRead:
     """Rename a meal or change its base serving size."""

@@ -176,6 +176,9 @@ def test_two_guests_cannot_see_or_touch_each_others_meals(guest, db):
             stranger.patch(f"/api/meals/{meal['id']}", json=update).status_code == 404
         )
         assert stranger.delete(f"/api/meals/{meal['id']}").status_code == 404
+        copy = stranger.post(f"/api/meals/{meal['id']}/duplicate")
+        assert copy.status_code == 404
+        assert stranger.get("/api/meals").json() == []
 
     assert guest.get(f"/api/meals/{meal['id']}").json()["name"] == "Spaghetti"
 

@@ -70,6 +70,33 @@ test("add ingredients straight after creating a meal, and edit an amount", async
   await expect(page.getByRole("button", { name: "Edit Rice" })).toContainText("300 g");
 });
 
+test("duplicate a meal and rename the copy by typing over its (copy)", async ({ page }) => {
+  await openWeek(page, "2026-01-05");
+  const name = uniqueName("Beef Curry");
+  await addMeal(page, name, 4);
+  await page.getByLabel("Ingredient", { exact: true }).fill("Beef");
+  await page.getByLabel("Quantity", { exact: true }).fill("500");
+  await page.getByLabel("Unit", { exact: true }).fill("g");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("button", { name: "Edit Beef", exact: true })).toContainText("500 g");
+
+  await page.getByRole("button", { name: `Duplicate ${name}` }).click();
+
+  // The copy opens with " (copy)" selected, so typing keeps the rest.
+  await expect(page.getByRole("heading", { level: 2, name: `${name} (copy)` })).toBeVisible();
+  await expect(page.getByLabel("Meal name")).toBeFocused();
+  await page.keyboard.type(", mild");
+  await page.keyboard.press("Enter");
+
+  const copy = `${name}, mild`;
+  await expect(page.getByRole("heading", { level: 2, name: copy })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit Beef", exact: true })).toContainText("500 g");
+  // Both are saved, each with its own ingredients.
+  await page.reload();
+  await expect(mealRow(page, copy)).toContainText("Serves 4 · 1 ingredient");
+  await expect(mealRow(page, name)).toContainText("Serves 4 · 1 ingredient");
+});
+
 test("plan a week: it saves itself, and survives a reload", async ({ page }) => {
   await openWeek(page, "2026-01-12");
   const name = uniqueName("Shakshuka");

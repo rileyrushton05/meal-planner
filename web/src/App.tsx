@@ -172,6 +172,7 @@ export default function App() {
                 pending={planner.mealsPending}
                 onAddMeal={planner.addMeal}
                 onAddFromTemplate={planner.addFromTemplate}
+                onDuplicateMeal={planner.duplicateMeal}
                 onImportRecipe={planner.importRecipe}
                 onUpdateMeal={planner.updateMeal}
                 onDeleteMeal={planner.deleteMeal}

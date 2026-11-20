@@ -23,6 +23,7 @@ function renderTab(state: AppState = makeState(), path = "/meals") {
     ),
     onImportRecipe: vi.fn(async (_url: string): Promise<ImportedRecipe | null> => null),
     onAddFromTemplate: vi.fn(async (): Promise<Meal | null> => null),
+    onDuplicateMeal: vi.fn(async (_id: number): Promise<Meal | null> => null),
     onUpdateMeal: vi.fn(),
     onDeleteMeal: vi.fn(),
     onAddIngredient: vi.fn(),
@@ -245,6 +246,79 @@ describe("changing a meal's details", () => {
 
     expect(screen.queryByLabelText("Meal name")).not.toBeInTheDocument();
     expect(props.onUpdateMeal).not.toHaveBeenCalled();
+  });
+});
+
+describe("duplicating a meal", () => {
+  const copy = makeMeal({ ...spaghetti, id: 3, name: "Spaghetti (copy)" });
+
+  /** Duplicate Spaghetti; the copy arrives in the list as the cache would
+   *  put it there. */
+  async function duplicateSpaghetti() {
+    const user = userEvent.setup();
+    const view = renderTab(makeState({ meals: [spaghetti, tacos] }), "/meals?meal=1");
+    view.props.onDuplicateMeal.mockResolvedValue(copy);
+
+    await user.click(screen.getByRole("button", { name: "Duplicate Spaghetti" }));
+    view.rerender(
+      <MealsTab {...view.props} state={makeState({ meals: [spaghetti, tacos, copy] })} />,
+    );
+    await screen.findByRole("heading", { level: 2, name: "Spaghetti (copy)" });
+    return { user, ...view };
+  }
+
+  it("opens the copy, ready to be given its own name", async () => {
+    const { props } = await duplicateSpaghetti();
+
+    expect(props.onDuplicateMeal).toHaveBeenCalledWith(1);
+    expect(selection()).toBe("3");
+    expect(screen.getByText(/Copied with its ingredients/)).toBeInTheDocument();
+    const name = screen.getByLabelText<HTMLInputElement>("Meal name");
+    expect(name).toHaveFocus();
+    // Only "(copy)" is selected, so typing replaces it and keeps the rest.
+    expect(name.value.slice(name.selectionStart!, name.selectionEnd!)).toBe(" (copy)");
+  });
+
+  it("renames the copy by typing over its (copy)", async () => {
+    const { user, props } = await duplicateSpaghetti();
+
+    await user.keyboard(", veggie");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(props.onUpdateMeal).toHaveBeenCalledWith(3, "Spaghetti, veggie", 4);
+  });
+
+  it("keeps the copy as named when the rename is cancelled", async () => {
+    const { user, props } = await duplicateSpaghetti();
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByLabelText("Meal name")).not.toBeInTheDocument();
+    expect(props.onUpdateMeal).not.toHaveBeenCalled();
+    expect(props.onDeleteMeal).not.toHaveBeenCalled();
+  });
+
+  it("opens the copy as usual when coming back to it later", async () => {
+    const { user } = await duplicateSpaghetti();
+
+    await user.click(within(screen.getByRole("article", { name: "Tacos" })).getByRole("button"));
+    await user.click(
+      within(screen.getByRole("article", { name: "Spaghetti (copy)" })).getByRole("button"),
+    );
+
+    expect(screen.getByRole("heading", { level: 2, name: "Spaghetti (copy)" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Meal name")).not.toBeInTheDocument();
+  });
+
+  it("stays on the original when duplicating fails", async () => {
+    const user = userEvent.setup();
+    const { props } = renderTab(makeState({ meals: [spaghetti] }), "/meals?meal=1");
+
+    await user.click(screen.getByRole("button", { name: "Duplicate Spaghetti" }));
+
+    expect(props.onDuplicateMeal).toHaveBeenCalledWith(1);
+    expect(selection()).toBe("1");
+    expect(screen.getByRole("heading", { level: 2, name: "Spaghetti" })).toBeInTheDocument();
   });
 });
 

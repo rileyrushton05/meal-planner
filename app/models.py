@@ -157,6 +157,10 @@ class Session(_Timestamps, table=True):
     )
 
 
+#: The longest meal name the API accepts.
+MAX_MEAL_NAME_LENGTH = 200
+
+
 class Meal(_Timestamps, table=True):
     """A recipe: a name, the servings it yields, and its ingredients."""
 
@@ -489,6 +493,7 @@ REFERENCE_TABLES: tuple[type[SQLModel], ...] = (CatalogItem, CatalogAlias)
 
 __all__ = [
     "ALL_TABLES",
+    "MAX_MEAL_NAME_LENGTH",
     "NAMING_CONVENTION",
     "REFERENCE_TABLES",
     "CatalogAlias",
