@@ -1,5 +1,5 @@
 import { CalendarDays, House, ShieldCheck, ShoppingBasket, UserRound, UtensilsCrossed } from "lucide-react";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, LoaderCircle, RotateCw, X } from "lucide-react";
 import { useEffect } from "react";
 
 import { AccountBar } from "@/components/AccountBar";
@@ -8,13 +8,14 @@ import { AppShell, type NavPage } from "@/components/AppShell";
 import { type GroceryActions, GroceryTab } from "@/components/GroceryTab";
 import { ThisWeekPage } from "@/components/home/ThisWeekPage";
 import { MealsTab } from "@/components/meals/MealsTab";
+import { PageSkeleton, type SkeletonPage } from "@/components/PageSkeleton";
 import { PrivacyPage } from "@/components/PrivacyPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { WeeklyPlanTab } from "@/components/WeeklyPlanTab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAccount } from "@/hooks/useAccount";
-import { usePlanner } from "@/hooks/usePlanner";
+import { type Freshness, usePlanner } from "@/hooks/usePlanner";
 import { useTheme } from "@/hooks/useTheme";
 import { addDays, formatWeekRange, mondayOf, toIso, weekName } from "@/lib/dates";
 import { navigate, usePathname } from "@/lib/location";
@@ -22,6 +23,7 @@ import { navigate, usePathname } from "@/lib/location";
 const APP_NAME = "The Fridge Door";
 
 interface Page extends NavPage {
+  id: SkeletonPage | "privacy";
   /** The heading at the top of the page, and the browser tab's title. */
   title: string;
   /** Whether what the page shows depends on the week, so it has a picker. */
@@ -82,7 +84,10 @@ export default function App() {
       {/* The title and the theme on one line; the week picker between them
           when there is room, and on a line of its own on a phone. */}
       <header className="flex min-h-16 flex-wrap items-center gap-x-3 gap-y-3 border-b px-4 py-3 sm:px-6 lg:px-8">
-        <h1 className="mr-auto text-xl font-semibold tracking-tight">{title}</h1>
+        <div className="mr-auto flex min-w-0 items-center gap-3">
+          <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+          {page.id !== "privacy" && <FreshnessNote freshness={planner.freshness} />}
+        </div>
         {page.weekly && (
           <div className="order-last basis-full md:order-none md:basis-auto">
             <WeekPicker
@@ -120,7 +125,18 @@ export default function App() {
             role="alert"
             className="mb-6 flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
           >
-            <span>{planner.error}</span>
+            <span className="min-w-0 flex-1">
+              {planner.error}
+              {planner.freshness === "offline" &&
+                " You're seeing what you had last time; changes are off until it loads."}
+            </span>
+            {/* With nothing on screen, the panel below offers it instead. */}
+            {planner.loadFailed && planner.state && (
+              <Button variant="outline" size="sm" className="-my-1" onClick={planner.retry}>
+                <RotateCw aria-hidden />
+                Try again
+              </Button>
+            )}
             <button
               onClick={planner.dismissError}
               aria-label="Dismiss"
@@ -131,19 +147,33 @@ export default function App() {
           </div>
         )}
 
-        {/* Only the first load has nothing to show. Later loads keep the
-            current week on screen and dim it, so changing week does not blank
-            the page. */}
+        {/* Only the first load has nothing to show, and shows the page's
+            outline instead. Later loads keep the current week on screen and
+            dim it, so changing week does not blank the page. A visit that
+            opens on the last one's data shows it as it is, but inert: it
+            can be read, and changed once the real data has replaced it. */}
         {/* Needs nothing from the API, so it shows even when that is down. */}
         {page.id === "privacy" ? (
           <PrivacyPage />
         ) : !planner.state ? (
-          <p role="status" className="py-10 text-sm text-muted-foreground">
-            Loading…
-          </p>
+          planner.loadFailed ? (
+            <div className="rounded-xl border border-dashed p-10 text-center">
+              <p className="font-heading text-lg font-semibold">Your planner didn't load</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Nothing is lost: your meals and plans are saved on the server.
+              </p>
+              <Button className="mt-4" onClick={planner.retry}>
+                <RotateCw aria-hidden />
+                Try again
+              </Button>
+            </div>
+          ) : (
+            <PageSkeleton page={page.id} />
+          )
         ) : (
           <div
-            aria-busy={planner.loading}
+            aria-busy={planner.loading || planner.freshness === "updating"}
+            inert={planner.freshness !== "live"}
             className={planner.loading ? "opacity-60 transition-opacity" : undefined}
           >
             {page.id === "home" && (
@@ -206,6 +236,28 @@ export default function App() {
         )}
       </main>
     </AppShell>
+  );
+}
+
+/**
+ * Beside the title while the page shows the last visit's data: that it is
+ * being brought up to date, or that it could not be, and so is a copy.
+ */
+function FreshnessNote({ freshness }: { freshness: Freshness }) {
+  if (freshness === "live") return null;
+  const updating = freshness === "updating";
+  return (
+    <span
+      role="status"
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+    >
+      {updating ? (
+        <LoaderCircle aria-hidden className="size-3.5 motion-safe:animate-spin" />
+      ) : (
+        <CloudOff aria-hidden className="size-3.5" />
+      )}
+      {updating ? "Updating…" : "Last visit's copy"}
+    </span>
   );
 }
 

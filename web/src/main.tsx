@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 
 import "./index.css";
 import App from "./App.tsx";
+import { keepLastVisit, restoreLastVisit } from "./api/persistence";
 import { createQueryClient } from "./api/queryClient";
 import { CrashBoundary } from "./components/CrashBoundary";
 import { initErrorTracking } from "./lib/monitoring";
@@ -16,6 +17,10 @@ void initErrorTracking();
 redirectLegacyTabLink();
 
 const queryClient = createQueryClient();
+// Before the first render, so the first paint shows the last visit's meals
+// rather than a loading state while the server wakes up.
+restoreLastVisit(queryClient);
+keepLastVisit(queryClient);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

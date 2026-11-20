@@ -1,12 +1,16 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "@/App";
 import { ApiError, api } from "@/api/client";
+import { clearLastVisit, restoreLastVisit } from "@/api/persistence";
 import { createQueryClient } from "@/api/queryClient";
+import { SLOW_LOAD_MS } from "@/components/PageSkeleton";
+import { mondayOf } from "@/lib/dates";
 import { makeMeal, makeState } from "@/test/factories";
+import { saveLastVisit } from "@/test/lastVisit";
 
 vi.mock("@/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/client")>()),
@@ -155,6 +159,128 @@ describe("loading", () => {
 
     expect(mocked.getState).toHaveBeenCalledWith("2026-08-03");
     expect(screen.getByLabelText("Week starting")).toHaveValue("2026-08-03");
+  });
+
+  it("shows the page's outline until there is something to show", async () => {
+    window.history.replaceState(null, "", "/meals");
+    render(
+      <QueryClientProvider client={createQueryClient({ retry: false })}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Loading…").closest("[role=status]")).toHaveAttribute("aria-busy", "true");
+    expect(await screen.findByText("Pick a meal to see its ingredients")).toBeInTheDocument();
+    expect(screen.queryByText("Loading…")).not.toBeInTheDocument();
+  });
+
+  it("says why, when the server is slow to wake", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mocked.getState.mockReturnValue(new Promise(() => {}));
+    try {
+      render(
+        <QueryClientProvider client={createQueryClient({ retry: false })}>
+          <App />
+        </QueryClientProvider>,
+      );
+      expect(screen.queryByText(/waking the server up/i)).not.toBeInTheDocument();
+
+      await act(() => vi.advanceTimersByTimeAsync(SLOW_LOAD_MS));
+
+      expect(screen.getByText(/waking the server up/i)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("offers to try again when the first load fails", async () => {
+    const user = userEvent.setup();
+    mocked.getState.mockRejectedValueOnce(
+      new ApiError(0, "Couldn't reach the server. Check your connection and try again."),
+    );
+    render(
+      <QueryClientProvider client={createQueryClient({ retry: false })}>
+        <App />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("Your planner didn't load")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't reach the server.");
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText("Spaghetti")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});
+
+describe("opening on the last visit's data", () => {
+  const meal = makeMeal({ id: 1, name: "Spaghetti" });
+
+  beforeEach(() => {
+    localStorage.clear();
+    saveLastVisit({
+      account: { email: null, is_guest: true, has_recovery_code: false },
+      state: makeState({ week_start: mondayOf(new Date()), meals: [meal] }),
+    });
+  });
+
+  afterEach(() => {
+    clearLastVisit();
+    localStorage.clear();
+  });
+
+  function renderRestored(path: string) {
+    window.history.replaceState(null, "", path);
+    const client = createQueryClient({ retry: false });
+    restoreLastVisit(client);
+    render(
+      <QueryClientProvider client={client}>
+        <App />
+      </QueryClientProvider>,
+    );
+  }
+
+  /** The page's content, below the header and any notices. */
+  const content = () => screen.getByRole("article", { name: "Spaghetti" }).closest("[aria-busy]");
+
+  it("shows it at once, read-only, while it is brought up to date", async () => {
+    let answer!: (state: ReturnType<typeof makeState>) => void;
+    mocked.getState.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+
+    renderRestored("/meals");
+
+    // No outline, no waiting: the meals are there on the first render.
+    expect(screen.getByRole("article", { name: "Spaghetti" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Updating…");
+    expect(content()).toHaveAttribute("inert");
+
+    await act(async () =>
+      answer(makeState({ week_start: mondayOf(new Date()), meals: [meal, makeMeal({ id: 2, name: "Tacos" })] })),
+    );
+
+    expect(await screen.findByRole("article", { name: "Tacos" })).toBeInTheDocument();
+    expect(screen.queryByText("Updating…")).not.toBeInTheDocument();
+    expect(content()).not.toHaveAttribute("inert");
+  });
+
+  it("keeps showing it when the server cannot be reached, and says so", async () => {
+    const user = userEvent.setup();
+    mocked.getState.mockRejectedValueOnce(
+      new ApiError(0, "Couldn't reach the server. Check your connection and try again."),
+    );
+
+    renderRestored("/meals");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "You're seeing what you had last time; changes are off until it loads.",
+    );
+    expect(screen.getByText("Last visit's copy")).toBeInTheDocument();
+    expect(content()).toHaveAttribute("inert");
+
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(content()).not.toHaveAttribute("inert"));
+    expect(screen.queryByText("Last visit's copy")).not.toBeInTheDocument();
   });
 });
 

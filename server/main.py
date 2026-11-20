@@ -14,8 +14,6 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import is_local_database
-from app.jobs import sync_catalog
-from app.migrations import upgrade_to_head
 from server.deps import get_database
 from server.headers import SecurityHeadersMiddleware
 from server.monitoring import init_error_tracking
@@ -63,9 +61,16 @@ def _auto_migrate_enabled(url: str) -> bool:
 async def lifespan(app: FastAPI):
     """Bring the schema and the catalogue up to date once, before serving
     any request. Only where migrations run automatically (a database on
-    this machine); deployments load the catalogue with the sync job."""
+    this machine); deployments load the catalogue with the sync job.
+
+    Imported here, not at the top: Alembic and the jobs are a seventh of
+    the app's import time, and a deployment's cold start never uses them
+    (tests/test_startup.py keeps it that way)."""
     database = get_database()
     if _auto_migrate_enabled(database.url):
+        from app.jobs import sync_catalog
+        from app.migrations import upgrade_to_head
+
         upgrade_to_head(database.url)
         with database.transaction() as session:
             sync_catalog(session, now=datetime.now(UTC), dry_run=False)

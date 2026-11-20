@@ -4,10 +4,12 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, api } from "@/api/client";
+import { clearLastVisit, restoreLastVisit } from "@/api/persistence";
 import { createQueryClient } from "@/api/queryClient";
 import type { GroceryList } from "@/api/types";
 import { usePlanner } from "@/hooks/usePlanner";
 import { makeMeal, makeState } from "@/test/factories";
+import { saveLastVisit } from "@/test/lastVisit";
 
 vi.mock("@/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/api/client")>()),
@@ -444,5 +446,127 @@ describe("pending work and errors", () => {
 
     await waitFor(() => expect(result.current.error).toBe("Database unavailable."));
     expect(result.current.state).toBeNull();
+  });
+});
+
+describe("trying a failed load again", () => {
+  it("fetches again what failed, and loads", async () => {
+    mocked.getState.mockRejectedValueOnce(new ApiError(503, "Database unavailable."));
+    const client = createQueryClient({ retry: false });
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    const { result } = renderHook(() => usePlanner(), { wrapper });
+    await waitFor(() => expect(result.current.loadFailed).toBe(true));
+
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+    expect(result.current.loadFailed).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+});
+
+describe("opening on the last visit's data", () => {
+  const WEEK = "2026-08-24";
+  const kept = makeState({
+    week_start: WEEK,
+    meals: [makeMeal({ id: 1, name: "Spaghetti (last visit)" })],
+    plan: plan(1),
+  });
+  const keptList: GroceryList = {
+    week_start: WEEK,
+    lines: [],
+    usuals: [],
+    aisle_order: ["produce", "meat", "dairy", "bakery", "pantry", "frozen"],
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    saveLastVisit({ state: kept, groceries: [keptList] });
+  });
+
+  afterEach(() => {
+    clearLastVisit();
+    localStorage.clear();
+  });
+
+  /** Start as the app does: the kept copy restored before the first render. */
+  function renderRestored(options: Parameters<typeof usePlanner>[0] = {}) {
+    const client = createQueryClient({ retry: false });
+    restoreLastVisit(client);
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client }, children);
+    return renderHook(() => usePlanner(options), { wrapper });
+  }
+
+  /** A response that arrives when the test says. */
+  function held<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => (resolve = r));
+    return { promise, resolve };
+  }
+
+  it("shows it straight away, as updating, while one request fetches the real thing", async () => {
+    const answer = held<ReturnType<typeof makeState>>();
+    mocked.getState.mockReturnValue(answer.promise);
+
+    const { result } = renderRestored();
+
+    expect(result.current.state?.meals[0].name).toBe("Spaghetti (last visit)");
+    expect(result.current.freshness).toBe("updating");
+
+    await act(async () =>
+      answer.resolve(makeState({ week_start: WEEK, meals: [makeMeal({ id: 1 })], plan: plan(1) })),
+    );
+
+    await waitFor(() => expect(result.current.freshness).toBe("live"));
+    expect(result.current.state?.meals[0].name).toBe("Spaghetti");
+    // The plan came with the state, as on any first load.
+    expect(mocked.getState).toHaveBeenCalledTimes(1);
+    expect(mocked.getPlan).not.toHaveBeenCalled();
+  });
+
+  it("keeps showing it, as offline, when the real thing cannot be fetched", async () => {
+    mocked.getState.mockRejectedValueOnce(
+      new ApiError(0, "Couldn't reach the server. Check your connection and try again."),
+    );
+
+    const { result } = renderRestored();
+
+    await waitFor(() => expect(result.current.freshness).toBe("offline"));
+    expect(result.current.state?.meals[0].name).toBe("Spaghetti (last visit)");
+    expect(result.current.loadFailed).toBe(true);
+
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(result.current.freshness).toBe("live"));
+    expect(result.current.state?.meals[0].name).toBe("Spaghetti");
+  });
+
+  it("waits for the grocery list too, on a page that shows it", async () => {
+    const list = held<GroceryList>();
+    mocked.getGroceries.mockReturnValue(list.promise);
+
+    const { result } = renderRestored({ loadGroceries: true });
+
+    expect(result.current.grocery).toEqual(keptList);
+    await waitFor(() => expect(mocked.getState).toHaveBeenCalled());
+    // The meals and plan are current; the list on screen is not, yet.
+    await waitFor(() =>
+      expect(result.current.state?.meals[0].name).toBe("Spaghetti"),
+    );
+    expect(result.current.freshness).toBe("updating");
+
+    await act(async () => list.resolve({ ...keptList, usuals: [] }));
+    await waitFor(() => expect(result.current.freshness).toBe("live"));
+  });
+
+  it("is live from the start when nothing was kept", async () => {
+    localStorage.clear();
+
+    const { result } = renderRestored();
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    expect(result.current.freshness).toBe("live");
   });
 });

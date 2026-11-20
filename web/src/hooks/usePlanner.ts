@@ -16,6 +16,11 @@
  * refetching, which is what makes the app feel instant: the network is used
  * when data changes, not when it is looked at.
  *
+ * A visit opens on the last one's data where the browser kept it
+ * (api/persistence.ts), so a server waking up costs a moment of
+ * "Updating…" rather than an empty page. It is read-only (`freshness`)
+ * until that same single request has replaced it.
+ *
  * The week lives in the URL (`?week=`), so a refresh or a shared link opens
  * the same week.
  */
@@ -29,6 +34,7 @@ import {
 import { useState } from "react";
 
 import { ApiError, api } from "../api/client";
+import { isFromLastVisit } from "../api/persistence";
 import { queryKeys } from "../api/queryClient";
 import type {
   AppState,
@@ -45,6 +51,15 @@ import type {
 import { parseWeek, useSearchParam } from "../lib/location";
 
 type Library = Pick<AppState, "meals" | "ingredient_suggestions" | "templates">;
+
+/**
+ * Whether what is on screen is current:
+ * - "live": fetched during this visit;
+ * - "updating": the last visit's, being fetched again;
+ * - "offline": the last visit's, and fetching it again failed or is waiting
+ *   for a connection.
+ */
+export type Freshness = "live" | "updating" | "offline";
 type SuggestionRequest = { weekStart: string; empty: Day[]; planned: number[] };
 type CheckRequest = { weekStart: string; key: string; state: CheckState | null };
 
@@ -88,7 +103,10 @@ export function usePlanner({
   const plan = useQuery({
     queryKey: queryKeys.plan(week),
     queryFn: () => api.getPlan(week),
-    enabled: library.isSuccess,
+    // Not while the library is being fetched: its answer includes this
+    // week's plan. (That happens when a visit opens on the last one's data,
+    // with every entry due to be fetched again.)
+    enabled: library.isSuccess && !library.isFetching,
     // Keep the week we are leaving on screen, dimmed, rather than blanking
     // the page while the next one loads.
     placeholderData: keepPreviousData,
@@ -382,12 +400,42 @@ export function usePlanner({
     actionError ??
     (loadError && loadError !== dismissedError ? describe(loadError) : null);
 
+  // What is on screen may be the last visit's, restored from the browser
+  // while the server wakes up (api/persistence.ts). Changes wait until the
+  // real data has replaced it: one made to an old plan would save that old
+  // week over whatever has changed since.
+  const fromLastVisit = [
+    isFromLastVisit(queryKeys.library, library.dataUpdatedAt) && library,
+    isFromLastVisit(queryKeys.plan(week), plan.dataUpdatedAt) && plan,
+    loadGroceries && isFromLastVisit(queryKeys.grocery(week), grocery.dataUpdatedAt) && grocery,
+  ].filter((query) => query !== false);
+  const freshness: Freshness =
+    fromLastVisit.length === 0
+      ? "live"
+      : // Failed, or waiting for a connection: what is shown may be all
+        // there is for a while.
+        fromLastVisit.some((query) => query.isError || query.fetchStatus === "paused")
+        ? "offline"
+        : "updating";
+
   return {
     week,
     setWeek,
     state,
     loading: !state || plan.isPlaceholderData,
+    freshness,
     error,
+    /** Whether loading failed and is not being tried again right now. */
+    loadFailed:
+      loadError !== null && !library.isFetching && !plan.isFetching && !grocery.isFetching,
+    /** Fetch again whatever failed to load. The plan comes with the library,
+     *  unless the library is already here. */
+    retry: () => {
+      setDismissedError(null);
+      if (!library.isSuccess) void library.refetch();
+      else if (plan.isError) void plan.refetch();
+      if (loadGroceries && grocery.isError) void grocery.refetch();
+    },
     dismissError: () => {
       setActionError(null);
       setDismissedError(loadError);

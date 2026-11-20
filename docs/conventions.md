@@ -108,7 +108,7 @@ permissions on Postgres, and returns a 503 problem when the database is
 unavailable or incompatible. Probes use SQLAlchemy expressions, fetch no
 application rows, and never write data or advance sequences. Compatible
 additive migrations remain ready; no migration-history access is required.
-Postgres probe timeouts are transaction-local. The keep-warm workflow pings
+Postgres probe timeouts are transaction-local. The health-check workflow asks
 `/health/ready`. `/health` remains an alias of `/health/live`.
 
 ## Frontend
@@ -129,6 +129,14 @@ Postgres probe timeouts are transaction-local. The keep-warm workflow pings
 - The cache belongs to one account. Whenever the account on screen changes
   (log in, log out, a session ending mid-use) every query is reset and
   refetched; signing up is the exception, since a guest keeps their row.
+  The copy of the cache kept in `localStorage` is cleared at the same moments.
+- The cache outlives the visit (`api/persistence.ts`): it is saved to
+  `localStorage` and restored before the first render, every entry marked
+  stale. Restored data is shown but inert until refetched
+  (`usePlanner().freshness`), because the plan saves a whole week at a time
+  and an edit to old data would overwrite newer changes. A new cache entry
+  that holds account data must be added to the persisted set deliberately,
+  and if its shape changes without the API's types changing, bump `FORMAT`.
 - A `not-signed-in` answer starts a guest session (`api/client.ts`). Reads
   are then retried; writes are not, because replaying one would save it
   into a brand-new guest account. The person is told the change was not
@@ -137,7 +145,8 @@ Postgres probe timeouts are transaction-local. The keep-warm workflow pings
   find a meal by name rather than by text that may repeat.
 
 Tests: `web/src/hooks/usePlanner.test.ts`, `web/src/hooks/useAccount.test.tsx`,
-`web/src/App.test.tsx`, `web/src/api/client.test.ts`.
+`web/src/App.test.tsx`, `web/src/api/client.test.ts`,
+`web/src/api/persistence.test.ts`.
 
 ## Database
 

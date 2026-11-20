@@ -1,0 +1,33 @@
+name: Health check
+
+# Asks the live site whether it is ready (`/health/ready` runs a trivial
+# query through the deployed API), so a failing run, and GitHub's email
+# about it, says the site or its database is down. It needs no credentials.
+#
+# This was once a keep-warm ping every five minutes, to stop Neon's free tier
+# suspending the database. GitHub runs scheduled workflows on a best-effort
+# basis and ran that one about every eight hours, so it never kept anything
+# warm; and keeping the database awake all day would use more compute than
+# the free plan allows. Cold starts are handled in the app instead: see
+# "Cold starts" in the README. A run does still wake the site, which helps
+# whoever visits soon after.
+
+on:
+  schedule:
+    # Hourly through Australian waking hours (UTC), off the hour, when
+    # GitHub's scheduler is busiest.
+    - cron: "17 20-23,0-12 * * *"
+  workflow_dispatch:
+
+jobs:
+  ready:
+    runs-on: ubuntu-latest
+    steps:
+      # APP_URL is a repository variable, defaulting to the production site.
+      - name: Ask /health/ready
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://meal-planner-liard-ten.vercel.app' }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            --write-out '\nready in %{time_total}s\n' \
+            "$APP_URL/health/ready"

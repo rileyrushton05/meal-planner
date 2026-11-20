@@ -1,4 +1,4 @@
-"""Health checks for the platform and the keep-warm schedule.
+"""Health checks for the platform and the scheduled health check.
 
 ``/health/live`` answers whether the process can serve at all, and touches
 nothing else. ``/health/ready`` also checks the database, with a bounded

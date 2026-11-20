@@ -95,13 +95,14 @@ and row-security-function permissions. Missing tables, columns or grants
 return 503; compatible additive schema changes still pass. The probe does
 not need access to Alembic's version table.
 
-Neon's free tier suspends an idle database, and the first query afterwards
-paid a cold start (859 ms against 135 ms warm).
-[`keep-warm.yml`](../.github/workflows/keep-warm.yml) requests
-`/health/ready` every five minutes during waking hours, which keeps both the
-database and the serverless function warm with no credentials at all.
-GitHub's schedules are best-effort, so this is a workaround rather than a
-guarantee.
+[`health-check.yml`](../.github/workflows/health-check.yml) asks
+`/health/ready` hourly during Australian waking hours, with no credentials,
+so a failed run (and GitHub's email about it) means the site or database is
+down. It used to be a keep-warm ping every five minutes, but GitHub ran it
+about every eight hours, so it kept nothing warm. Cold starts are handled
+in the app instead: see [Cold starts](../README.md#cold-starts). Each cold
+start logs one line, `"event": "cold_start"` with `import_ms`, which tells a
+slow function start apart from a slow database in Vercel's logs.
 
 ## Owner commands
 

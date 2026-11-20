@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 import { sentryVitePlugin } from "@sentry/vite-plugin";
@@ -36,6 +37,23 @@ const errorTracking = {
 };
 
 /**
+ * The version of the data the browser keeps from a visit (src/api/
+ * persistence.ts): a hash of the API's generated types. A deploy that
+ * changes what the API returns changes it, and copies saved by the old
+ * build are then ignored rather than handed to code that expects the new
+ * shape. Any other deploy keeps them, which matters: a fresh deploy is
+ * exactly when the server starts cold.
+ */
+const cacheVersion = {
+  "import.meta.env.VITE_CACHE_VERSION": JSON.stringify(
+    createHash("sha256")
+      .update(readFileSync(new URL("./src/api/schema.ts", import.meta.url)))
+      .digest("hex")
+      .slice(0, 12),
+  ),
+};
+
+/**
  * With an auth token (deployments only), upload source maps so a report
  * from the minified page shows the real file and line, then delete them:
  * they are for Sentry, not for anyone browsing the site. A failed upload
@@ -58,7 +76,7 @@ const sourceMapPlugins = uploadSourceMaps
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), ...sourceMapPlugins],
-  define: errorTracking,
+  define: { ...errorTracking, ...cacheVersion },
   build: {
     // "hidden": maps are written for the upload, but the page never points
     // at them.
