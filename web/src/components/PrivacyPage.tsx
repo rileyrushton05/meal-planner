@@ -53,8 +53,8 @@ export function PrivacyPage() {
               "No email or password at all. A guest session unused for 30 days is deleted with everything in it.",
             ],
             [
-              "In your browser only",
-              "Your light or dark choice. Never sent anywhere.",
+              "In your browser",
+              "Your light or dark choice, and a copy of what you last saw (your meals, recent plans and grocery lists, and the email you're signed in with) so the app opens at once next time. Logging out or deleting your account clears it, and a copy older than two weeks is ignored. Neither is sent anywhere.",
             ],
           ]}
         />

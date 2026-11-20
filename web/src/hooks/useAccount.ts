@@ -7,12 +7,16 @@
  * session ends mid-use and the client starts a new guest session
  * (`onGuestSessionStarted`). Signing up is the exception: a guest who signs
  * up keeps the same account and data, so only the name on it changes.
+ *
+ * Each reset also clears the copy of the cache the browser keeps between
+ * visits (api/persistence.ts): it belonged to the account being left.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { api, onGuestSessionStarted } from "../api/client";
+import { clearLastVisit } from "../api/persistence";
 import { queryKeys } from "../api/queryClient";
 import type { Account, SignedUp } from "../api/types";
 
@@ -40,14 +44,18 @@ export function useAccount() {
         // undo. With data on screen, the session it came from has ended.
         if (queryClient.getQueryData(queryKeys.library) === undefined) return;
         setNotice(SESSION_ENDED_NOTICE);
+        clearLastVisit();
         void queryClient.resetQueries();
       }),
     [queryClient],
   );
 
-  /** Another account's data is about to be on screen. */
+  /** Another account's data is about to be on screen. The copy the browser
+   *  kept of this one goes first, so it cannot outlive the session even if
+   *  the tab closes before the new account's data arrives. */
   const startOver = async () => {
     setNotice(null);
+    clearLastVisit();
     await queryClient.resetQueries();
   };
 

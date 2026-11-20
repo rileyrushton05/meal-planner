@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 
+import { E2E_DATABASE as database } from "./e2e/database.ts";
+
 /**
  * End-to-end tests: the production build in a real browser, against the real
  * API on a fresh SQLite database.
@@ -17,8 +19,6 @@ const WEB_PORT = 4174;
 /** Serves e2e/pages/, standing in for a recipe website to import from. */
 const RECIPE_SITE_PORT = 4175;
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
-// Not under test-results/, which Playwright empties when a run starts.
-const database = fileURLToPath(new URL("./.e2e/e2e.db", import.meta.url));
 
 export default defineConfig({
   testDir: "e2e",

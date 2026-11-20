@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, api, onGuestSessionStarted } from "./client";
+import { ApiError, UNREACHABLE, api, onGuestSessionStarted } from "./client";
 
 function mockFetch(response: Partial<Response> & { json?: () => unknown }) {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -83,6 +83,19 @@ describe("error handling", () => {
     });
 
     await expect(api.getState("2026-08-03")).rejects.toThrow("Request failed (500)");
+  });
+
+  it("says in words when the server could not be reached at all", async () => {
+    // What fetch does offline, or when nothing answers: the browser's own
+    // "Failed to fetch" means nothing to the person reading it.
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    await expect(api.getState("2026-08-03")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 0,
+      type: UNREACHABLE,
+      message: "Couldn't reach the server. Check your connection and try again.",
+    });
   });
 });
 

@@ -82,7 +82,7 @@ export function onGuestSessionStarted(listener: () => void): () => void {
  * and the server answers that with the same account rather than another.
  */
 function startGuestSession(): Promise<void> {
-  guestSession ??= fetch("/api/auth/guest", {
+  guestSession ??= send("/api/auth/guest", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sample_week: mondayOf(new Date()) }),
@@ -108,12 +108,30 @@ const SESSION_ROUTES = new Set([
   "/api/auth/recover",
 ]);
 
+/** The type of the error for a request that never reached the server. */
+export const UNREACHABLE = "urn:meal-planner:problem:unreachable";
+
+/**
+ * `fetch`, with a request that never got an answer (offline, the server
+ * down or still starting) turned into an ApiError saying so in words,
+ * rather than the browser's own "Failed to fetch".
+ */
+async function send(path: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(path, init);
+  } catch {
+    throw new ApiError(0, "Couldn't reach the server. Check your connection and try again.", {
+      type: UNREACHABLE,
+    });
+  }
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
   { retried = false }: { retried?: boolean } = {},
 ): Promise<T> {
-  const response = await fetch(path, {
+  const response = await send(path, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });

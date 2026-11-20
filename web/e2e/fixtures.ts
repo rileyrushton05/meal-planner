@@ -13,6 +13,8 @@
 
 import { expect, type Page, test as base } from "@playwright/test";
 
+import { resetGuestAllowance } from "./database.ts";
+
 export function watchForCspViolations(page: Page): string[] {
   const violations: string[] = [];
   // The browser's own report, which names the blocked resource.
@@ -24,7 +26,22 @@ export function watchForCspViolations(page: Page): string[] {
   return violations;
 }
 
-export const test = base.extend<{ cspViolationsAllowed: boolean; cspGuard: void }>({
+export const test = base.extend<{
+  cspViolationsAllowed: boolean;
+  cspGuard: void;
+  guestAllowance: void;
+}>({
+  /** Every test may start a guest session; see `resetGuestAllowance`. */
+  guestAllowance: [
+    // Playwright reads a fixture's dependencies from this pattern, so it
+    // must be one even when, as here, there are none.
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, use) => {
+      resetGuestAllowance();
+      await use();
+    },
+    { auto: true },
+  ],
   /** For the one test that breaks the policy on purpose, to prove it holds. */
   cspViolationsAllowed: [false, { option: true }],
   cspGuard: [

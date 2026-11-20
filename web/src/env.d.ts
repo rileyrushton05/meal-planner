@@ -6,4 +6,6 @@ interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string;
   readonly VITE_SENTRY_ENVIRONMENT?: string;
   readonly VITE_SENTRY_RELEASE?: string;
+  /** A hash of the API's types; see `cacheVersion` in vite.config.ts. */
+  readonly VITE_CACHE_VERSION?: string;
 }

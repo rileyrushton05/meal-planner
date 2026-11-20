@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
-from app.importing import import_recipe as read_recipe_at
 from server import serializers
 from server.deps import CurrentUserDep, TransactionDep
 from server.schemas import ImportedRecipe, RecipeLink
@@ -26,6 +25,10 @@ def import_recipe(
     2 MB; HTML), and each user may import 20 an hour. A page that cannot be
     read is 422 recipe-import, with a sentence saying why.
     """
+    # Loaded on first use: fetching pages brings in httpx, which no other
+    # request needs, so a cold start does not pay for it.
+    from app.importing import import_recipe as read_recipe_at
+
     recipe = read_recipe_at(
         session, user_id=user.id, url=payload.url, now=datetime.now(UTC)
     )

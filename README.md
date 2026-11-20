@@ -38,6 +38,10 @@ planned.
 - **3.4 s to 0.11 s** to change week, by measuring first: colocating the
   functions with the database and cutting round trips, not tuning queries.
   ([latency](#latency))
+- **Opens at once, even on a cold server.** A return visit shows the last
+  one's data from the browser on the first paint and refreshes it behind,
+  read-only until it has, so a sleeping database costs a moment of
+  "Updating…" rather than an empty page. ([cold starts](#cold-starts))
 - **Types from the API, not by hand.** The TypeScript the frontend uses is
   generated from the OpenAPI document, and CI fails if either is stale, so a
   renamed field breaks the build rather than the page.
@@ -156,6 +160,10 @@ What the app keeps, in plain terms (also in the app, at `/privacy`):
 - **A session** is a cookie; the database holds only its hash, and it ends
   after 30 days. **A guest** has no email or password at all, and a guest
   unused for 30 days is deleted with everything in it by a nightly job.
+- **In the browser:** the light or dark choice, and a copy of what you last
+  saw (meals, recent plans and grocery lists, the signed-in email) so the
+  next visit opens at once. Logging out, logging in as someone else or
+  deleting the account clears it; a copy over two weeks old is ignored.
 - **Logs** never record email addresses, passwords, tokens or IP addresses.
   Login throttling counts keyed hashes of the email and network, never the
   values, and forgets them after a day. **Error reports** (Sentry, EU) carry
@@ -227,6 +235,40 @@ Four changes, in order of how much they bought:
 The frontend loads a week in one request and works from memory afterwards, so
 changing page or opening a dropdown touches no network at all. Only changes
 hit the API.
+
+### Cold starts
+
+All of that assumes something is awake to answer. On free tiers, after a
+quiet spell nothing is: the serverless function has to start and import the
+app, and Neon has suspended the database (it does after five idle minutes).
+Neon's own log put a wake-up at **0.45 s** median, up to 2.2 s. So the first
+visit of the day waited one to three seconds on a blank page.
+
+Keeping things awake was tried first and is not the answer. A scheduled ping
+every five minutes was in fact run by GitHub every eight hours or so
+(scheduled workflows are best-effort), and a database kept up all day would
+use more compute than the free plan allows. So the app makes waiting cheap
+instead:
+
+1. **Open on the last visit.** The browser keeps a copy of the cache (meals,
+   recent plans and grocery lists) and the next visit renders it before the
+   first paint, then fetches the real data with the same single request. The
+   page is inert until it lands, with "Updating…" by the title: a change made
+   to an old plan would otherwise save that old week over one edited since on
+   another device. If the server cannot be reached the copy stays readable,
+   which is the grocery list in a shop with no signal. The copy is versioned
+   by a hash of the API's generated types, so a deploy that changes a shape
+   discards it instead of handing a page data it cannot read; it belongs to
+   the session and is cleared with it. (`web/src/api/persistence.ts`)
+2. **Show the page's outline, and say why.** With nothing kept (a first
+   visit), each page shows a skeleton of its own layout, and after 2.5 s a
+   line explaining that the server is waking up.
+3. **Import less on a cold start.** Alembic, the scheduled jobs and the
+   recipe fetcher (httpx) were imported by every function start and used by
+   almost none: deferring them took the import from 640 ms to 480 ms
+   locally, and a test fails if one creeps back. Each cold start logs its
+   import time (`"event": "cold_start"`), so the real figure is in Vercel's
+   logs rather than estimated.
 
 ### Data model
 
