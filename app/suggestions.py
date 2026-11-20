@@ -3,8 +3,9 @@ fills in when they pick one.
 
 A person's own ingredients come first, with the unit they usually measure
 each in. Catalogue items they have not used yet are suggested too, with the
-unit the built-in templates measure them in, or failing that the natural
-one for how the item is measured (grams, millilitres, or a plain count).
+unit the built-in templates measure them in, failing that the catalogue's
+own (a teaspoon of salt), and failing that the natural one for how the item
+is measured (grams, millilitres, or a plain count).
 """
 
 from __future__ import annotations
@@ -76,7 +77,8 @@ def usual_units(
     entries: Iterable[CatalogEntry], templates: Iterable[MealTemplate]
 ) -> dict[str, str]:
     """Each catalogue item's name key -> the unit to suggest for it: the one
-    the templates use most, or the natural one for how it is measured."""
+    the templates use most, else the catalogue's own (`unit`), else the
+    natural one for how it is measured."""
     entries = list(entries)
     owner = {key: entry for entry in entries for key in entry.keys}
     in_templates: defaultdict[str, Counter[str]] = defaultdict(Counter)
@@ -90,6 +92,8 @@ def usual_units(
         entry.name_key: (
             in_templates[entry.name_key].most_common(1)[0][0]
             if in_templates[entry.name_key]
+            else entry.unit
+            if entry.unit is not None
             else _BY_MEASURE[entry.measure]
         )
         for entry in entries

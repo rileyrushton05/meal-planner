@@ -141,8 +141,11 @@ ingredient. You check each line, then the meal is created in one request.
   already in the cupboard. Ticks are saved to your account, so the phone in
   the shop and the laptop at home show the same list, and two people
   shopping see each other's. Copy what's left, or download the whole list.
-- **An ingredient catalogue** links ingredients to about 80 common grocery
-  items by name or alias, which is how the list knows each one's aisle.
+- **An ingredient catalogue** links ingredients to about 140 common grocery
+  items by name or alias, which is how the list knows each one's aisle and
+  the ingredient field knows to offer a teaspoon of cumin and a bunch of
+  coriander. Its gaps were found by running real recipe lines through the
+  parser and listing what it did not recognise.
 - **Your data is yours:** download all of it as JSON, or delete the account
   and everything in it, from the Account page.
 - **Phone and desktop, light and dark.**

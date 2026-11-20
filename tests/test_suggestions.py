@@ -42,6 +42,27 @@ def test_an_item_no_template_uses_gets_the_unit_for_how_it_is_measured() -> None
     assert usual_units(entries, [template])["lime"] == ""
 
 
+def test_an_item_can_name_the_unit_recipes_use() -> None:
+    """Salt is weighed, but no recipe asks for grams of it."""
+    salt = CatalogEntry(
+        "Salt", Category.PANTRY, Measure.MASS, None, ("salt",), unit="tsp"
+    )
+
+    assert usual_units([salt], []) == {"salt": "tsp"}
+    # What the templates actually use still comes first.
+    assert usual_units([salt], [make_template("Chips", ("Salt", 5, "g"))]) == {
+        "salt": "g"
+    }
+
+
+def test_the_catalogue_names_units_for_spices_sauces_and_herbs() -> None:
+    offered = _units()
+
+    assert offered["Ground Cumin"] == "tsp"
+    assert offered["Fish Sauce"] == "tbsp"
+    assert offered["Coriander"] == "bunches"
+
+
 def test_the_unit_templates_use_most_is_the_one_suggested() -> None:
     entries = [CatalogEntry("Rice", Category.PANTRY, Measure.MASS, None, ("rice",))]
     templates = [

@@ -89,7 +89,7 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("4 cheese slices", 4, "slices", "Cheese"),
     ("3 rashers bacon", 3, "rashers", "Bacon"),
     ("2 celery sticks", 2, "sticks", "Celery"),
-    ("2 fish sticks", 2, "", "Fish sticks"),
+    ("2 fish sticks", 2, "", "Fish Fingers"),
     # Describing words are set aside to find the item.
     ("2 large brown onions", 2, "", "Onion"),
     ("1 small red onion, finely diced", 1, "", "Red Onion"),
@@ -115,9 +115,9 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("* 1 cup rice", 1, "cups", "Rice"),
     # Juice and zest.
     ("Juice of 1 lemon", 1, "", "Lemon"),
-    ("zest of 2 limes", 2, "", "Limes"),
+    ("zest of 2 limes", 2, "", "Lime"),
     # Not in the catalogue: the line's own words, capitalised.
-    ("2 tsp smoked paprika", 2, "tsp", "Smoked paprika"),
+    ("2 tsp smoked paprika", 2, "tsp", "Smoked Paprika"),
     ("1 bunch coriander", 1, "bunches", "Coriander"),
     ("3 sprigs thyme", 3, "sprigs", "Thyme"),
     # As recipe sites write them (found importing real pages, 2026-11-19).
@@ -125,7 +125,7 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("2 garlic cloves (, minced)", 2, "cloves", "Garlic"),
     ("1 onion (, diced (white or brown))", 1, "", "Onion"),
     ("2 tsp sugar (, if needed (Note 3))", 2, "tsp", "Sugar"),
-    ("1 cup red wine ((or beef stock))", 1, "cups", "Red wine"),
+    ("1 cup red wine ((or beef stock))", 1, "cups", "Red Wine"),
     ("Grated parmesan (and parsley (optional))", None, "", "Parmesan"),
     # Two measures of one amount: the metric one.
     ("1 lb / 500g beef mince", 500, "g", "Beef Mince"),
@@ -138,11 +138,11 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("2 carrots peeled and finely chopped", 2, "", "Carrots"),
     ("3 garlic cloves finely chopped", 3, "cloves", "Garlic"),
     ("250 g cherry tomatoes sliced in half", 250, "g", "Cherry Tomatoes"),
-    ("1 red chilli deseeded and sliced (optional)", 1, "", "Red chilli"),
+    ("1 red chilli deseeded and sliced (optional)", 1, "", "Red Chilli"),
     ("2 eggs beaten", 2, "", "Eggs"),
-    ("1 tbsp sun dried tomatoes", 1, "tbsp", "Sun dried tomatoes"),
+    ("1 tbsp sun dried tomatoes", 1, "tbsp", "Sun Dried Tomatoes"),
     # A count of cans of a size, with no "x".
-    ("1 15oz. can cannellini beans, drained", 15, "oz", "Cannellini beans"),
+    ("1 15oz. can cannellini beans, drained", 15, "oz", "Cannellini Beans"),
     ("2 400 g tins chickpeas", 800, "g", "Chickpeas"),
     # Footnote marks and prices are not part of the name.
     ("2 cups vegetable stock*", 2, "cups", "Vegetable Stock"),
@@ -152,7 +152,7 @@ LINES: list[tuple[str, float | None, str, str]] = [
     ("Salt to taste", None, "", "Salt"),
     ("a few sprigs of thyme", None, "sprigs", "Thyme"),
     ("some olive oil", None, "", "Olive Oil"),
-    ("Fresh basil", None, "", "Fresh basil"),
+    ("Fresh basil", None, "", "Basil"),
 ]
 
 
@@ -217,7 +217,7 @@ def test_an_amount_and_a_catalogue_item_is_certain() -> None:
 
 
 def test_a_name_outside_the_catalogue_wants_a_look() -> None:
-    parsed = parse_line("2 tsp smoked paprika")
+    parsed = parse_line("2 tsp sumac")
 
     assert parsed.confidence is Confidence.MEDIUM
     assert parsed.catalog_item is None

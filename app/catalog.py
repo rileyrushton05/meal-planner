@@ -3,8 +3,10 @@ ingredients link to, so they can be grouped by aisle and, later, priced.
 
 The catalogue is reference data kept in the repository, in `catalog.csv`
 beside this module: one row per item, with every other spelling of it in
-`aliases`. A change to it is a reviewable diff. `python -m app.jobs
-sync-catalog` loads it, idempotently, and relinks every ingredient.
+`aliases`, and optionally the `unit` recipes measure it in (only the
+ingredient field's suggestions read that; it is not stored). A change to it
+is a reviewable diff. `python -m app.jobs sync-catalog` loads it,
+idempotently, and relinks every ingredient.
 
 Matching is deliberately literal: an ingredient links when its name, with
 case and spacing ignored (`catalog_key`), is an item's name or one of its
@@ -25,7 +27,7 @@ from pathlib import Path
 from app.models import Category, Measure
 
 CATALOG_PATH = Path(__file__).with_name("catalog.csv")
-_COLUMNS = ["name", "category", "measure", "each_grams", "aliases"]
+_COLUMNS = ["name", "category", "measure", "each_grams", "aliases", "unit"]
 
 
 def catalog_key(name: str) -> str:
@@ -45,6 +47,10 @@ class CatalogEntry:
     each_grams: int | None
     #: Every key that means this item, its own name's first.
     keys: tuple[str, ...]
+    #: The unit a recipe measures it in ("tsp" of salt, "bunches" of
+    #: coriander), for the ingredient field to fill in. None: whatever
+    #: `measure` suggests (app/suggestions.py).
+    unit: str | None = None
 
     @property
     def name_key(self) -> str:
@@ -98,8 +104,16 @@ def _entry(row: dict[str, str], line: int, file: str) -> CatalogEntry:
     keys = [catalog_key(name), *aliases]
     if len(set(keys)) != len(keys):
         raise CatalogError(f"{where}: a spelling is listed twice.")
+    # Here, not at the top: app.parsing reads the catalogue itself.
+    from app.parsing import canonical_unit
+
+    unit = (row["unit"] or "").strip() or None
+    if unit is not None and canonical_unit(unit) != unit:
+        raise CatalogError(
+            f"{where}: write the unit as the app does: '{canonical_unit(unit)}'."
+        )
     return CatalogEntry(
-        name, category, measure, int(each) if each else None, tuple(keys)
+        name, category, measure, int(each) if each else None, tuple(keys), unit
     )
 
 
