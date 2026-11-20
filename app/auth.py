@@ -23,7 +23,9 @@ The rules, and why:
   code, below), so the limit is the defence.
 - **Guessing is throttled** (app/ratelimit.py): per account and network,
   with a higher ceiling per account. While throttled, even the right
-  password is refused, without being checked.
+  password is refused, without being checked. Anyone who knows an email can
+  reach that ceiling, so a browser that has signed in to the account before
+  is throttled on its own instead, and stays usable.
 - **A forgotten password is recovered with a code**, shown once at signup
   and stored only as a hash, rather than a link sent by email: no third
   party receives anyone's address. Each code works once, and recovering
@@ -58,12 +60,15 @@ from app.ratelimit import (
     GUESTS_PER_NETWORK,
     LOGIN_PER_ACCOUNT,
     LOGIN_PER_ACCOUNT_AND_NETWORK,
+    LOGIN_PER_DEVICE,
     TAKEN_EMAILS_PER_NETWORK,
     RateLimiter,
     Rule,
     describe_wait,
+    device_token,
     network_of,
     subject,
+    trusted_device,
     wait_seconds,
 )
 from app.repositories import SessionRepository, UserRepository
@@ -111,6 +116,9 @@ class SignedIn:
     #: A new recovery code, when one was just issued (signup, recovery). Like
     #: the token, it exists nowhere else: show it once.
     recovery_code: str | None = None
+    #: For an account with a login, a new device token for the caller to
+    #: keep in a cookie (app/ratelimit.py, `device_token`). None for a guest.
+    device_token: str | None = None
 
 
 def normalise_email(raw: str) -> str:
@@ -137,10 +145,16 @@ def normalise_email(raw: str) -> str:
 
 class AuthService:
     """Account operations within one transaction, at one moment in time,
-    for a request from one network (its IP address, or "unknown")."""
+    for a request from one network (its IP address, or "unknown"), and from
+    a browser holding the device token it was last given, if any."""
 
     def __init__(
-        self, session: Session, *, now: datetime, address: str = "unknown"
+        self,
+        session: Session,
+        *,
+        now: datetime,
+        address: str = "unknown",
+        device: str | None = None,
     ) -> None:
         if now.tzinfo is None:
             raise ValueError("now must be timezone-aware")
@@ -150,6 +164,7 @@ class AuthService:
         self._limits = RateLimiter(session, now=now)
         self._now = now
         self._network = network_of(address)
+        self._device = device
 
     # --- Who is asking ------------------------------------------------------
 
@@ -465,15 +480,24 @@ class AuthService:
         per account, keyed on the email so the throttle reveals nothing
         about who has an account. Login, deletion and recovery all prove
         themselves here, so guesses at any of them count towards all of
-        them from that network.
+        them from that network. A browser with a device token for this
+        email is throttled on its own instead, so guesses from anywhere
+        else, however many, never refuse it.
         """
-        per_network = subject("login", email_key, self._network)
         per_account = subject("login", email_key)
-        rules: tuple[tuple[Rule, str], ...] = (
-            (LOGIN_PER_ACCOUNT_AND_NETWORK, per_network),
-        )
-        if account_wide:
-            rules += ((LOGIN_PER_ACCOUNT, per_account),)
+        device = trusted_device(self._device, email_key)
+        rules: tuple[tuple[Rule, str], ...]
+        if device is not None:
+            rules = ((LOGIN_PER_DEVICE, subject("login", email_key, "device", device)),)
+        else:
+            rules = (
+                (
+                    LOGIN_PER_ACCOUNT_AND_NETWORK,
+                    subject("login", email_key, self._network),
+                ),
+            )
+            if account_wide:
+                rules += ((LOGIN_PER_ACCOUNT, per_account),)
         for rule, key in rules:
             self._refuse_if_throttled(
                 rule, key, "Too many failed attempts. Try again in {wait}."
@@ -508,7 +532,10 @@ class AuthService:
                 )
             raise InvalidCredentialsError(refusal)
 
-        # Proof ends the throttling for this account.
+        # Proof ends the throttling it was under. A trusted browser's proof
+        # leaves the account-wide count alone: clearing it would hand
+        # whoever is guessing elsewhere a fresh allowance each time the
+        # owner signs in.
         for rule, key in rules:
             self._limits.clear(rule, key)
         return user
@@ -548,7 +575,12 @@ class AuthService:
         self._sessions.create(token_hash, user_id, self._now + SESSION_LIFETIME)
         self._users.touch(user_id, self._now)
         return SignedIn(
-            user=_current(user, token_hash), token=token, recovery_code=recovery_code
+            user=_current(user, token_hash),
+            token=token,
+            recovery_code=recovery_code,
+            # Every way of starting a session with a login has just proven
+            # the password or the code, or set one.
+            device_token=device_token(user.email) if user.email else None,
         )
 
 

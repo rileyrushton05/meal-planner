@@ -45,7 +45,11 @@ unscoped, and someone else's meal answers 404, never 403.
 - **Throttling:** five wrong passwords for one account from one network
   start a wait (1 minute, doubling to 15) during which even the right
   password is refused; a higher ceiling per account catches guesses spread
-  across many networks without letting one attacker lock the owner out.
+  across many networks. Anyone who knows the email can reach that ceiling,
+  so a browser that has signed in to the account before carries a device
+  cookie (OWASP's pattern: a random id with a keyed hash binding it to the
+  email, nothing stored) and is throttled on its own instead: guesses from
+  anywhere else never lock the owner out of their own browser.
   Guest sessions and "email already taken" answers are capped per network
   per hour. Emails and IP addresses are stored only as keyed hashes, and
   the address comes from the platform's header, never one a client can set.

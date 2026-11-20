@@ -25,7 +25,7 @@ from app.ratelimit import (
     subject,
 )
 from app.repositories import RateLimitRepository
-from server.deps import SESSION_COOKIE
+from server.deps import DEVICE_COOKIE, SESSION_COOKIE
 from server.observability import configure_logging
 
 EMAIL = "cook@example.com"
@@ -133,6 +133,155 @@ def test_signing_in_clears_the_count(account, anonymous):
     for _ in range(PER_NETWORK - 1):
         assert _login(anonymous, WRONG).status_code == 401
     assert _login(anonymous).status_code == 200
+
+
+# --- Browsers that have signed in before ------------------------------------------
+#
+# The account-wide ceiling is reached by anyone who knows the email, from a
+# few networks, in seconds. A browser that has proven the password before
+# carries a device cookie, and is throttled on its own instead, so the
+# owner's own browser is not locked out (OWASP's "device cookies").
+
+
+@pytest.fixture
+def owners_browser(account):
+    """A browser the owner has signed in from before, then signed out."""
+    with api_client(as_guest=False) as browser:
+        assert _login(browser).status_code == 200
+        browser.post("/api/auth/logout")
+        yield browser
+
+
+def _set_cookie(client, name: str, value: str) -> None:
+    # Where the test client keeps cookies the server set (http.cookiejar
+    # names a dotless host "<host>.local"), so this one replaces theirs.
+    client.cookies.set(name, value, domain="testserver.local", path="/")
+
+
+def _changed(text: str) -> str:
+    """`text` with its last character replaced by a different one."""
+    return text[:-1] + ("b" if text[-1] == "a" else "a")
+
+
+def _lock_the_account(client) -> None:
+    networks = LOGIN_PER_ACCOUNT.free // PER_NETWORK
+    for n in range(networks):
+        for _ in range(PER_NETWORK):
+            _login(client, WRONG, network=f"203.0.113.{n}")
+    assert _login(client, network="198.51.100.7").status_code == 429
+
+
+def test_guesses_elsewhere_do_not_lock_out_a_browser_that_signed_in_before(
+    on_vercel, owners_browser, anonymous
+):
+    _lock_the_account(anonymous)
+
+    assert _login(owners_browser, network="198.51.100.7").status_code == 200
+    owners_browser.post("/api/auth/logout")
+    # Even from the network the guesses came from.
+    assert _login(owners_browser, network="203.0.113.0").status_code == 200
+
+
+def test_a_trusted_browser_guessing_is_throttled_on_its_own(owners_browser, anonymous):
+    for _ in range(PER_NETWORK):
+        assert _login(owners_browser, WRONG).status_code == 401
+    assert _login(owners_browser).status_code == 429
+
+    # Its guesses were not counted against anyone else.
+    assert _login(anonymous).status_code == 200
+
+
+def test_the_device_cookie_vouches_only_for_its_own_account(
+    on_vercel, owners_browser, anonymous
+):
+    other = "other@example.com"
+    with api_client(as_guest=False) as theirs:
+        theirs.post("/api/auth/signup", json={"email": other, "password": PASSWORD})
+    networks = LOGIN_PER_ACCOUNT.free // PER_NETWORK
+    for n in range(networks):
+        for _ in range(PER_NETWORK):
+            _login(anonymous, WRONG, email=other, network=f"203.0.113.{n}")
+
+    response = _login(owners_browser, email=other, network="198.51.100.7")
+
+    assert response.status_code == 429
+
+
+def test_a_made_up_device_cookie_vouches_for_nothing(
+    on_vercel, owners_browser, anonymous
+):
+    genuine = owners_browser.cookies[DEVICE_COOKIE]
+    device, _, mac = genuine.partition(".")
+    _lock_the_account(anonymous)
+    with api_client(as_guest=False) as forger:
+        for forged in (
+            "x",
+            "x.y",
+            ".",
+            f"{device}.",
+            f"{device}.{_changed(mac)}",
+            f"{_changed(device)}.{mac}",
+            genuine + "x" * 200,
+        ):
+            _set_cookie(forger, DEVICE_COOKIE, forged)
+            assert _login(forger, network="198.51.100.7").status_code == 429
+
+        # The cookie set this way is sent: the genuine one gets in.
+        _set_cookie(forger, DEVICE_COOKIE, genuine)
+        assert _login(forger, network="198.51.100.7").status_code == 200
+
+
+def test_the_device_cookie_is_locked_down_and_holds_no_email(account):
+    with api_client(as_guest=False) as browser:
+        response = _login(browser)
+        cookie = next(
+            c
+            for c in response.headers.get_list("set-cookie")
+            if c.startswith(f"{DEVICE_COOKIE}=")
+        )
+        value = browser.cookies.get(DEVICE_COOKIE)
+        browser.post("/api/auth/logout")
+        kept = browser.cookies.get(DEVICE_COOKIE)
+
+    attributes = {part.strip().lower() for part in cookie.split(";")[1:]}
+    assert {"httponly", "secure", "path=/", "samesite=strict"} <= attributes
+    assert not any(a.startswith("domain") for a in attributes)
+    assert value and "cook" not in value and "example" not in value
+    # Signing out does not forget that this browser is the owner's.
+    assert kept == value
+
+
+def test_signing_up_or_recovering_also_makes_the_browser_trusted(anonymous):
+    response = anonymous.post(
+        "/api/auth/signup", json={"email": EMAIL, "password": PASSWORD}
+    )
+    assert anonymous.cookies.get(DEVICE_COOKIE)
+    code = response.json()["recovery_code"]
+    with api_client(as_guest=False) as other:
+        other.post(
+            "/api/auth/recover",
+            json={
+                "email": EMAIL,
+                "recovery_code": code,
+                "new_password": "copper kettle meadow",
+            },
+        )
+        assert other.cookies.get(DEVICE_COOKIE)
+
+
+def test_a_guest_gets_no_device_cookie(anonymous):
+    assert anonymous.post("/api/auth/guest").status_code == 201
+    assert anonymous.cookies.get(DEVICE_COOKIE) is None
+
+
+def test_deleting_the_account_forgets_the_browser(account):
+    with api_client(as_guest=False) as browser:
+        _login(browser)
+        response = browser.request(
+            "DELETE", "/api/account", json={"password": PASSWORD}
+        )
+        assert response.status_code == 204
+        assert browser.cookies.get(DEVICE_COOKIE) is None
 
 
 def test_an_email_with_no_account_is_throttled_identically(anonymous):

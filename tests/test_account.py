@@ -311,18 +311,37 @@ def test_with_its_password_an_account_and_everything_in_it_goes(
 def test_guessing_the_password_is_throttled_with_login(account) -> None:
     """Otherwise a stolen session could guess the password here, unthrottled,
     and then use it wherever else it was reused."""
-    for _ in range(LOGIN_PER_ACCOUNT_AND_NETWORK.free):
-        wrong = account.request("DELETE", "/api/account", json={"password": "guess"})
-        assert wrong.status_code == 401
+    with api_client(as_guest=False) as thief:
+        # The session cookie alone: the owner's browser also holds a device
+        # cookie, which would make it throttled on its own (below).
+        thief.cookies.set(
+            SESSION_COOKIE,
+            account.cookies[SESSION_COOKIE],
+            # Where the test client keeps the cookies the server set.
+            domain="testserver.local",
+            path="/",
+        )
+        for _ in range(LOGIN_PER_ACCOUNT_AND_NETWORK.free):
+            wrong = thief.request("DELETE", "/api/account", json={"password": "guess"})
+            assert wrong.status_code == 401
 
-    refused = account.request("DELETE", "/api/account", json={"password": PASSWORD})
-    assert refused.status_code == 429
+        refused = thief.request("DELETE", "/api/account", json={"password": PASSWORD})
+        assert refused.status_code == 429
     # The same throttle as login: signing in is refused for now too.
     with api_client(as_guest=False) as browser:
         login = browser.post(
             "/api/auth/login", json={"email": EMAIL, "password": PASSWORD}
         )
         assert login.status_code == 429
+
+
+def test_guessing_from_the_owners_own_browser_is_throttled_too(account) -> None:
+    for _ in range(LOGIN_PER_ACCOUNT_AND_NETWORK.free):
+        wrong = account.request("DELETE", "/api/account", json={"password": "guess"})
+        assert wrong.status_code == 401
+
+    refused = account.request("DELETE", "/api/account", json={"password": PASSWORD})
+    assert refused.status_code == 429
 
 
 def test_deletion_is_logged_without_saying_who(account, db, log_lines) -> None:

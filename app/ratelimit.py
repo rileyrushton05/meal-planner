@@ -7,7 +7,9 @@ Two kinds of rule, for two kinds of threat:
   after the streak began and cleared by a success. Keyed per account *and*
   network, so someone who knows your email cannot lock you out from their
   own connection, with a higher ceiling per account alone, so spreading
-  guesses across many addresses does not escape it either.
+  guesses across many addresses does not escape it either. A browser that
+  has signed in to the account before is throttled on its own instead
+  (`device_token`), so that ceiling cannot lock the owner out.
 - **Window**, for things that are fine in moderation: starting guest
   sessions (each one is a row in the database) and learning that an email
   already has an account (which is what signup reveals). A fixed number
@@ -34,6 +36,7 @@ import hmac
 import ipaddress
 import math
 import os
+import secrets
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
@@ -140,6 +143,17 @@ LOGIN_PER_ACCOUNT = Backoff(
     max_wait=timedelta(minutes=15),
     forget_after=timedelta(days=1),
 )
+#: Guessing from a browser that has signed in to the account before (see
+#: `device_token`), instead of both rules above: the owner's browser is not
+#: locked out by guesses made anywhere else, and a stolen device cookie
+#: buys no more guesses than one network gets.
+LOGIN_PER_DEVICE = Backoff(
+    scope="login-device",
+    free=5,
+    first_wait=timedelta(minutes=1),
+    max_wait=timedelta(minutes=15),
+    forget_after=timedelta(days=1),
+)
 #: New guest sessions from one network. Generous: a shared connection (a
 #: university, an office) can hold many real visitors.
 GUESTS_PER_NETWORK = Window(scope="guest-network", limit=30, period=timedelta(hours=1))
@@ -200,6 +214,39 @@ def subject(*parts: str) -> str:
     return hmac.new(_key(), message, hashlib.sha256).hexdigest()
 
 
+# --- Devices ---------------------------------------------------------------------
+#
+# The per-account rule has a cost: anyone who knows an email can reach its
+# ceiling, and then the owner is refused too. So a browser that proves the
+# password gets a device token, and is throttled on its own from then on
+# (OWASP, "Slow Down Online Guessing Attacks with Device Cookies"). It is a
+# random id with a keyed hash binding it to the email: nothing to store,
+# nothing a stranger can make, and no email in it to read. It is not a
+# credential: it only decides which throttle applies.
+
+_DEVICE_ID_BYTES = 16
+_MAX_DEVICE_TOKEN_LENGTH = 128
+
+
+def device_token(email_key: str) -> str:
+    """A new token for the browser that just proved it holds the account
+    for `email_key` (trimmed and lower-cased, as login compares it)."""
+    device = secrets.token_urlsafe(_DEVICE_ID_BYTES)
+    return f"{device}.{subject('device', email_key, device)}"
+
+
+def trusted_device(token: str | None, email_key: str) -> str | None:
+    """The device's id if `token` was issued for `email_key`, else None:
+    missing, made up, or given for another account."""
+    if not token or len(token) > _MAX_DEVICE_TOKEN_LENGTH:
+        return None
+    device, _, mac = token.partition(".")
+    if not device or not mac:
+        return None
+    expected = subject("device", email_key, device)
+    return device if hmac.compare_digest(mac.encode(), expected.encode()) else None
+
+
 # --- Storage ---------------------------------------------------------------------
 
 
@@ -253,6 +300,7 @@ def _as_utc(moment: datetime) -> datetime:
 STALE_AFTER = max(
     LOGIN_PER_ACCOUNT_AND_NETWORK.forget_after,
     LOGIN_PER_ACCOUNT.forget_after,
+    LOGIN_PER_DEVICE.forget_after,
     GUESTS_PER_NETWORK.period,
     TAKEN_EMAILS_PER_NETWORK.period,
     IMPORTS_PER_USER.period,
