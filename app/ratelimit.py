@@ -14,7 +14,9 @@ Two kinds of rule, for two kinds of threat:
   sessions (each one is a row in the database), learning that an email
   already has an account (which is what signup reveals), and failing to
   sign in to any account at all (one password tried against many emails,
-  which no per-account rule sees). A fixed number per hour per network.
+  which no per-account rule sees), and signing up. A fixed number per hour
+  per network, and for new accounts one ceiling for everyone, as a
+  backstop for many networks at once.
 
 The arithmetic is pure functions of a bucket and the time, so the schedule
 is tested exactly, without a clock (tests/test_ratelimit.py). `RateLimiter`
@@ -166,6 +168,20 @@ LOGIN_FAILURES_PER_NETWORK = Window(
 #: New guest sessions from one network. Generous: a shared connection (a
 #: university, an office) can hold many real visitors.
 GUESTS_PER_NETWORK = Window(scope="guest-network", limit=30, period=timedelta(hours=1))
+#: Signups from one network, a guest's included: each spends the slow
+#: password hash, and a new one adds an account for good.
+SIGNUPS_PER_NETWORK = Window(
+    scope="signup-network", limit=20, period=timedelta(hours=1)
+)
+#: New accounts, guests and signups alike, from everywhere at once: the
+#: backstop for what the per-network rules cannot see, someone with many
+#: networks (an IPv6 block holds thousands of /64s). Tripping it turns new
+#: visitors away for the rest of the hour, but nobody who already has an
+#: account, which is the trade: a full database would turn away everyone.
+#: Far above what this app sees, so only a flood reaches it.
+NEW_ACCOUNTS_OVERALL = Window(
+    scope="new-accounts", limit=300, period=timedelta(hours=1)
+)
 #: "That email already has an account" answers to one network: what
 #: signup reveals, so what an attacker would harvest.
 TAKEN_EMAILS_PER_NETWORK = Window(
@@ -312,6 +328,8 @@ STALE_AFTER = max(
     LOGIN_PER_DEVICE.forget_after,
     LOGIN_FAILURES_PER_NETWORK.period,
     GUESTS_PER_NETWORK.period,
+    SIGNUPS_PER_NETWORK.period,
+    NEW_ACCOUNTS_OVERALL.period,
     TAKEN_EMAILS_PER_NETWORK.period,
     IMPORTS_PER_USER.period,
 )

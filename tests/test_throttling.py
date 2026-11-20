@@ -20,7 +20,9 @@ from app.ratelimit import (
     LOGIN_FAILURES_PER_NETWORK,
     LOGIN_PER_ACCOUNT,
     LOGIN_PER_ACCOUNT_AND_NETWORK,
+    NEW_ACCOUNTS_OVERALL,
     RATE_LIMIT_KEY_ENV_VAR,
+    SIGNUPS_PER_NETWORK,
     TAKEN_EMAILS_PER_NETWORK,
     network_of,
     subject,
@@ -429,7 +431,8 @@ def test_counts_survive_the_failed_request_and_store_no_email_or_address(
         rows = connection.execute(
             text("SELECT scope, subject, hits FROM rate_limits ORDER BY scope")
         ).all()
-    assert [(scope, hits) for scope, _, hits in rows] == [
+    logins = [(scope, hits) for scope, _, hits in rows if scope.startswith("login")]
+    assert logins == [
         ("login-account", 1),
         ("login-account-network", 1),
         ("login-failure-network", 1),
@@ -471,6 +474,80 @@ def test_learning_which_emails_have_accounts_is_capped_per_network(
     assert sign_up(EMAIL, "203.0.113.9").status_code == 429
     assert sign_up("new@example.com", "203.0.113.9").status_code == 429
     assert sign_up("new@example.com", "198.51.100.7").status_code == 200
+
+
+def _sign_up(client, email: str, network: str):
+    return client.post(
+        "/api/auth/signup",
+        json={"email": email, "password": PASSWORD},
+        headers=_from(network),
+    )
+
+
+def test_signups_per_network_are_capped(db, on_vercel):
+    # Each spends the slow password hash, and most add an account for good.
+    for n in range(SIGNUPS_PER_NETWORK.limit):
+        # Half from guests upgrading, half straight to an account.
+        with api_client(as_guest=False) as browser:
+            if n % 2:
+                browser.post("/api/auth/guest", headers=_from("203.0.113.9"))
+            response = _sign_up(browser, f"person{n}@example.com", "203.0.113.9")
+            assert response.status_code == 200, response.text
+
+    with api_client(as_guest=False) as browser:
+        refused = _sign_up(browser, "one-more@example.com", "203.0.113.9")
+        elsewhere = _sign_up(browser, "one-more@example.com", "198.51.100.7")
+
+    assert refused.status_code == 429
+    assert "network" in refused.json()["detail"]
+    assert elsewhere.status_code == 200
+
+
+def _overall_count(db) -> int:
+    with db.transaction() as session:
+        row = RateLimitRepository(session).get(
+            NEW_ACCOUNTS_OVERALL.scope, subject("everyone")
+        )
+        return row.hits if row is not None else 0
+
+
+def test_every_new_account_counts_towards_the_overall_ceiling(db, on_vercel):
+    with api_client(as_guest=False) as browser:
+        browser.post("/api/auth/guest", headers=_from("203.0.113.1"))
+        # Upgrading the guest adds no account: its row already exists.
+        _sign_up(browser, "guest@example.com", "203.0.113.1")
+    with api_client(as_guest=False) as browser:
+        _sign_up(browser, "direct@example.com", "203.0.113.2")
+
+    assert _overall_count(db) == 2
+
+
+def test_at_the_overall_ceiling_only_new_visitors_are_turned_away(
+    on_vercel, account, db
+):
+    with api_client(as_guest=False) as guest:
+        assert guest.post("/api/auth/guest").status_code == 201
+        now = datetime.now(UTC)
+        with db.transaction() as session:
+            limits = RateLimitRepository(session)
+            limits.get(NEW_ACCOUNTS_OVERALL.scope, subject("everyone"), for_update=True)
+            limits.save(
+                NEW_ACCOUNTS_OVERALL.scope,
+                subject("everyone"),
+                hits=NEW_ACCOUNTS_OVERALL.limit,
+                window_started_at=now,
+                blocked_until=now + NEW_ACCOUNTS_OVERALL.period,
+            )
+
+        with api_client(as_guest=False) as newcomer:
+            new_guest = newcomer.post("/api/auth/guest", headers=_from("198.51.100.7"))
+            new_account = _sign_up(newcomer, "new@example.com", "198.51.100.8")
+            assert new_guest.status_code == new_account.status_code == 429
+            assert "new visitors" in new_guest.json()["detail"]
+            # Someone with an account still gets in,
+            assert _login(newcomer).status_code == 200
+        # and a guest already here can still keep what they made.
+        assert _sign_up(guest, "guest@example.com", "198.51.100.9").status_code == 200
 
 
 # --- Security events -------------------------------------------------------------

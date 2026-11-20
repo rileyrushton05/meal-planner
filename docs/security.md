@@ -53,8 +53,10 @@ unscoped, and someone else's meal answers 404, never 403.
   from one network are also capped across every email (50 an hour, never
   reset by a success), which catches one password tried against many
   accounts and bounds the password-hashing work a stranger can cause.
-  Guest sessions and "email already taken" answers are capped per network
-  per hour. Emails and IP addresses are stored only as keyed hashes, and
+  Guest sessions, signups and "email already taken" answers are capped per
+  network per hour, and new accounts of either kind by one ceiling for
+  everyone (300 an hour), the backstop against many networks at once: at
+  it, new visitors wait, but no one with an account does. Emails and IP addresses are stored only as keyed hashes, and
   the address comes from the platform's header, never one a client can set.
 - **Bounded work:** reading pasted ingredients takes at most 100 lines of
   200 characters, and the parser runs in time linear in the line (a test

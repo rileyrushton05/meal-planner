@@ -26,6 +26,10 @@ The rules, and why:
   password is refused, without being checked. Anyone who knows an email can
   reach that ceiling, so a browser that has signed in to the account before
   is throttled on its own instead, and stays usable.
+- **New accounts are capped**, per network and, as a backstop against many
+  networks at once, overall. Each is a row kept until it is deleted, and a
+  signup spends the slow password hash: unlimited, they would fill the
+  database or use up the server's time.
 - **A forgotten password is recovered with a code**, shown once at signup
   and stored only as a hash, rather than a link sent by email: no third
   party receives anyone's address. Each code works once, and recovering
@@ -62,6 +66,8 @@ from app.ratelimit import (
     LOGIN_PER_ACCOUNT,
     LOGIN_PER_ACCOUNT_AND_NETWORK,
     LOGIN_PER_DEVICE,
+    NEW_ACCOUNTS_OVERALL,
+    SIGNUPS_PER_NETWORK,
     TAKEN_EMAILS_PER_NETWORK,
     RateLimiter,
     Rule,
@@ -206,8 +212,10 @@ class AuthService:
             "Too many new sessions have started from your network. "
             "Try again in {wait}.",
         )
+        self._refuse_if_overall_full()
         user = self._users.create(is_guest=True)
         self._limits.record(GUESTS_PER_NETWORK, network)
+        self._limits.record(NEW_ACCOUNTS_OVERALL, subject("everyone"))
         if sample_week is not None:
             # From here the transaction acts as the new guest, so the
             # samples are written through row-level security like any other
@@ -235,6 +243,14 @@ class AuthService:
             network,
             "Too many signup attempts from your network. Try again in {wait}.",
         )
+        # Before the password is hashed: that is the expensive part.
+        self._refuse_if_throttled(
+            SIGNUPS_PER_NETWORK,
+            network,
+            "Too many accounts have been made from your network. Try again in {wait}.",
+        )
+        if current is None:
+            self._refuse_if_overall_full()
         try:
             email, password_hash = self._new_credentials(email, password)
         except EmailTakenError:
@@ -244,8 +260,10 @@ class AuthService:
             events.record("signup_email_taken", subject=network)
             raise
 
+        self._limits.record(SIGNUPS_PER_NETWORK, network)
         if current is None:
             user = self._users.create_account(email, password_hash)
+            self._limits.record(NEW_ACCOUNTS_OVERALL, subject("everyone"))
             outcome = "account_created"
         else:
             user = self._users.get(current.id)
@@ -556,6 +574,16 @@ class AuthService:
         for rule, key in rules:
             self._limits.clear(rule, key)
         return user
+
+    def _refuse_if_overall_full(self) -> None:
+        """Refuse a new account while the ceiling for everyone is reached
+        (a guest upgrading is not one: their row already exists)."""
+        self._refuse_if_throttled(
+            NEW_ACCOUNTS_OVERALL,
+            subject("everyone"),
+            "The app isn't taking new visitors for a little while. "
+            "Try again in {wait}.",
+        )
 
     def _refuse_if_throttled(self, rule: Rule, key: str, message: str) -> None:
         wait = self._limits.wait_remaining(rule, key)
