@@ -391,8 +391,13 @@ def test_the_app_works_end_to_end_as_the_runtime_role(
         assert {line["key"]: line["state"] for line in after["lines"]}[key] == "basket"
         assert [u["name"] for u in after["usuals"]] == ["Milk"]
 
+        # A copy writes its own meal and ingredient lines under row security.
+        copy = client.post(f"/api/meals/{meal['id']}/duplicate").json()
+        assert len(copy["ingredients"]) == len(meal["ingredients"])
+
         # Bob's meal 2 exists, and is invisible.
         assert client.get("/api/meals/2").status_code == 404
+        assert client.post("/api/meals/2/duplicate").status_code == 404
         bad_plan = {"days": [{"day": "Tuesday", "meal_id": 2}]}
         assert client.put("/api/plan/2026-08-03", json=bad_plan).status_code == 404
 

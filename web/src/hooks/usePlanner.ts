@@ -281,6 +281,9 @@ export function usePlanner({
     addFromTemplate: (templateName: string) =>
       runFor(mealChange.mutateAsync(() => api.createMealFromTemplate(templateName))),
 
+    duplicateMeal: (id: number) =>
+      runFor(mealChange.mutateAsync(() => api.duplicateMeal(id))),
+
     updateMeal: (id: number, name: string, servings: number) =>
       run(mealChange.mutateAsync(() => api.updateMeal(id, name, servings))),
 

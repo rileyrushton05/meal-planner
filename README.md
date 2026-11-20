@@ -117,7 +117,9 @@ ingredient. You check each line, then the meal is created in one request.
   recipe's ingredient list to be read the same way, or add them one at a
   time with autocomplete that fills in the usual unit. Names match ignoring
   case and units are stored one way ("clove", "Cloves"), so "Eggs" and
-  "eggs" stay one item rather than splitting the shopping list.
+  "eggs" stay one item rather than splitting the shopping list. Duplicate a
+  meal to make a version of it (the veggie one, the one for guests): the
+  copy opens with "(copy)" selected, ready to be typed over.
 - **About 40 templates** of common meals, ingredients filled in, added in
   one click.
 - **Weekly plan:** pick a meal and servings for each day of any week; it

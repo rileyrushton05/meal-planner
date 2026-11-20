@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models import Category, CheckState, DayOfWeek
+from app.models import MAX_MEAL_NAME_LENGTH, Category, CheckState, DayOfWeek
 from app.parsing import Confidence
 
 
@@ -65,7 +65,7 @@ MAX_LINE_LENGTH = 200
 
 
 class MealUpdate(RequestSchema):
-    name: str = Field(min_length=1, max_length=200)
+    name: str = Field(min_length=1, max_length=MAX_MEAL_NAME_LENGTH)
     servings: int = Field(default=1, ge=1)
 
     @field_validator("name")

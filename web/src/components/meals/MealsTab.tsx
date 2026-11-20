@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import { useState } from "react";
 
 import type { AppState, ImportedRecipe, IngredientLine, Meal } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,8 @@ interface Props extends Omit<MealPanelActions, "onUpdate" | "onDelete"> {
   /** Resolve with the recipe read from the page, or null if it could not be. */
   onImportRecipe: (url: string) => Promise<ImportedRecipe | null>;
   onAddFromTemplate: (name: string) => Promise<Meal | null>;
+  /** Resolve with the copy (or null if it failed), so it can be opened. */
+  onDuplicateMeal: (id: number) => Promise<Meal | null>;
   onUpdateMeal: MealPanelActions["onUpdate"];
   onDeleteMeal: MealPanelActions["onDelete"];
 }
@@ -35,7 +38,14 @@ const parseSelection = (raw: string | null) => raw ?? "";
  * The open meal lives in the URL, so a refresh or a shared link reopens it.
  */
 export function MealsTab({ state, pending, ...props }: Props) {
-  const [selection, setSelection] = useSearchParam("meal", parseSelection);
+  const [selection, setSelectionParam] = useSearchParam("meal", parseSelection);
+  // The copy just made, which opens ready to be renamed. Forgotten on moving
+  // to anything else, so coming back to it later opens it as usual.
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const setSelection = (value: string) => {
+    setCopiedId(null);
+    setSelectionParam(value);
+  };
 
   const selected = /^\d+$/.test(selection)
     ? (state.meals.find((m) => m.id === Number(selection)) ?? null)
@@ -47,6 +57,13 @@ export function MealsTab({ state, pending, ...props }: Props) {
 
   const open = (meal: Meal | null) => {
     if (meal) setSelection(String(meal.id));
+  };
+
+  const duplicate = async (id: number) => {
+    const copy = await props.onDuplicateMeal(id);
+    if (!copy) return;
+    open(copy);
+    setCopiedId(copy.id);
   };
 
   return (
@@ -86,6 +103,8 @@ export function MealsTab({ state, pending, ...props }: Props) {
             state={state}
             pending={pending}
             onBack={backToList}
+            onDuplicate={duplicate}
+            justCopied={selected.id === copiedId}
             onUpdate={props.onUpdateMeal}
             onDelete={props.onDeleteMeal}
             onAddIngredient={props.onAddIngredient}

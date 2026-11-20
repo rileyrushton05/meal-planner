@@ -351,6 +351,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/meals/{meal_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duplicate Meal
+         * @description A new meal with the same servings and ingredients, named
+         *     "<name> (copy)", to make a variation of: the veggie version, the one for
+         *     guests. Planned on no day.
+         */
+        post: operations["duplicate_meal_api_meals__meal_id__duplicate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/meals/{meal_id}/ingredients": {
         parameters: {
             query?: never;
@@ -1993,6 +2015,46 @@ export interface operations {
             header?: never;
             path: {
                 template_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Problem Details (RFC 9457) */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    duplicate_meal_api_meals__meal_id__duplicate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                meal_id: number;
             };
             cookie?: never;
         };

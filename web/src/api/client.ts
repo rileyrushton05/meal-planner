@@ -220,6 +220,10 @@ export const api = {
       method: "POST",
     }),
 
+  /** A copy of a meal, its ingredients included, under a free name. */
+  duplicateMeal: (id: number): Promise<Meal> =>
+    request(`/api/meals/${id}/duplicate`, { method: "POST" }),
+
   updateMeal: (id: number, name: string, servings: number): Promise<Meal> =>
     request(`/api/meals/${id}`, {
       method: "PATCH",

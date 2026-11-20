@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardList, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ClipboardList, CopyPlus, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRef, useState } from "react";
 
 import type {
@@ -54,14 +54,20 @@ export function MealPanel({
   state,
   pending,
   onBack,
+  onDuplicate,
+  justCopied = false,
   ...actions
 }: MealPanelActions & {
   meal: Meal;
   state: AppState;
   pending: boolean;
   onBack: () => void;
+  onDuplicate: (id: number) => void;
+  /** A copy just made: open with its name ready to change, since a copy is
+   *  made to become a version of its own. */
+  justCopied?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(justCopied);
   const days = plannedDays(state.plan, meal.id);
   const titleId = `meal-${meal.id}-title`;
 
@@ -93,6 +99,15 @@ export function MealPanel({
           >
             <Pencil aria-hidden />
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Duplicate ${meal.name}`}
+            disabled={pending}
+            onClick={() => onDuplicate(meal.id)}
+          >
+            <CopyPlus aria-hidden />
+          </Button>
           <DeleteMeal meal={meal} pending={pending} onDelete={actions.onDelete} />
         </div>
       </header>
@@ -101,6 +116,7 @@ export function MealPanel({
         <MealDetailsForm
           meal={meal}
           pending={pending}
+          justCopied={justCopied}
           onSave={(name, servings) => {
             actions.onUpdate(meal.id, name, servings);
             setEditing(false);
@@ -127,20 +143,26 @@ export function BackToList({ onBack }: { onBack?: () => void }) {
   );
 }
 
+/** What the server ends a copy's name with: " (copy)", " (copy 2)". */
+const COPY_SUFFIX = / \(copy(?: \d+)?\)$/i;
+
 function MealDetailsForm({
   meal,
   pending,
+  justCopied,
   onSave,
   onCancel,
 }: {
   meal: Meal;
   pending: boolean;
+  justCopied: boolean;
   onSave: (name: string, servings: number) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(meal.name);
   // Held as text so the field can be cleared while typing a new number.
   const [servings, setServings] = useState(String(meal.servings));
+  const suffixSelected = useRef(false);
 
   return (
     <form
@@ -151,6 +173,11 @@ function MealDetailsForm({
       onKeyDown={(event) => event.key === "Escape" && onCancel()}
       className="flex flex-wrap items-end gap-3 border-b bg-muted/40 p-4 sm:px-5"
     >
+      {justCopied && (
+        <p className="w-full text-sm text-muted-foreground">
+          Copied with its ingredients. Give this version a name of its own.
+        </p>
+      )}
       <div className="min-w-44 flex-1 space-y-1.5">
         <Label htmlFor={`name-${meal.id}`}>Meal name</Label>
         <Input
@@ -158,6 +185,14 @@ function MealDetailsForm({
           value={name}
           autoFocus
           onChange={(e) => setName(e.target.value)}
+          // A fresh copy's "(copy)" is selected, so typing replaces just it:
+          // "Curry (copy)" becomes "Curry, veggie" without retyping "Curry".
+          onFocus={(e) => {
+            if (!justCopied || suffixSelected.current) return;
+            suffixSelected.current = true;
+            const suffix = COPY_SUFFIX.exec(e.currentTarget.value);
+            if (suffix) e.currentTarget.setSelectionRange(suffix.index, e.currentTarget.value.length);
+          }}
         />
       </div>
       <div className="w-24 space-y-1.5">

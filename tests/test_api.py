@@ -349,6 +349,125 @@ def test_unknown_template_is_a_404(client):
     assert client.post("/api/meals/from-template/Nonexistent").status_code == 404
 
 
+# ------------------------------------------------------------- duplicating
+
+
+def _meal_with(client, name, servings, *lines):
+    meal = client.post(
+        "/api/meals",
+        json={
+            "name": name,
+            "servings": servings,
+            "ingredients": [{"name": n, "qty": q, "unit": u} for n, q, u in lines],
+        },
+    ).json()
+    return meal
+
+
+def _amounts(meal):
+    return sorted((i["name"], i["qty"], i["unit"]) for i in meal["ingredients"])
+
+
+def test_duplicating_a_meal_copies_its_servings_and_ingredients(client):
+    curry = _meal_with(
+        client, "Chicken curry", 4, ("Chicken thigh", 500, "g"), ("Onion", 2, "")
+    )
+
+    response = client.post(f"/api/meals/{curry['id']}/duplicate")
+
+    assert response.status_code == 201
+    copy = response.json()
+    assert response.headers["location"] == f"/api/meals/{copy['id']}"
+    assert (copy["name"], copy["servings"]) == ("Chicken curry (copy)", 4)
+    assert copy["id"] != curry["id"]
+    assert _amounts(copy) == _amounts(curry)
+
+
+def test_a_duplicate_is_its_own_meal(client):
+    curry = _meal_with(client, "Curry", 2, ("Onion", 2, ""))
+    copy = client.post(f"/api/meals/{curry['id']}/duplicate").json()
+    onion = copy["ingredients"][0]["ingredient_id"]
+
+    client.patch(
+        f"/api/meals/{copy['id']}/ingredients/{onion}", json={"qty": 5, "unit": ""}
+    )
+    client.post(
+        f"/api/meals/{copy['id']}/ingredients",
+        json={"name": "Chickpeas", "qty": 1, "unit": "can"},
+    )
+
+    original = client.get(f"/api/meals/{curry['id']}").json()
+    assert _amounts(original) == [("Onion", 2, "")]
+
+
+def test_a_duplicate_is_not_planned(client):
+    curry = _meal_with(client, "Curry", 2)
+    client.put(
+        f"/api/plan/{MONDAY.isoformat()}",
+        json={"days": [{"day": "Monday", "meal_id": curry["id"], "servings": 2}]},
+    )
+
+    copy = client.post(f"/api/meals/{curry['id']}/duplicate").json()
+
+    plan = client.get(f"/api/plan/{MONDAY.isoformat()}").json()
+    planned = {d["meal_id"] for d in plan["days"]} - {None}
+    assert planned == {curry["id"]} != {copy["id"]}
+
+
+def test_each_copy_takes_the_next_free_name(client):
+    curry = _meal_with(client, "Curry", 2)
+
+    names = [
+        client.post(f"/api/meals/{curry['id']}/duplicate").json()["name"]
+        for _ in range(3)
+    ]
+
+    assert names == ["Curry (copy)", "Curry (copy 2)", "Curry (copy 3)"]
+
+
+def test_a_copy_of_a_copy_counts_on_from_the_original(client):
+    curry = _meal_with(client, "Curry", 2)
+    first = client.post(f"/api/meals/{curry['id']}/duplicate").json()
+
+    second = client.post(f"/api/meals/{first['id']}/duplicate").json()
+
+    assert second["name"] == "Curry (copy 2)"
+
+
+def test_a_freed_name_is_used_again(client):
+    curry = _meal_with(client, "Curry", 2)
+    first = client.post(f"/api/meals/{curry['id']}/duplicate").json()
+    client.post(f"/api/meals/{curry['id']}/duplicate")
+    client.delete(f"/api/meals/{first['id']}")
+
+    again = client.post(f"/api/meals/{curry['id']}/duplicate").json()
+
+    assert again["name"] == "Curry (copy)"
+
+
+def test_a_copy_of_a_long_name_still_fits(client):
+    name = "x" * 200
+    meal = _meal_with(client, name, 1)
+
+    copy = client.post(f"/api/meals/{meal['id']}/duplicate").json()
+
+    assert copy["name"] == "x" * 193 + " (copy)"
+    # The copy can be saved again as it is: it is within the limit.
+    assert (
+        client.patch(
+            f"/api/meals/{copy['id']}", json={"name": copy["name"], "servings": 1}
+        ).status_code
+        == 200
+    )
+
+
+def test_duplicating_an_unknown_meal_is_a_404(client):
+    response = client.post("/api/meals/999999/duplicate")
+
+    assert response.status_code == 404
+    assert client.get("/api/meals").json() == []
+
+
 # ------------------------------------------------------------------- plan
 
 

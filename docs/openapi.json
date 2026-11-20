@@ -848,6 +848,59 @@
         }
       }
     },
+    "/api/meals/{meal_id}/duplicate": {
+      "post": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Duplicate Meal",
+        "description": "A new meal with the same servings and ingredients, named\n\"<name> (copy)\", to make a variation of: the veggie version, the one for\nguests. Planned on no day.",
+        "operationId": "duplicate_meal_api_meals__meal_id__duplicate_post",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Meal Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Problem Details (RFC 9457)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/meals/{meal_id}/ingredients": {
       "post": {
         "tags": [
