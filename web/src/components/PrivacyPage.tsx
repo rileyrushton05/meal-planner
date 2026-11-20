@@ -49,6 +49,10 @@ export function PrivacyPage() {
               "A cookie that keeps you signed in. The app stores only a hash of it, and it ends after 30 days.",
             ],
             [
+              "Browsers you've signed in from",
+              "A second cookie, kept when you log out, that marks this browser as yours, so someone guessing your password elsewhere can't lock you out of it. It holds no email, and nothing about it is stored.",
+            ],
+            [
               "Guest sessions",
               "No email or password at all. A guest session unused for 30 days is deleted with everything in it.",
             ],

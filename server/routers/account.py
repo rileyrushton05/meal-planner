@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from app.models import CheckState
 from app.repositories import UserRepository
 from server.deps import AuthDep, CurrentUserDep, ServicesDep, TransactionDep
-from server.routers.auth import clear_session_cookie
+from server.routers.auth import clear_session_cookie, forget_device
 from server.schemas import (
     AccountDeletion,
     AccountExport,
@@ -126,4 +126,5 @@ def delete_account(
     auth.delete_account(current, payload.password if payload is not None else None)
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookie(response)
+    forget_device(response)
     return response

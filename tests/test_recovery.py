@@ -14,7 +14,11 @@ import pytest
 from api_client import api_client
 from sqlalchemy import text
 
-from app.ratelimit import LOGIN_PER_ACCOUNT_AND_NETWORK
+from app.ratelimit import (
+    LOGIN_PER_ACCOUNT,
+    LOGIN_PER_ACCOUNT_AND_NETWORK,
+    RATE_LIMIT_KEY_ENV_VAR,
+)
 from app.security import hash_recovery_code
 from server.deps import SESSION_COOKIE
 from server.observability import configure_logging
@@ -22,6 +26,7 @@ from server.observability import configure_logging
 EMAIL = "cook@example.com"
 PASSWORD = "lettuce harbour spoon"
 NEW_PASSWORD = "copper kettle meadow"
+WRONG_CODE = "AAAA-BBBB-CCCC-DDDD"
 PROBLEM = "urn:meal-planner:problem:"
 REFUSAL = "That email and recovery code don't match an account."
 
@@ -30,15 +35,32 @@ def _type(response) -> str:
     return response.json()["type"].removeprefix(PROBLEM)
 
 
-def _recover(client, code: str, *, email: str = EMAIL, password: str = NEW_PASSWORD):
+def _from(network: str | None) -> dict[str, str]:
+    # With VERCEL set, the caller's address is the last entry of this header.
+    return {"x-vercel-forwarded-for": network} if network else {}
+
+
+def _recover(
+    client,
+    code: str,
+    *,
+    email: str = EMAIL,
+    password: str = NEW_PASSWORD,
+    network: str | None = None,
+):
     return client.post(
         "/api/auth/recover",
         json={"email": email, "recovery_code": code, "new_password": password},
+        headers=_from(network),
     )
 
 
-def _log_in(client, password: str):
-    return client.post("/api/auth/login", json={"email": EMAIL, "password": password})
+def _log_in(client, password: str, *, network: str | None = None):
+    return client.post(
+        "/api/auth/login",
+        json={"email": EMAIL, "password": password},
+        headers=_from(network),
+    )
 
 
 @pytest.fixture
@@ -232,6 +254,42 @@ def test_guessing_codes_is_throttled_with_login(signed_up, stranger) -> None:
     assert _recover(stranger, code).status_code == 429
     with api_client(as_guest=False) as browser:
         assert _log_in(browser, PASSWORD).status_code == 429
+
+
+def test_guesses_that_lock_the_account_do_not_stop_its_owner_recovering(
+    signed_up, stranger, monkeypatch
+) -> None:
+    """Anyone who knows the email can reach the account-wide ceiling, from a
+    few networks, in seconds. Login must then refuse even the right password,
+    but the recovery code is the owner's way back: 80 random bits need no
+    account-wide ceiling to be safe from guessing."""
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv(RATE_LIMIT_KEY_ENV_VAR, "test-only-key")
+    _, code = signed_up
+    per_network = LOGIN_PER_ACCOUNT_AND_NETWORK.free
+    for n in range(LOGIN_PER_ACCOUNT.free // per_network):
+        for _ in range(per_network):
+            _log_in(stranger, "a wrong guess", network=f"203.0.113.{n}")
+    with api_client(as_guest=False) as owner:
+        assert _log_in(owner, PASSWORD, network="198.51.100.7").status_code == 429
+
+        recovered = _recover(owner, code, network="198.51.100.7")
+
+        assert recovered.status_code == 200
+        assert owner.get("/api/auth/me").json()["email"] == EMAIL
+
+
+def test_recovery_guesses_are_still_throttled_per_network_across_networks(
+    signed_up, stranger, monkeypatch
+) -> None:
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv(RATE_LIMIT_KEY_ENV_VAR, "test-only-key")
+    _, code = signed_up
+    for n in range(3):
+        network = f"203.0.113.{n}"
+        for _ in range(LOGIN_PER_ACCOUNT_AND_NETWORK.free):
+            assert _recover(stranger, WRONG_CODE, network=network).status_code == 401
+        assert _recover(stranger, code, network=network).status_code == 429
 
 
 def test_a_guest_who_recovers_their_account_leaves_the_guest_behind(signed_up) -> None:

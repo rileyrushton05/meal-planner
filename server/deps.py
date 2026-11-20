@@ -27,6 +27,11 @@ from app.repositories import (
 #: unless it is Secure, has Path=/ and no Domain, so nothing on another
 #: subdomain can set or overwrite it.
 SESSION_COOKIE = "__Host-session"
+#: Marks a browser that has signed in to an account before, so guesses at
+#: its password from elsewhere do not lock it out (app/ratelimit.py,
+#: `device_token`). Not a credential, but `__Host-` and HttpOnly all the
+#: same, so another site or a script cannot plant or read it.
+DEVICE_COOKIE = "__Host-device"
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,7 +97,12 @@ def client_address(request: Request) -> str:
 
 
 def get_auth(request: Request, session: TransactionDep) -> AuthService:
-    return AuthService(session, now=datetime.now(UTC), address=client_address(request))
+    return AuthService(
+        session,
+        now=datetime.now(UTC),
+        address=client_address(request),
+        device=request.cookies.get(DEVICE_COOKIE),
+    )
 
 
 AuthDep = Annotated[AuthService, Depends(get_auth)]

@@ -164,8 +164,11 @@ What the app keeps, in plain terms (also in the app, at `/privacy`):
   hashes (argon2id and SHA-256). Then the meals, ingredients and planned
   days you add.
 - **A session** is a cookie; the database holds only its hash, and it ends
-  after 30 days. **A guest** has no email or password at all, and a guest
-  unused for 30 days is deleted with everything in it by a nightly job.
+  after 30 days. A second cookie marks a browser you've signed in from, so
+  guesses at your password elsewhere can't lock it out; it holds no email
+  and nothing about it is stored. **A guest** has no email or password at
+  all, and a guest unused for 30 days is deleted with everything in it by a
+  nightly job.
 - **In the browser:** the light or dark choice, and a copy of what you last
   saw (meals, recent plans and grocery lists, the signed-in email) so the
   next visit opens at once. Logging out, logging in as someone else or

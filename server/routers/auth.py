@@ -13,6 +13,7 @@ from fastapi import APIRouter, Body, Response, status
 
 from app.auth import CurrentUser, SignedIn
 from server.deps import (
+    DEVICE_COOKIE,
     SESSION_COOKIE,
     AuthDep,
     CurrentUserDep,
@@ -30,10 +31,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _COOKIE_MAX_AGE = int(timedelta(days=400).total_seconds())
 
 
-def _set_session_cookie(response: Response, token: str) -> None:
+def _set_cookie(response: Response, name: str, value: str) -> None:
     response.set_cookie(
-        SESSION_COOKIE,
-        token,
+        name,
+        value,
         max_age=_COOKIE_MAX_AGE,
         path="/",
         secure=True,
@@ -42,12 +43,29 @@ def _set_session_cookie(response: Response, token: str) -> None:
     )
 
 
-def clear_session_cookie(response: Response) -> None:
+def _clear_cookie(response: Response, name: str) -> None:
     # The attributes must match, or the browser treats it as another cookie;
     # a __Host- cookie cannot even be cleared without Secure.
     response.delete_cookie(
-        SESSION_COOKIE, path="/", secure=True, httponly=True, samesite="strict"
+        name, path="/", secure=True, httponly=True, samesite="strict"
     )
+
+
+def _set_session_cookies(response: Response, result: SignedIn) -> None:
+    _set_cookie(response, SESSION_COOKIE, result.token)
+    if result.device_token is not None:
+        _set_cookie(response, DEVICE_COOKIE, result.device_token)
+
+
+def clear_session_cookie(response: Response) -> None:
+    """Sign out. The device cookie stays: that this browser is the owner's
+    is what keeps it usable while someone guesses at the password."""
+    _clear_cookie(response, SESSION_COOKIE)
+
+
+def forget_device(response: Response) -> None:
+    """For an account that no longer exists."""
+    _clear_cookie(response, DEVICE_COOKIE)
 
 
 def _account(user: CurrentUser) -> Account:
@@ -61,14 +79,14 @@ def _account(user: CurrentUser) -> Account:
 def _signed_up(response: Response, result: SignedIn) -> SignedUp:
     """Signed in, with the new recovery code to show the person once."""
     assert result.recovery_code is not None, "a recovery code was issued"
-    _set_session_cookie(response, result.token)
+    _set_session_cookies(response, result)
     return SignedUp(
         **_account(result.user).model_dump(), recovery_code=result.recovery_code
     )
 
 
 def _signed_in(response: Response, result: SignedIn) -> Account:
-    _set_session_cookie(response, result.token)
+    _set_session_cookies(response, result)
     return _account(result.user)
 
 
