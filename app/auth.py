@@ -27,7 +27,9 @@ The rules, and why:
 - **A forgotten password is recovered with a code**, shown once at signup
   and stored only as a hash, rather than a link sent by email: no third
   party receives anyone's address. Each code works once, and recovering
-  ends every session. Guesses share login's throttle.
+  ends every session. Guesses share login's per-network throttle, but not
+  its account-wide one, so a stranger holding login shut cannot hold
+  recovery shut too.
 - **Each of these is a security event** (app/events.py).
 """
 
@@ -394,6 +396,11 @@ class AuthService:
             matches,
             refusal="That email and recovery code don't match an account.",
             outcome="recover",
+            # The code is the owner's way back in while guesses elsewhere
+            # hold login shut, so the account-wide ceiling must not refuse
+            # it. It is not needed: 80 random bits cannot be guessed, even
+            # from many networks at a few guesses each.
+            account_wide=False,
         )
         user_id = persisted_id(user)
         self._users.set_password_hash(user, hash_password(new_password))
@@ -448,22 +455,25 @@ class AuthService:
         *,
         refusal: str,
         outcome: str | None = None,
+        account_wide: bool = True,
     ) -> User:
         """Return `user` if `proven(user)`; otherwise raise
         InvalidCredentialsError with `refusal`, or TooManyAttemptsError while
         throttled.
 
-        Throttled per account and network and per account, keyed on the email
-        so the throttle reveals nothing about who has an account. Login,
-        deletion and recovery all prove themselves here, so guesses at any of
-        them count towards all of them.
+        Throttled per account and network and, unless not `account_wide`,
+        per account, keyed on the email so the throttle reveals nothing
+        about who has an account. Login, deletion and recovery all prove
+        themselves here, so guesses at any of them count towards all of
+        them from that network.
         """
         per_network = subject("login", email_key, self._network)
         per_account = subject("login", email_key)
-        rules = (
+        rules: tuple[tuple[Rule, str], ...] = (
             (LOGIN_PER_ACCOUNT_AND_NETWORK, per_network),
-            (LOGIN_PER_ACCOUNT, per_account),
         )
+        if account_wide:
+            rules += ((LOGIN_PER_ACCOUNT, per_account),)
         for rule, key in rules:
             self._refuse_if_throttled(
                 rule, key, "Too many failed attempts. Try again in {wait}."

@@ -29,7 +29,10 @@ unscoped, and someone else's meal answers 404, never 403.
   on. Only the code's SHA-256 is stored; each code works once (recovery
   issues the next); resetting ends every session; the refusal is the same
   whether the email or the code is wrong, and guesses share login's
-  throttle. Codes can be replaced from the Account page with the password.
+  per-network throttle. They skip its account-wide ceiling, which anyone
+  who knows the email can reach: the code is how the owner gets back in
+  meanwhile, and 80 random bits need no such ceiling. Codes can be
+  replaced from the Account page with the password.
   The trade-off: lose both the password and the code, and the account is
   gone, unless whoever runs the deployment gives it a new password
   ([`set-password`](operations.md#replacing-a-lost-password)).
