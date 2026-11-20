@@ -54,6 +54,9 @@ planned.
   codes instead of email, a strict Content-Security-Policy checked in every
   browser test, and error reports that never say who.
   ([security](docs/security.md))
+- **Decisions written down.** Each one that shaped the app has a short
+  record of what forced it, what was turned down and what it costs.
+  ([decision records](docs/adr/README.md))
 
 ## Import a recipe from a link
 
@@ -335,7 +338,7 @@ the-fridge-door/
 ├── migrations/             # Alembic revision history
 ├── tests/                  # Python suite, run against SQLite and Postgres
 ├── scripts/                # OpenAPI export, database report, password list
-├── docs/                   # Security, operations, schema, conventions
+├── docs/                   # Security, operations, schema, conventions, decisions (adr/)
 └── vercel.json             # Region, build and the page's security headers
 ```
 
@@ -382,7 +385,7 @@ cd web && npm run lint
 cd web && npm run test:e2e     # Playwright: the production build in Chromium
 ```
 
-About 500 Python tests, 210 frontend tests and a Playwright suite run on
+About 840 Python tests, 310 frontend tests and 30 Playwright flows run on
 every pull request. The Python suite runs against SQLite and again against
 Postgres. Running both is what proves the data layer is genuinely portable
 rather than accidentally SQLite-shaped: it caught a handler returning 500
@@ -400,8 +403,26 @@ python scripts/export_openapi.py
 cd web && npm run generate:api
 ```
 
+## Known limits, and what I would do next
+
+- **No prices yet.** The plan is to compare Coles and Woolworths, but both
+  stores' terms restrict automated collection, so how prices are sourced is
+  an open decision rather than a scraper waiting to be written.
+- **One person per account.** Households sharing a plan would need
+  memberships and roles on top of the current ownership model.
+- **Edits need a connection.** The last visit stays readable offline, but
+  changes are not queued; doing that safely means merging edits made on two
+  devices, not just replaying them.
+- **No email at all**, by choice (no domain to send from). Recovery codes
+  cover forgotten passwords; verifying addresses would need a provider.
+- **Free tiers.** A visit after a quiet spell still waits a second or two
+  for the database behind the restored page.
+
 ## Further reading
 
+- [Decision records](docs/adr/README.md): why row-level security, guest
+  accounts, recovery codes, a rule-based parser, address-pinned fetching and
+  the restored last visit, and what each costs.
 - [Security](docs/security.md): accounts, sessions, throttling, row-level
   security, headers, logs and error reports, and the tests behind each.
 - [Operations](docs/operations.md): deploying, migrating, scheduled jobs,
