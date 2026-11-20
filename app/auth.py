@@ -58,6 +58,7 @@ from app.exceptions import (
 from app.models import User, persisted_id
 from app.ratelimit import (
     GUESTS_PER_NETWORK,
+    LOGIN_FAILURES_PER_NETWORK,
     LOGIN_PER_ACCOUNT,
     LOGIN_PER_ACCOUNT_AND_NETWORK,
     LOGIN_PER_DEVICE,
@@ -483,10 +484,17 @@ class AuthService:
         them from that network. A browser with a device token for this
         email is throttled on its own instead, so guesses from anywhere
         else, however many, never refuse it.
+
+        Failures from one network are also capped across every email, so
+        trying one common password against many accounts (spraying) is
+        caught, and so is the cost of the slow password hash each attempt
+        spends. A success never clears that count: otherwise signing in to
+        an account of one's own now and then would reset it.
         """
         per_account = subject("login", email_key)
         device = trusted_device(self._device, email_key)
         rules: tuple[tuple[Rule, str], ...]
+        across_emails: tuple[tuple[Rule, str], ...] = ()
         if device is not None:
             rules = ((LOGIN_PER_DEVICE, subject("login", email_key, "device", device)),)
         else:
@@ -498,16 +506,25 @@ class AuthService:
             )
             if account_wide:
                 rules += ((LOGIN_PER_ACCOUNT, per_account),)
+            across_emails = (
+                (LOGIN_FAILURES_PER_NETWORK, subject("network", self._network)),
+            )
         for rule, key in rules:
             self._refuse_if_throttled(
                 rule, key, "Too many failed attempts. Try again in {wait}."
+            )
+        for rule, key in across_emails:
+            self._refuse_if_throttled(
+                rule,
+                key,
+                "Too many failed sign-ins from your network. Try again in {wait}.",
             )
 
         # Evaluated whether or not there is a user, so the cost is the same.
         if not proven(user) or user is None:
             # Keeps writes: nothing but these records (and perhaps a session
             # refresh) has been written, and they must outlive the error.
-            for rule, key in rules:
+            for rule, key in rules + across_emails:
                 bucket = self._limits.record(rule, key)
                 if bucket.blocked_until is not None:
                     events.record(

@@ -11,9 +11,10 @@ Two kinds of rule, for two kinds of threat:
   has signed in to the account before is throttled on its own instead
   (`device_token`), so that ceiling cannot lock the owner out.
 - **Window**, for things that are fine in moderation: starting guest
-  sessions (each one is a row in the database) and learning that an email
-  already has an account (which is what signup reveals). A fixed number
-  per hour per network.
+  sessions (each one is a row in the database), learning that an email
+  already has an account (which is what signup reveals), and failing to
+  sign in to any account at all (one password tried against many emails,
+  which no per-account rule sees). A fixed number per hour per network.
 
 The arithmetic is pure functions of a bucket and the time, so the schedule
 is tested exactly, without a clock (tests/test_ratelimit.py). `RateLimiter`
@@ -153,6 +154,14 @@ LOGIN_PER_DEVICE = Backoff(
     first_wait=timedelta(minutes=1),
     max_wait=timedelta(minutes=15),
     forget_after=timedelta(days=1),
+)
+#: Failed attempts from one network at any account: trying one common
+#: password against many emails, which the per-account rules never see,
+#: and each attempt spending the slow password hash. Generous, as a shared
+#: connection holds many people's typos; browsers that have signed in
+#: before are not counted (or refused) here at all.
+LOGIN_FAILURES_PER_NETWORK = Window(
+    scope="login-failure-network", limit=50, period=timedelta(hours=1)
 )
 #: New guest sessions from one network. Generous: a shared connection (a
 #: university, an office) can hold many real visitors.
@@ -301,6 +310,7 @@ STALE_AFTER = max(
     LOGIN_PER_ACCOUNT_AND_NETWORK.forget_after,
     LOGIN_PER_ACCOUNT.forget_after,
     LOGIN_PER_DEVICE.forget_after,
+    LOGIN_FAILURES_PER_NETWORK.period,
     GUESTS_PER_NETWORK.period,
     TAKEN_EMAILS_PER_NETWORK.period,
     IMPORTS_PER_USER.period,

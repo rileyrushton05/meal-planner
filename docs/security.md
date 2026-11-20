@@ -49,7 +49,10 @@ unscoped, and someone else's meal answers 404, never 403.
   so a browser that has signed in to the account before carries a device
   cookie (OWASP's pattern: a random id with a keyed hash binding it to the
   email, nothing stored) and is throttled on its own instead: guesses from
-  anywhere else never lock the owner out of their own browser.
+  anywhere else never lock the owner out of their own browser. Failures
+  from one network are also capped across every email (50 an hour, never
+  reset by a success), which catches one password tried against many
+  accounts and bounds the password-hashing work a stranger can cause.
   Guest sessions and "email already taken" answers are capped per network
   per hour. Emails and IP addresses are stored only as keyed hashes, and
   the address comes from the platform's header, never one a client can set.
